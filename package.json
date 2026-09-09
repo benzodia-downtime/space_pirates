@@ -6,11 +6,11 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check src/main.js",
-    "test": "npm run check"
+    "build": "node scripts/build-static.mjs",
+    "check": "node --check server.mjs && node --check scripts/build-static.mjs && node --check src/main.js",
+    "test": "npm run build && npm run check"
   },
   "engines": {
     "node": ">=18"
   }
 }
-
