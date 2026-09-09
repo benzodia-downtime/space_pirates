@@ -10,6 +10,7 @@
     />
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./battle.css" />
   </head>
   <body>
     <a class="skip-link" href="#spaceship">함선으로 바로가기</a>
@@ -195,6 +196,11 @@
         </svg>
       </section>
 
+      <button id="battle-start" class="battle-start" type="button">
+        <span>적함 조우</span>
+        전투 시작
+      </button>
+
       <aside id="help-overlay" class="help-overlay" aria-label="조작 도움말">
         <span class="help-overlay__signal" aria-hidden="true"></span>
         <span>Move your pointer to shift the view</span>
@@ -207,6 +213,140 @@
         Ship link stable
       </p>
     </main>
+
+    <section
+      id="battle-level"
+      class="battle-level"
+      aria-labelledby="battle-title"
+      tabindex="-1"
+      hidden
+    >
+      <div class="battle-level__stars" aria-hidden="true"></div>
+
+      <header class="battle-hud">
+        <article class="unit-card unit-card--player" aria-label="플레이어 승무원 능력치">
+          <div class="unit-card__heading">
+            <div>
+              <span>PLAYER CREW</span>
+              <strong>인간 사수</strong>
+            </div>
+            <output id="player-health-text">100 / 100 HP</output>
+          </div>
+          <div
+            id="player-health-track"
+            class="health-track"
+            role="progressbar"
+            aria-label="플레이어 체력"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="100"
+          >
+            <span id="player-health-bar"></span>
+          </div>
+          <dl class="unit-card__stats">
+            <div><dt>ATK</dt><dd>10</dd></div>
+            <div><dt>RANGE</dt><dd>20m</dd></div>
+          </dl>
+        </article>
+
+        <div class="battle-readout" aria-live="polite">
+          <span id="battle-phase">교전 대기</span>
+          <h1 id="battle-title">함내 교전</h1>
+          <strong id="battle-distance">44.0 m</strong>
+        </div>
+
+        <article class="unit-card unit-card--enemy" aria-label="적 승무원 능력치">
+          <div class="unit-card__heading">
+            <div>
+              <span>HOSTILE CREW</span>
+              <strong>인간 약탈자</strong>
+            </div>
+            <output id="enemy-health-text">50 / 50 HP</output>
+          </div>
+          <div
+            id="enemy-health-track"
+            class="health-track"
+            role="progressbar"
+            aria-label="적 체력"
+            aria-valuemin="0"
+            aria-valuemax="50"
+            aria-valuenow="50"
+          >
+            <span id="enemy-health-bar"></span>
+          </div>
+          <dl class="unit-card__stats">
+            <div><dt>ATK</dt><dd>10</dd></div>
+            <div><dt>RANGE</dt><dd>20m</dd></div>
+          </dl>
+        </article>
+      </header>
+
+      <div id="battlefield" class="battlefield" aria-label="60미터 함선 내부 전장">
+        <div class="battlefield__ceiling" aria-hidden="true"></div>
+        <div class="battlefield__depth" aria-hidden="true"></div>
+        <div class="battlefield__floor" aria-hidden="true"></div>
+        <div id="projectile-layer" class="projectile-layer" aria-hidden="true"></div>
+
+        <div
+          id="player-combatant"
+          class="combatant combatant--player"
+          data-state="idle"
+          role="img"
+          aria-label="소총을 든 플레이어 인간 승무원"
+        >
+          <div class="combatant__sprite-frame">
+            <img
+              class="combatant__sprite"
+              src="./assets/crew-player.png"
+              width="64"
+              height="64"
+              alt=""
+              draggable="false"
+            />
+            <span class="combatant__muzzle" aria-hidden="true"></span>
+          </div>
+          <span class="combatant__name">PLAYER · HUMAN</span>
+        </div>
+
+        <div
+          id="enemy-combatant"
+          class="combatant combatant--enemy"
+          data-state="idle"
+          role="img"
+          aria-label="소총을 든 적 인간 승무원"
+        >
+          <div class="combatant__sprite-frame">
+            <img
+              class="combatant__sprite"
+              src="./assets/crew-enemy.png"
+              width="64"
+              height="64"
+              alt=""
+              draggable="false"
+            />
+            <span class="combatant__muzzle" aria-hidden="true"></span>
+          </div>
+          <span class="combatant__name">HOSTILE · HUMAN</span>
+        </div>
+
+        <div id="battle-result" class="battle-result" role="status" hidden>
+          <span>ENCOUNTER RESOLVED</span>
+          <h2 id="battle-result-title">승리</h2>
+          <p id="battle-result-copy">적 승무원이 제압되었습니다.</p>
+          <button id="battle-restart" type="button">다시 전투</button>
+        </div>
+      </div>
+
+      <footer class="battle-footer">
+        <p class="scale-readout">
+          <span>UNREAL SCALE</span>
+          1m = 100uu = <strong id="meter-pixels">0 px</strong>
+          <i aria-hidden="true">·</i>
+          사정거리 20m = 2,000uu = <strong id="range-pixels">0 px</strong>
+        </p>
+        <button id="battle-return" class="battle-return" type="button">우주로 돌아가기</button>
+      </footer>
+    </section>
 
     <script type="module" src="./src/main.js"></script>
   </body>

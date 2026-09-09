@@ -7,7 +7,10 @@ const distDirectory = join(projectRoot, "dist");
 const staticFiles = [
   ["index.html", "index.html"],
   ["styles.css", "styles.css"],
+  ["battle.css", "battle.css"],
   [join("src", "main.js"), join("src", "main.js")],
+  [join("assets", "crew-player.png"), join("assets", "crew-player.png")],
+  [join("assets", "crew-enemy.png"), join("assets", "crew-enemy.png")],
 ];
 
 await rm(distDirectory, { recursive: true, force: true });
