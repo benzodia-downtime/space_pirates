@@ -253,7 +253,17 @@ body {
   left: 50%;
   width: min(54vmin, 33rem);
   aspect-ratio: 1;
-  transform: translate(-50%, -48%);
+  transform: translate(-50%, -50%);
+}
+
+.ship-stage--player {
+  top: 76%;
+}
+
+.ship-stage--enemy {
+  z-index: 9;
+  top: 24%;
+  pointer-events: none;
 }
 
 .ship-stage__halo {
@@ -292,13 +302,22 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  scale: 0.1;
+  scale: 0.3;
   overflow: visible;
   outline: none;
   transform-origin: 50% 52%;
   filter: drop-shadow(0 0 24px rgba(57, 172, 207, 0.1));
   cursor: default;
   will-change: transform;
+}
+
+.spaceship--enemy {
+  rotate: 180deg;
+  opacity: 0.9;
+  filter:
+    hue-rotate(145deg)
+    saturate(1.35)
+    drop-shadow(0 0 22px rgba(255, 74, 112, 0.2));
 }
 
 .spaceship:focus-visible {
@@ -451,7 +470,7 @@ kbd {
 
   .ship-stage {
     width: min(82vw, 27rem);
-    transform: translate(-50%, -43%);
+    transform: translate(-50%, -50%);
   }
 
   .help-overlay {
@@ -499,7 +518,7 @@ kbd {
 
   .ship-stage {
     width: min(76vh, 25rem);
-    transform: translate(-50%, -49%);
+    transform: translate(-50%, -50%);
   }
 
   .help-overlay {

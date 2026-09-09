@@ -37,7 +37,7 @@
         <p class="title-overlay__subtitle">No maps. No masters.</p>
       </header>
 
-      <section id="ship-stage" class="ship-stage" aria-label="플레이어 함선">
+      <section id="ship-stage" class="ship-stage ship-stage--player" aria-label="플레이어 함선">
         <div class="ship-stage__halo" aria-hidden="true"></div>
         <div class="ship-stage__orbit" aria-hidden="true">
           <span></span>
@@ -96,14 +96,14 @@
             </filter>
           </defs>
 
-          <g class="spaceship__engine-glow" data-engine-glow filter="url(#engine-glow)" aria-hidden="true">
+          <g id="ship-engine-art" class="spaceship__engine-glow" data-engine-glow filter="url(#engine-glow)" aria-hidden="true">
             <path d="M211 393 C203 431 207 467 219 494 C230 459 232 428 225 393 Z" fill="url(#engine-fire)" />
             <path d="M295 393 C288 431 291 467 302 494 C315 459 317 428 309 393 Z" fill="url(#engine-fire)" />
             <ellipse cx="218" cy="401" rx="15" ry="10" fill="#d8ffff" opacity=".9" />
             <ellipse cx="302" cy="401" rx="15" ry="10" fill="#d8ffff" opacity=".9" />
           </g>
 
-          <g class="spaceship__body" filter="url(#ship-shadow)">
+          <g id="ship-body-art" class="spaceship__body" filter="url(#ship-shadow)">
             <path
               d="M250 67 C192 110 152 171 120 250 L35 340 L166 318 L207 411 L260 445 L313 411 L354 318 L485 340 L400 250 C368 171 328 110 270 67 L260 35 Z"
               fill="#070c18"
@@ -169,10 +169,29 @@
             <path d="M190 247 L178 301 M330 247 L342 301" fill="none" stroke="#ca914b" stroke-width="3" opacity=".9" />
           </g>
 
-          <g class="spaceship__navigation-lights" aria-hidden="true">
+          <g id="ship-navigation-art" class="spaceship__navigation-lights" aria-hidden="true">
             <circle cx="62" cy="322" r="5" fill="#ff526b" />
             <circle cx="458" cy="322" r="5" fill="#55f3d4" />
           </g>
+        </svg>
+      </section>
+
+      <section class="ship-stage ship-stage--enemy" aria-label="적 함선">
+        <svg
+          id="enemy-spaceship"
+          class="spaceship spaceship--enemy"
+          viewBox="0 0 520 520"
+          role="img"
+          aria-labelledby="enemy-ship-title enemy-ship-description"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <title id="enemy-ship-title">정체불명의 적 우주선</title>
+          <desc id="enemy-ship-description">
+            화면 상단에서 플레이어 쪽을 바라보는 적 우주선입니다.
+          </desc>
+          <use href="#ship-engine-art" aria-hidden="true"></use>
+          <use href="#ship-body-art" aria-hidden="true"></use>
+          <use href="#ship-navigation-art" aria-hidden="true"></use>
         </svg>
       </section>
 
