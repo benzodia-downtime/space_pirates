@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#030713" />
+    <meta
+      name="description"
+      content="깊은 우주를 항해하는 한 척의 해적선, Space Pirates."
+    />
+    <title>Space Pirates</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#spaceship">함선으로 바로가기</a>
+
+    <main
+      id="space-scene"
+      class="space-scene"
+      aria-label="별빛이 흐르는 깊은 우주와 중앙의 해적선"
+    >
+      <canvas id="starfield" aria-hidden="true"></canvas>
+
+      <div id="nebula-field" class="nebula-field" aria-hidden="true">
+        <span class="nebula nebula--violet"></span>
+        <span class="nebula nebula--cyan"></span>
+        <span class="nebula nebula--amber"></span>
+      </div>
+
+      <div id="stars-far" class="stars stars--far" aria-hidden="true"></div>
+      <div id="stars-mid" class="stars stars--mid" aria-hidden="true"></div>
+      <div id="stars-near" class="stars stars--near" aria-hidden="true"></div>
+
+      <header id="title-overlay" class="title-overlay">
+        <p class="title-overlay__eyebrow">Uncharted Sector 07</p>
+        <h1>Space <span>Pirates</span></h1>
+        <p class="title-overlay__subtitle">No maps. No masters.</p>
+      </header>
+
+      <section id="ship-stage" class="ship-stage" aria-label="플레이어 함선">
+        <div class="ship-stage__halo" aria-hidden="true"></div>
+        <div class="ship-stage__orbit" aria-hidden="true">
+          <span></span>
+        </div>
+
+        <svg
+          id="spaceship"
+          class="spaceship"
+          viewBox="0 0 520 520"
+          role="img"
+          aria-labelledby="ship-title ship-description"
+          tabindex="0"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <title id="ship-title">우주 해적선 노틸러스</title>
+          <desc id="ship-description">
+            황동 장갑과 청록색 엔진을 단, 위쪽을 향한 대칭형 우주선입니다.
+          </desc>
+
+          <defs>
+            <linearGradient id="hull-metal" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#39445a" />
+              <stop offset="0.42" stop-color="#172034" />
+              <stop offset="1" stop-color="#080e1d" />
+            </linearGradient>
+            <linearGradient id="hull-edge" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#8b5b2b" />
+              <stop offset="0.5" stop-color="#e0ae5d" />
+              <stop offset="1" stop-color="#6c4220" />
+            </linearGradient>
+            <linearGradient id="sail-metal" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#202c42" />
+              <stop offset="1" stop-color="#090f20" />
+            </linearGradient>
+            <radialGradient id="cockpit-glass" cx="35%" cy="28%" r="75%">
+              <stop offset="0" stop-color="#d9ffff" />
+              <stop offset="0.28" stop-color="#48dce9" />
+              <stop offset="0.72" stop-color="#12637a" />
+              <stop offset="1" stop-color="#061d31" />
+            </radialGradient>
+            <linearGradient id="engine-fire" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#ffffff" />
+              <stop offset="0.18" stop-color="#9ffcff" />
+              <stop offset="0.55" stop-color="#32d9f2" stop-opacity=".86" />
+              <stop offset="1" stop-color="#376cff" stop-opacity="0" />
+            </linearGradient>
+            <filter id="ship-shadow" x="-40%" y="-35%" width="180%" height="200%">
+              <feDropShadow dx="0" dy="15" stdDeviation="16" flood-color="#000916" flood-opacity=".9" />
+            </filter>
+            <filter id="engine-glow" x="-200%" y="-50%" width="500%" height="220%">
+              <feGaussianBlur stdDeviation="8" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <g class="spaceship__engine-glow" data-engine-glow filter="url(#engine-glow)" aria-hidden="true">
+            <path d="M211 393 C203 431 207 467 219 494 C230 459 232 428 225 393 Z" fill="url(#engine-fire)" />
+            <path d="M295 393 C288 431 291 467 302 494 C315 459 317 428 309 393 Z" fill="url(#engine-fire)" />
+            <ellipse cx="218" cy="401" rx="15" ry="10" fill="#d8ffff" opacity=".9" />
+            <ellipse cx="302" cy="401" rx="15" ry="10" fill="#d8ffff" opacity=".9" />
+          </g>
+
+          <g class="spaceship__body" filter="url(#ship-shadow)">
+            <path
+              d="M250 67 C192 110 152 171 120 250 L35 340 L166 318 L207 411 L260 445 L313 411 L354 318 L485 340 L400 250 C368 171 328 110 270 67 L260 35 Z"
+              fill="#070c18"
+              stroke="#050711"
+              stroke-width="12"
+              stroke-linejoin="round"
+            />
+
+            <path
+              d="M225 156 L102 271 L47 326 L178 301 L213 218 Z"
+              fill="url(#sail-metal)"
+              stroke="#59657a"
+              stroke-width="3"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M295 156 L418 271 L473 326 L342 301 L307 218 Z"
+              fill="url(#sail-metal)"
+              stroke="#59657a"
+              stroke-width="3"
+              stroke-linejoin="round"
+            />
+
+            <path d="M205 183 L82 306" fill="none" stroke="#bc8242" stroke-width="5" opacity=".72" />
+            <path d="M315 183 L438 306" fill="none" stroke="#bc8242" stroke-width="5" opacity=".72" />
+            <path d="M178 301 L104 272" fill="none" stroke="#3e4d66" stroke-width="4" />
+            <path d="M342 301 L416 272" fill="none" stroke="#3e4d66" stroke-width="4" />
+
+            <path
+              d="M260 47 C226 88 203 157 190 247 C179 322 196 389 260 431 C324 389 341 322 330 247 C317 157 294 88 260 47 Z"
+              fill="url(#hull-metal)"
+              stroke="url(#hull-edge)"
+              stroke-width="7"
+            />
+            <path
+              d="M260 76 C245 118 237 181 237 269 C237 336 244 382 260 413 C276 382 283 336 283 269 C283 181 275 118 260 76 Z"
+              fill="#111a2c"
+              stroke="#4c586d"
+              stroke-width="2"
+              opacity=".94"
+            />
+
+            <path
+              d="M260 101 C236 125 225 162 225 199 C225 230 237 251 260 264 C283 251 295 230 295 199 C295 162 284 125 260 101 Z"
+              fill="url(#cockpit-glass)"
+              stroke="#d5a558"
+              stroke-width="5"
+            />
+            <path d="M243 130 C251 118 264 116 273 121" fill="none" stroke="#e7ffff" stroke-width="7" stroke-linecap="round" opacity=".72" />
+
+            <path d="M203 318 L233 347 L218 402 L188 362 Z" fill="#11192a" stroke="#b17738" stroke-width="5" />
+            <path d="M317 318 L287 347 L302 402 L332 362 Z" fill="#11192a" stroke="#b17738" stroke-width="5" />
+            <ellipse cx="218" cy="399" rx="17" ry="10" fill="#4deaff" stroke="#c8ffff" stroke-width="3" />
+            <ellipse cx="302" cy="399" rx="17" ry="10" fill="#4deaff" stroke="#c8ffff" stroke-width="3" />
+
+            <g class="spaceship__mark" transform="translate(260 301)" fill="none" stroke="#d0a35b" stroke-linecap="round">
+              <circle cy="-8" r="17" stroke-width="4" />
+              <path d="M-13 -12 L-7 -7 M7 -7 L13 -12" stroke-width="5" />
+              <path d="M-8 5 L8 5 M-16 18 L16 42 M16 18 L-16 42" stroke-width="4" />
+            </g>
+
+            <path d="M260 59 L260 101" stroke="#f1c477" stroke-width="4" stroke-linecap="round" />
+            <path d="M190 247 L178 301 M330 247 L342 301" fill="none" stroke="#ca914b" stroke-width="3" opacity=".9" />
+          </g>
+
+          <g class="spaceship__navigation-lights" aria-hidden="true">
+            <circle cx="62" cy="322" r="5" fill="#ff526b" />
+            <circle cx="458" cy="322" r="5" fill="#55f3d4" />
+          </g>
+        </svg>
+      </section>
+
+      <aside id="help-overlay" class="help-overlay" aria-label="조작 도움말">
+        <span class="help-overlay__signal" aria-hidden="true"></span>
+        <span>Move your pointer to shift the view</span>
+        <span class="help-overlay__separator" aria-hidden="true">/</span>
+        <span><kbd>Touch</kbd> and drag on mobile</span>
+      </aside>
+
+      <p class="status-whisper" aria-live="polite">
+        <span aria-hidden="true"></span>
+        Ship link stable
+      </p>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
