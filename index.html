@@ -10,7 +10,7 @@
     />
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./battle.css?v=topdown-1" />
+    <link rel="stylesheet" href="./battle.css?v=loot-1" />
   </head>
   <body>
     <a class="skip-link" href="#spaceship">함선으로 바로가기</a>
@@ -210,7 +210,7 @@
 
       <p class="status-whisper" aria-live="polite">
         <span aria-hidden="true"></span>
-        Ship link stable
+        <output id="space-status-text">Ship link stable</output>
       </p>
     </main>
 
@@ -329,11 +329,23 @@
           <span class="combatant__name">HOSTILE · HUMAN</span>
         </div>
 
-        <div id="battle-result" class="battle-result" role="status" hidden>
-          <span>ENCOUNTER RESOLVED</span>
-          <h2 id="battle-result-title">승리</h2>
+        <div
+          id="battle-result"
+          class="battle-result"
+          role="dialog"
+          aria-labelledby="battle-result-title"
+          aria-describedby="battle-result-copy"
+          hidden
+        >
+          <span id="battle-result-eyebrow">ENCOUNTER RESOLVED</span>
+          <h2 id="battle-result-title">적함 제압</h2>
           <p id="battle-result-copy">적 승무원이 제압되었습니다.</p>
-          <button id="battle-restart" type="button">다시 전투</button>
+          <ul id="battle-loot" class="loot-manifest" aria-label="적함에서 회수할 물자" hidden>
+            <li><span>연료 전지</span><strong>×2</strong></li>
+            <li><span>탄약 상자</span><strong>×1</strong></li>
+            <li><span>의료 물자</span><strong>×1</strong></li>
+          </ul>
+          <button id="battle-result-action" type="button">전리품 모두 회수</button>
         </div>
       </div>
 
@@ -348,6 +360,6 @@
       </footer>
     </section>
 
-    <script type="module" src="./src/main.js?v=topdown-1"></script>
+    <script type="module" src="./src/main.js?v=loot-1"></script>
   </body>
 </html>

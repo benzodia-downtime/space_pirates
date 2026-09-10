@@ -416,6 +416,12 @@
     introMilliseconds: 700,
   });
 
+  const ENCOUNTER_LOOT = Object.freeze({
+    fuelCells: 2,
+    ammoCrates: 1,
+    medicalSupplies: 1,
+  });
+
   class BattleController {
     constructor(ambientScene) {
       this.ambientScene = ambientScene;
@@ -423,16 +429,20 @@
       this.level = document.getElementById("battle-level");
       this.field = document.getElementById("battlefield");
       this.startButton = document.getElementById("battle-start");
-      this.restartButton = document.getElementById("battle-restart");
+      this.startButtonStatus = this.startButton?.querySelector("span");
+      this.resultActionButton = document.getElementById("battle-result-action");
       this.returnButton = document.getElementById("battle-return");
+      this.spaceStatusText = document.getElementById("space-status-text");
       this.phaseLabel = document.getElementById("battle-phase");
       this.distanceLabel = document.getElementById("battle-distance");
       this.meterPixelsLabel = document.getElementById("meter-pixels");
       this.rangePixelsLabel = document.getElementById("range-pixels");
       this.projectileLayer = document.getElementById("projectile-layer");
       this.result = document.getElementById("battle-result");
+      this.resultEyebrow = document.getElementById("battle-result-eyebrow");
       this.resultTitle = document.getElementById("battle-result-title");
       this.resultCopy = document.getElementById("battle-result-copy");
+      this.lootManifest = document.getElementById("battle-loot");
 
       this.units = {
         player: {
@@ -468,11 +478,18 @@
       this.frameId = 0;
       this.lastFrameTime = 0;
       this.suspendedPhase = null;
+      this.playerWon = false;
+      this.lootRecovered = false;
+      this.cargo = {
+        fuelCells: 0,
+        ammoCrates: 0,
+        medicalSupplies: 0,
+      };
       this.timers = new Set();
       this.renderScalePixelsPerUnit = 1;
 
       this.onStart = this.start.bind(this);
-      this.onRestart = this.start.bind(this);
+      this.onResultAction = this.handleResultAction.bind(this);
       this.onReturn = this.returnToSpace.bind(this);
       this.onResize = this.render.bind(this);
       this.onFrame = this.onFrame.bind(this);
@@ -483,6 +500,7 @@
         this.level &&
         this.field &&
         this.startButton &&
+        this.resultActionButton &&
         this.units.player.element &&
         this.units.enemy.element,
       );
@@ -490,7 +508,7 @@
       if (!this.ready) return;
 
       this.startButton.addEventListener("click", this.onStart);
-      this.restartButton?.addEventListener("click", this.onRestart);
+      this.resultActionButton?.addEventListener("click", this.onResultAction);
       this.returnButton?.addEventListener("click", this.onReturn);
       window.addEventListener("resize", this.onResize, { passive: true });
       document.addEventListener("visibilitychange", this.onVisibilityChange);
@@ -530,6 +548,8 @@
       this.phase = "idle";
       this.volley = 0;
       this.suspendedPhase = null;
+      this.playerWon = false;
+      this.lootRecovered = false;
 
       for (const unit of Object.values(this.units)) {
         unit.positionUnits = { ...unit.startPositionUnits };
@@ -537,7 +557,16 @@
         this.setUnitState(unit, "idle");
       }
 
-      if (this.result) this.result.hidden = true;
+      if (this.result) {
+        this.result.hidden = true;
+        delete this.result.dataset.outcome;
+        delete this.result.dataset.state;
+      }
+      if (this.lootManifest) {
+        this.lootManifest.hidden = true;
+        for (const item of this.lootManifest.children) delete item.dataset.collected;
+      }
+      if (this.returnButton) this.returnButton.disabled = false;
       this.setPhase("교전 대기");
       this.updateHud();
       this.render();
@@ -755,19 +784,67 @@
     finishBattle() {
       this.phase = "result";
       const playerWon = this.units.player.health > 0 && this.units.enemy.health <= 0;
+      this.playerWon = playerWon;
+      this.lootRecovered = false;
 
       this.setUnitState(this.units.player, this.units.player.health > 0 ? "idle" : "down");
       this.setUnitState(this.units.enemy, this.units.enemy.health > 0 ? "idle" : "down");
       this.setPhase(playerWon ? "적 승무원 제압" : "플레이어 승무원 전투 불능");
 
-      if (this.resultTitle) this.resultTitle.textContent = playerWon ? "승리" : "패배";
+      if (this.result) this.result.dataset.outcome = playerWon ? "victory" : "defeat";
+      if (this.resultEyebrow) {
+        this.resultEyebrow.textContent = playerWon ? "BOARDING COMPLETE" : "BOARDING FAILED";
+      }
+      if (this.resultTitle) this.resultTitle.textContent = playerWon ? "적함 제압" : "패배";
       if (this.resultCopy) {
         this.resultCopy.textContent = playerWon
-          ? `적 승무원을 제압했습니다. 남은 체력 ${this.units.player.health}.`
+          ? `적 승무원을 모두 제압했습니다. 적함은 남겨두고 내부 물자만 회수합니다. 남은 체력 ${this.units.player.health}.`
           : "플레이어 승무원이 쓰러졌습니다.";
       }
+      if (this.lootManifest) this.lootManifest.hidden = !playerWon;
+      if (this.resultActionButton) {
+        this.resultActionButton.textContent = playerWon ? "전리품 모두 회수" : "다시 전투";
+      }
+      if (this.returnButton) this.returnButton.disabled = playerWon;
       if (this.result) this.result.hidden = false;
-      this.restartButton?.focus({ preventScroll: true });
+      this.resultActionButton?.focus({ preventScroll: true });
+    }
+
+    handleResultAction() {
+      if (this.phase !== "result") return;
+
+      if (!this.playerWon) {
+        this.start();
+        return;
+      }
+
+      if (!this.lootRecovered) {
+        this.recoverLoot();
+        return;
+      }
+
+      this.returnToSpace();
+    }
+
+    recoverLoot() {
+      if (!this.playerWon || this.lootRecovered) return;
+      this.lootRecovered = true;
+      for (const [item, quantity] of Object.entries(ENCOUNTER_LOOT)) {
+        this.cargo[item] += quantity;
+      }
+      this.setPhase("적함 물자 회수 완료");
+
+      if (this.result) this.result.dataset.state = "recovered";
+      if (this.resultEyebrow) this.resultEyebrow.textContent = "CARGO SECURED";
+      if (this.resultTitle) this.resultTitle.textContent = "회수 완료";
+      if (this.resultCopy) {
+        this.resultCopy.textContent = "연료 전지, 탄약 상자, 의료 물자를 챙겼습니다. 적함을 떠나 아군 함선으로 복귀합니다.";
+      }
+      if (this.lootManifest) {
+        for (const item of this.lootManifest.children) item.dataset.collected = "true";
+      }
+      if (this.resultActionButton) this.resultActionButton.textContent = "아군 함선으로 귀환";
+      if (this.returnButton) this.returnButton.disabled = false;
     }
 
     updateHud() {
@@ -829,10 +906,17 @@
 
     returnToSpace() {
       if (!this.ready) return;
+      const returnedWithLoot = this.playerWon && this.lootRecovered;
       this.clearActivity();
       this.level.hidden = true;
       this.spaceScene.hidden = false;
       this.startButton.disabled = false;
+      if (returnedWithLoot) {
+        if (this.startButtonStatus) this.startButtonStatus.textContent = "물자 회수 완료";
+        if (this.spaceStatusText) {
+          this.spaceStatusText.textContent = `Cargo · Fuel ×${this.cargo.fuelCells} · Ammo ×${this.cargo.ammoCrates} · Medical ×${this.cargo.medicalSupplies}`;
+        }
+      }
       this.suspendedPhase = null;
       this.ambientScene?.resume();
       this.startButton.focus({ preventScroll: true });
@@ -841,7 +925,7 @@
     destroy() {
       this.clearActivity();
       this.startButton?.removeEventListener("click", this.onStart);
-      this.restartButton?.removeEventListener("click", this.onRestart);
+      this.resultActionButton?.removeEventListener("click", this.onResultAction);
       this.returnButton?.removeEventListener("click", this.onReturn);
       window.removeEventListener("resize", this.onResize);
       document.removeEventListener("visibilitychange", this.onVisibilityChange);
@@ -878,6 +962,7 @@
       start: () => battle.start(),
       exit: () => battle.returnToSpace(),
       reset: () => battle.start(),
+      getCargo: () => ({ ...battle.cargo }),
       destroy: () => battle.destroy(),
       config: BATTLE_CONFIG,
     };

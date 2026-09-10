@@ -353,6 +353,60 @@
   margin: 0 0 1rem;
   color: #9aabbc;
   font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.battle-result[data-outcome="defeat"] h2 {
+  color: var(--enemy-color);
+}
+
+.loot-manifest {
+  display: grid;
+  gap: 0.42rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.loot-manifest[hidden] {
+  display: none;
+}
+
+.loot-manifest li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 2.15rem;
+  padding: 0.45rem 0.65rem;
+  color: #b9cbd9;
+  font-size: 0.72rem;
+  background: rgba(13, 31, 45, 0.72);
+  border: 1px solid rgba(115, 172, 195, 0.2);
+}
+
+.loot-manifest li::before {
+  content: "◇";
+  margin-right: 0.55rem;
+  color: #d4a75e;
+}
+
+.loot-manifest li span {
+  flex: 1;
+}
+
+.loot-manifest li strong {
+  color: #eefaff;
+}
+
+.loot-manifest li[data-collected="true"] {
+  color: #8fe7d0;
+  border-color: rgba(102, 232, 193, 0.38);
+}
+
+.loot-manifest li[data-collected="true"]::before {
+  content: "◆";
+  color: #66e8c1;
 }
 
 .battle-result button,
@@ -375,6 +429,16 @@
   color: #061019;
   background: #a9f8ff;
   outline: none;
+}
+
+.battle-return:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+.battle-return:disabled:hover {
+  color: #dffcff;
+  background: #0a1a27;
 }
 
 .battle-footer {
