@@ -252,7 +252,7 @@
         <div class="battle-readout" aria-live="polite">
           <span id="battle-phase">교전 대기</span>
           <h1 id="battle-title">함내 교전</h1>
-          <strong id="battle-distance">44.0 m</strong>
+          <strong id="battle-distance">49.2 m</strong>
         </div>
 
         <article class="unit-card unit-card--enemy" aria-label="적 승무원 능력치">
@@ -281,10 +281,10 @@
         </article>
       </header>
 
-      <div id="battlefield" class="battlefield" aria-label="60미터 함선 내부 전장">
-        <div class="battlefield__ceiling" aria-hidden="true"></div>
-        <div class="battlefield__depth" aria-hidden="true"></div>
-        <div class="battlefield__floor" aria-hidden="true"></div>
+      <div id="battlefield" class="battlefield" aria-label="60미터 곱하기 36미터 함선 내부 탑뷰 전장">
+        <div class="battlefield__deck" aria-hidden="true"></div>
+        <div class="battlefield__grid" aria-hidden="true"></div>
+        <div class="battlefield__bulkheads" aria-hidden="true"></div>
         <div id="projectile-layer" class="projectile-layer" aria-hidden="true"></div>
 
         <div
@@ -292,7 +292,7 @@
           class="combatant combatant--player"
           data-state="idle"
           role="img"
-          aria-label="소총을 든 플레이어 인간 승무원"
+          aria-label="위에서 내려다본, 소총을 든 플레이어 인간 승무원"
         >
           <div class="combatant__sprite-frame">
             <img
@@ -313,7 +313,7 @@
           class="combatant combatant--enemy"
           data-state="idle"
           role="img"
-          aria-label="소총을 든 적 인간 승무원"
+          aria-label="위에서 내려다본, 소총을 든 적 인간 승무원"
         >
           <div class="combatant__sprite-frame">
             <img

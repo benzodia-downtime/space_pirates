@@ -175,52 +175,66 @@
 }
 
 .battlefield {
+  --arena-left: 0px;
+  --arena-top: 0px;
+  --arena-width: 100%;
+  --arena-height: 100%;
   position: relative;
   align-self: center;
   justify-self: center;
-  width: min(calc(100% - 2rem), 72rem);
-  height: min(68vh, 38rem);
-  min-height: 18rem;
+  width: min(calc(100% - 2rem), 63.333rem, 113.333dvh);
+  height: auto;
+  min-height: 0;
+  aspect-ratio: 5 / 3;
   overflow: hidden;
   background:
-    linear-gradient(90deg, transparent 49.8%, rgba(102, 225, 238, 0.08) 50%, transparent 50.2%),
-    radial-gradient(ellipse at center, rgba(33, 74, 92, 0.22), transparent 55%),
-    linear-gradient(180deg, #080f19 0%, #0a1724 60%, #07101a 100%);
+    radial-gradient(ellipse at center, rgba(33, 74, 92, 0.16), transparent 58%),
+    #03070c;
   border: 1px solid rgba(116, 169, 193, 0.28);
   box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.72), 0 18px 70px rgba(0, 0, 0, 0.45);
 }
 
-.battlefield__ceiling,
-.battlefield__floor,
-.battlefield__depth {
+.battlefield__deck,
+.battlefield__grid,
+.battlefield__bulkheads {
   position: absolute;
-  inset-inline: 0;
+  left: var(--arena-left);
+  top: var(--arena-top);
+  width: var(--arena-width);
+  height: var(--arena-height);
   pointer-events: none;
 }
 
-.battlefield__ceiling {
-  top: 0;
-  height: 17%;
-  background: repeating-linear-gradient(90deg, transparent 0 9%, rgba(98, 145, 166, 0.13) 9.2% 9.5%, transparent 9.7% 18%), linear-gradient(180deg, #03070c, #0b1721 68%, transparent);
-  border-bottom: 1px solid rgba(93, 202, 216, 0.12);
+.battlefield__deck {
+  z-index: 1;
+  background:
+    linear-gradient(135deg, rgba(97, 234, 244, 0.035) 0 25%, transparent 25% 75%, rgba(97, 234, 244, 0.025) 75%),
+    linear-gradient(180deg, #0c1823, #07111b);
+  border: 1px solid rgba(99, 155, 179, 0.2);
+  box-shadow: inset 0 0 48px rgba(0, 0, 0, 0.58);
 }
 
-.battlefield__depth {
-  top: 17%;
-  bottom: 29%;
-  background: repeating-linear-gradient(90deg, transparent 0 12%, rgba(112, 153, 174, 0.07) 12.2% 12.5%, transparent 12.7% 25%);
+.battlefield__grid {
+  z-index: 2;
+  opacity: 0.72;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 9.8%, rgba(96, 159, 181, 0.12) 10% 10.25%),
+    repeating-linear-gradient(0deg, transparent 0 16.35%, rgba(96, 159, 181, 0.1) 16.55% 16.9%),
+    linear-gradient(90deg, transparent 49.7%, rgba(97, 234, 244, 0.12) 50%, transparent 50.3%);
 }
 
-.battlefield__floor {
-  bottom: 0;
-  height: 30%;
-  background: repeating-linear-gradient(90deg, transparent 0 8%, rgba(97, 234, 244, 0.1) 8.2% 8.5%, transparent 8.7% 16%), linear-gradient(180deg, #0b1721, #03070c);
-  border-top: 2px solid rgba(97, 234, 244, 0.17);
+.battlefield__bulkheads {
+  z-index: 3;
+  border: 7px solid rgba(15, 34, 48, 0.92);
+  box-shadow:
+    inset 0 0 0 1px rgba(112, 199, 218, 0.24),
+    0 0 0 1px rgba(2, 5, 9, 0.85),
+    inset 0 0 30px rgba(0, 0, 0, 0.42);
 }
 
 .projectile-layer {
   position: absolute;
-  z-index: 12;
+  z-index: 18;
   inset: 0;
   pointer-events: none;
 }
@@ -236,19 +250,18 @@
 }
 
 .combatant {
-  --recoil: -4px;
+  --facing-angle: 0deg;
+  --recoil: 4px;
   position: absolute;
   z-index: 10;
-  bottom: 17%;
-  left: var(--position, 13.333%);
+  top: var(--position-y, 50%);
+  left: var(--position-x, 50%);
   display: grid;
   justify-items: center;
   width: 74px;
-  transform: translateX(-50%);
-  will-change: left;
+  transform: translate(-50%, -32px);
+  will-change: left, top;
 }
-
-.combatant--enemy { --recoil: 4px; }
 
 .combatant__sprite-frame,
 .combatant__sprite {
@@ -256,32 +269,35 @@
   height: 64px;
 }
 
-.combatant__sprite-frame { position: relative; }
+.combatant__sprite-frame {
+  position: relative;
+  transform: rotate(var(--facing-angle));
+  transform-origin: 50% 50%;
+  transition: transform 80ms linear;
+}
 
 .combatant__sprite {
   display: block;
   object-fit: contain;
   image-rendering: pixelated;
   user-select: none;
-  transform-origin: 50% 92%;
+  transform-origin: 50% 50%;
 }
 
 .combatant__muzzle {
   position: absolute;
-  top: 29px;
-  right: -3px;
+  top: 1px;
+  left: 50%;
   width: 11px;
   height: 7px;
   opacity: 0;
   background: #efffff;
   clip-path: polygon(0 35%, 42% 35%, 68% 0, 72% 34%, 100% 50%, 72% 66%, 68% 100%, 42% 65%, 0 65%);
   filter: drop-shadow(0 0 5px var(--player-color));
+  transform: translate(-50%, -50%) rotate(-90deg);
 }
 
 .combatant--enemy .combatant__muzzle {
-  right: auto;
-  left: -3px;
-  transform: scaleX(-1);
   filter: drop-shadow(0 0 5px var(--enemy-color));
 }
 
@@ -309,7 +325,7 @@
 .combatant[data-state="down"] .combatant__sprite {
   opacity: 0.46;
   filter: grayscale(0.75);
-  transform: translateY(17px) rotate(90deg);
+  transform: scale(0.9) rotate(12deg);
 }
 
 .battle-result {
@@ -381,18 +397,18 @@
 .scale-readout i { margin: 0 0.4rem; color: #4d6576; font-style: normal; }
 
 @keyframes crew-idle {
-  from { transform: translateY(0); }
-  to { transform: translateY(-2px); }
+  from { transform: translateY(0) scale(1); }
+  to { transform: translateY(-1px) scale(1.025); }
 }
 
 @keyframes crew-walk {
-  0%, 100% { transform: translateY(0) rotate(-1deg); }
-  50% { transform: translateY(-3px) rotate(1deg); }
+  0%, 100% { transform: translateX(-2px) translateY(0) rotate(-1deg); }
+  50% { transform: translateX(2px) translateY(-2px) rotate(1deg); }
 }
 
 @keyframes crew-fire {
-  0%, 100% { transform: translateX(0); }
-  45% { transform: translateX(var(--recoil)); }
+  0%, 100% { transform: translateY(0); }
+  45% { transform: translateY(var(--recoil)); }
 }
 
 @keyframes muzzle-flash {
@@ -428,12 +444,11 @@
   .unit-card__stats { gap: 0.6rem; }
 
   .battlefield {
-    width: calc(100% - 0.8rem);
-    height: calc(100dvh - 15.5rem);
-    min-height: 17rem;
+    width: min(calc(100% - 0.8rem), 63.333rem, 113.333dvh);
+    height: auto;
+    min-height: 0;
   }
 
-  .combatant { bottom: 16%; }
   .combatant__name { font-size: 0.48rem; }
 
   .battle-footer {
@@ -481,12 +496,6 @@
   .unit-card__stats { display: none; }
   .health-track { margin-top: 0.35rem; }
 
-  .battlefield {
-    height: calc(100dvh - 8rem);
-    min-height: 11rem;
-  }
-
-  .combatant { bottom: 11%; }
   .combatant__name { display: none; }
 
   .battle-footer { padding-block: 0.35rem; }

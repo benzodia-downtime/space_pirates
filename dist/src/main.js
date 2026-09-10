@@ -408,6 +408,7 @@
   const BATTLE_CONFIG = Object.freeze({
     unrealUnitsPerMeter: 100,
     worldWidthUnits: 6000,
+    worldHeightUnits: 3600,
     attackRangeUnits: 2000,
     walkSpeedUnitsPerSecond: 400,
     projectileSpeedUnitsPerSecond: 5000,
@@ -440,8 +441,8 @@
           healthBar: document.getElementById("player-health-bar"),
           healthTrack: document.getElementById("player-health-track"),
           healthText: document.getElementById("player-health-text"),
-          startUnits: 800,
-          positionUnits: 800,
+          startPositionUnits: { x: 800, y: 2900 },
+          positionUnits: { x: 800, y: 2900 },
           maxHealth: 100,
           health: 100,
           attack: 10,
@@ -453,8 +454,8 @@
           healthBar: document.getElementById("enemy-health-bar"),
           healthTrack: document.getElementById("enemy-health-track"),
           healthText: document.getElementById("enemy-health-text"),
-          startUnits: 5200,
-          positionUnits: 5200,
+          startPositionUnits: { x: 5200, y: 700 },
+          positionUnits: { x: 5200, y: 700 },
           maxHealth: 50,
           health: 50,
           attack: 10,
@@ -468,6 +469,7 @@
       this.lastFrameTime = 0;
       this.suspendedPhase = null;
       this.timers = new Set();
+      this.renderScalePixelsPerUnit = 1;
 
       this.onStart = this.start.bind(this);
       this.onRestart = this.start.bind(this);
@@ -530,7 +532,7 @@
       this.suspendedPhase = null;
 
       for (const unit of Object.values(this.units)) {
-        unit.positionUnits = unit.startUnits;
+        unit.positionUnits = { ...unit.startPositionUnits };
         unit.health = unit.maxHealth;
         this.setUnitState(unit, "idle");
       }
@@ -602,22 +604,44 @@
 
       const player = this.units.player;
       const enemy = this.units.enemy;
-      const distance = enemy.positionUnits - player.positionUnits;
+      const deltaX = enemy.positionUnits.x - player.positionUnits.x;
+      const deltaY = enemy.positionUnits.y - player.positionUnits.y;
+      const distance = Math.hypot(deltaX, deltaY);
       const excessDistance = Math.max(0, distance - BATTLE_CONFIG.attackRangeUnits);
+      if (excessDistance <= 0.5) {
+        this.render();
+        this.beginAttack();
+        return;
+      }
+
+      const hasDirection = distance > 0.000001;
+      const directionX = hasDirection ? deltaX / distance : 1;
+      const directionY = hasDirection ? deltaY / distance : 0;
       const movement = Math.min(
         BATTLE_CONFIG.walkSpeedUnitsPerSecond * deltaSeconds,
         excessDistance / 2,
       );
 
-      player.positionUnits += movement;
-      enemy.positionUnits -= movement;
-      this.render();
+      player.positionUnits.x += directionX * movement;
+      player.positionUnits.y += directionY * movement;
+      enemy.positionUnits.x -= directionX * movement;
+      enemy.positionUnits.y -= directionY * movement;
 
-      if (excessDistance <= 0.5) {
+      const remainingDistance = distance - movement * 2;
+      if (remainingDistance <= BATTLE_CONFIG.attackRangeUnits + 0.5) {
+        const midpointX = (player.positionUnits.x + enemy.positionUnits.x) / 2;
+        const midpointY = (player.positionUnits.y + enemy.positionUnits.y) / 2;
+        const halfRange = BATTLE_CONFIG.attackRangeUnits / 2;
+        player.positionUnits.x = midpointX - directionX * halfRange;
+        player.positionUnits.y = midpointY - directionY * halfRange;
+        enemy.positionUnits.x = midpointX + directionX * halfRange;
+        enemy.positionUnits.y = midpointY + directionY * halfRange;
+        this.render();
         this.beginAttack();
         return;
       }
 
+      this.render();
       this.frameId = window.requestAnimationFrame(this.onFrame);
     }
 
@@ -674,30 +698,49 @@
       if (!this.projectileLayer || !this.field) return 1;
 
       const fieldBounds = this.field.getBoundingClientRect();
-      const sourceBounds = source.element.getBoundingClientRect();
-      const targetBounds = target.element.getBoundingClientRect();
-      const travelsRight = source.id === "player";
-      const startX = (travelsRight ? sourceBounds.right - 8 : sourceBounds.left + 8) - fieldBounds.left;
-      const endX = (travelsRight ? targetBounds.left + 12 : targetBounds.right - 12) - fieldBounds.left;
-      const y = sourceBounds.top + 31 - fieldBounds.top;
-      const distanceUnits = Math.abs(target.positionUnits - source.positionUnits);
+      const sourceSprite = source.element?.querySelector(".combatant__sprite-frame");
+      const targetSprite = target.element?.querySelector(".combatant__sprite-frame");
+      const sourceBounds = sourceSprite?.getBoundingClientRect();
+      const targetBounds = targetSprite?.getBoundingClientRect();
+      if (!sourceBounds || !targetBounds) return 1;
+
+      const sourceCenterX = sourceBounds.left + sourceBounds.width / 2 - fieldBounds.left;
+      const sourceCenterY = sourceBounds.top + sourceBounds.height / 2 - fieldBounds.top;
+      const targetCenterX = targetBounds.left + targetBounds.width / 2 - fieldBounds.left;
+      const targetCenterY = targetBounds.top + targetBounds.height / 2 - fieldBounds.top;
+      const centerDeltaX = targetCenterX - sourceCenterX;
+      const centerDeltaY = targetCenterY - sourceCenterY;
+      const screenDistance = Math.hypot(centerDeltaX, centerDeltaY);
+      const directionX = screenDistance > 0 ? centerDeltaX / screenDistance : 1;
+      const directionY = screenDistance > 0 ? centerDeltaY / screenDistance : 0;
+      const startX = sourceCenterX + directionX * 22;
+      const startY = sourceCenterY + directionY * 22;
+      const endX = targetCenterX - directionX * 18;
+      const endY = targetCenterY - directionY * 18;
+      const travelX = endX - startX;
+      const travelY = endY - startY;
+      const angle = Math.atan2(travelY, travelX) * 180 / Math.PI;
+      const travelPixels = Math.hypot(travelX, travelY);
+      const projectileSpeedPixelsPerSecond =
+        BATTLE_CONFIG.projectileSpeedUnitsPerSecond * this.renderScalePixelsPerUnit;
       const duration = Math.max(
         120,
-        Math.round((distanceUnits / BATTLE_CONFIG.projectileSpeedUnitsPerSecond) * 1000),
+        Math.round((travelPixels / Math.max(0.001, projectileSpeedPixelsPerSecond)) * 1000),
       );
 
       const projectile = document.createElement("span");
       projectile.className = "projectile";
       projectile.style.left = `${startX.toFixed(1)}px`;
-      projectile.style.top = `${y.toFixed(1)}px`;
+      projectile.style.top = `${(startY - 1.5).toFixed(1)}px`;
       projectile.style.setProperty("--projectile-color", source.color);
+      projectile.style.transform = `rotate(${angle.toFixed(2)}deg)`;
       this.projectileLayer.append(projectile);
 
       if (typeof projectile.animate === "function") {
         const animation = projectile.animate(
           [
-            { transform: "translate3d(0, 0, 0)", opacity: 1 },
-            { transform: `translate3d(${(endX - startX).toFixed(1)}px, 0, 0)`, opacity: 1 },
+            { transform: `translate3d(0, 0, 0) rotate(${angle.toFixed(2)}deg)`, opacity: 1 },
+            { transform: `translate3d(${travelX.toFixed(1)}px, ${travelY.toFixed(1)}px, 0) rotate(${angle.toFixed(2)}deg)`, opacity: 1 },
           ],
           { duration, easing: "linear", fill: "forwards" },
         );
@@ -740,19 +783,41 @@
       if (!this.field) return;
 
       const fieldWidth = this.field.clientWidth;
-      const spriteWidth = 64;
-      const usableWidth = Math.max(1, fieldWidth - spriteWidth);
-      const pixelsPerUnit = usableWidth / BATTLE_CONFIG.worldWidthUnits;
+      const fieldHeight = this.field.clientHeight;
+      const usableWidth = Math.max(1, fieldWidth);
+      const usableHeight = Math.max(1, fieldHeight);
+      const pixelsPerUnit = Math.min(
+        usableWidth / BATTLE_CONFIG.worldWidthUnits,
+        usableHeight / BATTLE_CONFIG.worldHeightUnits,
+      );
+      this.renderScalePixelsPerUnit = pixelsPerUnit;
       const pixelsPerMeter = pixelsPerUnit * BATTLE_CONFIG.unrealUnitsPerMeter;
+      const arenaWidth = BATTLE_CONFIG.worldWidthUnits * pixelsPerUnit;
+      const arenaHeight = BATTLE_CONFIG.worldHeightUnits * pixelsPerUnit;
+      const originX = (fieldWidth - arenaWidth) / 2;
+      const originY = (fieldHeight - arenaHeight) / 2;
+
+      this.field.style.setProperty("--arena-left", `${originX.toFixed(2)}px`);
+      this.field.style.setProperty("--arena-top", `${originY.toFixed(2)}px`);
+      this.field.style.setProperty("--arena-width", `${arenaWidth.toFixed(2)}px`);
+      this.field.style.setProperty("--arena-height", `${arenaHeight.toFixed(2)}px`);
 
       for (const unit of Object.values(this.units)) {
-        const x = spriteWidth / 2 + unit.positionUnits * pixelsPerUnit;
-        unit.element?.style.setProperty("--position", `${x.toFixed(2)}px`);
+        const target = unit.id === "player" ? this.units.enemy : this.units.player;
+        const x = originX + unit.positionUnits.x * pixelsPerUnit;
+        const y = originY + unit.positionUnits.y * pixelsPerUnit;
+        const facingAngle = Math.atan2(
+          target.positionUnits.y - unit.positionUnits.y,
+          target.positionUnits.x - unit.positionUnits.x,
+        ) * 180 / Math.PI + 90;
+        unit.element?.style.setProperty("--position-x", `${x.toFixed(2)}px`);
+        unit.element?.style.setProperty("--position-y", `${y.toFixed(2)}px`);
+        unit.element?.style.setProperty("--facing-angle", `${facingAngle.toFixed(2)}deg`);
       }
 
-      const distanceUnits = Math.max(
-        0,
-        this.units.enemy.positionUnits - this.units.player.positionUnits,
+      const distanceUnits = Math.hypot(
+        this.units.enemy.positionUnits.x - this.units.player.positionUnits.x,
+        this.units.enemy.positionUnits.y - this.units.player.positionUnits.y,
       );
       const distanceMeters = distanceUnits / BATTLE_CONFIG.unrealUnitsPerMeter;
       if (this.distanceLabel) this.distanceLabel.textContent = `${distanceMeters.toFixed(1)} m`;
