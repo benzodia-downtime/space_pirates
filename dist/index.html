@@ -10,6 +10,7 @@
     />
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./voyage.css?v=voyage-1" />
     <link rel="stylesheet" href="./battle.css?v=loot-1" />
   </head>
   <body>
@@ -33,15 +34,49 @@
       <div id="stars-near" class="stars stars--near" aria-hidden="true"></div>
 
       <header id="title-overlay" class="title-overlay">
-        <p class="title-overlay__eyebrow">Uncharted Sector 07</p>
+        <p class="title-overlay__eyebrow">Nautilus // Navigation</p>
         <h1>Space <span>Pirates</span></h1>
-        <p class="title-overlay__subtitle">No maps. No masters.</p>
+        <p class="title-overlay__subtitle">미탐사 구역 · 항로 07</p>
       </header>
+
+      <section class="voyage-hud" aria-label="장거리 항해 정보">
+        <div class="voyage-readout">
+          <span class="voyage-readout__label"><i aria-hidden="true"></i> LONG RANGE SENSOR</span>
+          <strong id="voyage-state">막막한 항해 중</strong>
+          <output id="voyage-distance">확인된 신호 없음</output>
+          <div class="voyage-progress" aria-hidden="true">
+            <span id="voyage-progress-bar"></span>
+          </div>
+          <p>
+            <span>CRUISE <output id="voyage-speed">0.06c</output></span>
+            <span id="voyage-coordinate">X 000 · Y 000</span>
+          </p>
+        </div>
+
+        <div id="voyage-radar" class="voyage-radar" aria-hidden="true">
+          <span class="voyage-radar__ring voyage-radar__ring--inner"></span>
+          <span class="voyage-radar__ring voyage-radar__ring--outer"></span>
+          <span class="voyage-radar__cross"></span>
+          <span class="voyage-radar__sweep"></span>
+          <span id="radar-blip" class="voyage-radar__blip"></span>
+          <span class="voyage-radar__ship"></span>
+        </div>
+      </section>
+
+      <div id="contact-marker" class="contact-marker" aria-hidden="true" hidden>
+        <span class="contact-marker__frame" aria-hidden="true"></span>
+        <output id="contact-bearing">희미한 신호</output>
+      </div>
+
+      <p id="voyage-announcement" class="sr-only" aria-live="polite"></p>
 
       <section id="ship-stage" class="ship-stage ship-stage--player" aria-label="플레이어 함선">
         <div class="ship-stage__halo" aria-hidden="true"></div>
         <div class="ship-stage__orbit" aria-hidden="true">
           <span></span>
+        </div>
+        <div class="ship-stage__wake" aria-hidden="true">
+          <i></i><i></i><i></i>
         </div>
 
         <svg
@@ -177,7 +212,13 @@
         </svg>
       </section>
 
-      <section class="ship-stage ship-stage--enemy" aria-label="적 함선">
+      <section
+        id="enemy-ship-stage"
+        class="ship-stage ship-stage--enemy"
+        aria-label="미확인 적 함선"
+        aria-hidden="true"
+        data-contact-state="hidden"
+      >
         <svg
           id="enemy-spaceship"
           class="spaceship spaceship--enemy"
@@ -196,16 +237,33 @@
         </svg>
       </section>
 
-      <button id="battle-start" class="battle-start" type="button">
-        <span>적함 조우</span>
+      <button id="battle-start" class="battle-start" type="button" disabled hidden>
+        <span>미확인 함선 포착</span>
         전투 시작
       </button>
 
+      <section class="flight-controls" aria-label="항해 조종 장치">
+        <div
+          id="steering-pad"
+          class="steering-pad"
+          role="group"
+          aria-label="드래그하거나 방향키와 WASD로 함선을 조향합니다"
+          tabindex="0"
+        >
+          <span class="steering-pad__axis" aria-hidden="true"></span>
+          <span id="steering-knob" class="steering-pad__knob" aria-hidden="true"></span>
+        </div>
+        <button id="scan-button" class="scan-button" type="button" aria-label="장거리 센서 펄스 방출">
+          <span>센서 펄스</span>
+          <strong id="scan-button-state">SCAN</strong>
+        </button>
+      </section>
+
       <aside id="help-overlay" class="help-overlay" aria-label="조작 도움말">
         <span class="help-overlay__signal" aria-hidden="true"></span>
-        <span>Move your pointer to shift the view</span>
+        <span><kbd>드래그</kbd> 또는 <kbd>WASD</kbd>로 조향</span>
         <span class="help-overlay__separator" aria-hidden="true">/</span>
-        <span><kbd>Touch</kbd> and drag on mobile</span>
+        <span><kbd>SCAN</kbd>으로 신호 탐색</span>
       </aside>
 
       <p class="status-whisper" aria-live="polite">
@@ -360,6 +418,6 @@
       </footer>
     </section>
 
-    <script type="module" src="./src/main.js?v=loot-1"></script>
+    <script type="module" src="./src/main.js?v=voyage-1"></script>
   </body>
 </html>

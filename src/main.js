@@ -1,3 +1,5 @@
+import { VoyageScene } from "./voyage.js";
+
 (() => {
   "use strict";
 
@@ -573,7 +575,7 @@
     }
 
     start() {
-      if (!this.ready) return;
+      if (!this.ready || (this.ambientScene && !this.ambientScene.encounterReady)) return;
 
       this.spaceScene.hidden = true;
       this.level.hidden = false;
@@ -918,8 +920,13 @@
         }
       }
       this.suspendedPhase = null;
+      this.ambientScene?.resolveEncounter({ lootRecovered: returnedWithLoot });
       this.ambientScene?.resume();
-      this.startButton.focus({ preventScroll: true });
+      if (this.startButton.hidden) {
+        this.ambientScene?.focusControls();
+      } else {
+        this.startButton.focus({ preventScroll: true });
+      }
     }
 
     destroy() {
@@ -945,7 +952,7 @@
 
     const ship = document.getElementById("spaceship");
     const canvas = document.getElementById("starfield");
-    const scene = new AmbientSpaceScene(ship, canvas);
+    const scene = new VoyageScene(ship, canvas);
     const battle = new BattleController(scene);
 
     window.SpacePiratesAmbient = {
@@ -953,8 +960,10 @@
       resume: () => scene.resume(),
       destroy: () => scene.destroy(),
       redraw: () => scene.onResize(),
+      forceEncounter: () => scene.forceEncounter(),
+      getState: () => scene.getState(),
       get paused() {
-        return scene.manuallyPaused || scene.reducedMotion || document.hidden;
+        return scene.manuallyPaused || document.hidden;
       },
     };
 

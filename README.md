@@ -1,6 +1,6 @@
 # Space Pirates
 
-Space Pirates is a minimal, browser-based ambient space scene: one lone spaceship drifts through a quiet starfield. It is built with plain HTML, CSS, and JavaScript, with no framework, game engine, build step, or runtime dependency.
+Space Pirates is an engine-free browser game prototype built with plain HTML, CSS, and JavaScript. Pilot the Nautilus through deep space, scan for hostile ships, board them, defeat their crew, and return with recovered supplies. It has no framework or runtime dependency.
 
 ## Run locally
 
@@ -12,18 +12,29 @@ npm start
 
 Then open [http://localhost:4173](http://localhost:4173) in a browser. To use a different port, set the `PORT` environment variable before starting the server.
 
-## Experience
+## Controls and game loop
 
-There are no controls, objectives, combat systems, scores, or fail states. Space Pirates is designed as a passive visual: leave the page open and watch the ship drift through space. The scene adapts to the browser window.
+- Steer with the pointer, the on-screen control pad, `WASD`, or the arrow keys.
+- Use **SCAN** or the space bar to accelerate long-range contact detection.
+- When a hostile ship is identified, select **전투 시작** to enter the top-down crew battle.
+- Win the boarding action, collect the enemy ship's supplies, and return to begin a new search.
+
+The voyage uses an engine-free perspective starfield and CSS 3D ship rig. The interface adapts to desktop and mobile screens and supports reduced-motion preferences.
 
 ## Project structure
 
 ```text
 .
-├── index.html      Page structure and scene elements
-├── styles.css      Space, ship, and motion presentation
+├── index.html      Voyage, encounter, and battle structure
+├── styles.css      Shared space and ship presentation
+├── voyage.css      Navigation HUD, controls, and chase-view styling
+├── battle.css      Top-down crew battle styling
+├── assets/         Player and enemy crew sprites
 ├── src/
-│   └── main.js     Ambient animation and scene behavior
+│   ├── main.js     Battle logic and scene integration
+│   └── voyage.js   Perspective flight, controls, scanning, and encounters
+├── scripts/
+│   └── build-static.mjs  Static deployment build
 ├── server.mjs      Dependency-free local static server
 ├── package.json    Project scripts and metadata
 └── README.md       Project overview and usage
@@ -31,11 +42,10 @@ There are no controls, objectives, combat systems, scores, or fail states. Space
 
 ## Validate
 
-Run the lightweight syntax checks:
+Build the static deployment and run the syntax checks:
 
 ```sh
 npm test
 ```
 
-`npm test` delegates to `npm run check` and checks both the local server and browser JavaScript with Node's built-in syntax checker.
-
+`npm test` runs `npm run build` and `npm run check`. The generated deployment is written to `dist/`.
