@@ -230,7 +230,6 @@ export class VoyageScene {
     this.onPointerDown = this.onPointerDown.bind(this);
     this.onPointerMove = this.onPointerMove.bind(this);
     this.onPointerEnd = this.onPointerEnd.bind(this);
-    this.onPointerLeave = this.onPointerLeave.bind(this);
     this.onKeyDown = this.onKeyDown.bind(this);
     this.onKeyUp = this.onKeyUp.bind(this);
     this.onScan = this.triggerScan.bind(this);
@@ -257,7 +256,6 @@ export class VoyageScene {
     window.addEventListener("pointermove", this.onPointerMove, { passive: true });
     window.addEventListener("pointerup", this.onPointerEnd, { passive: true });
     window.addEventListener("pointercancel", this.onPointerEnd, { passive: true });
-    document.documentElement.addEventListener("pointerleave", this.onPointerLeave, { passive: true });
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
     this.steeringPad?.addEventListener("pointerdown", this.onPointerDown);
@@ -278,7 +276,6 @@ export class VoyageScene {
     window.removeEventListener("pointermove", this.onPointerMove);
     window.removeEventListener("pointerup", this.onPointerEnd);
     window.removeEventListener("pointercancel", this.onPointerEnd);
-    document.documentElement.removeEventListener("pointerleave", this.onPointerLeave);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
     this.steeringPad?.removeEventListener("pointerdown", this.onPointerDown);
@@ -303,18 +300,8 @@ export class VoyageScene {
 
   onPointerMove(event) {
     if (this.manuallyPaused || this.destroyed) return;
-
-    if (this.activePointerId === event.pointerId) {
-      this.updateTargetFromPad(event.clientX, event.clientY);
-      return;
-    }
-
-    if (event.pointerType === "mouse" && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
-      const width = Math.max(1, window.innerWidth);
-      const height = Math.max(1, window.innerHeight);
-      this.pointerTarget.x = clamp((event.clientX / width) * 2 - 1, -1, 1);
-      this.pointerTarget.y = clamp((event.clientY / height) * 2 - 1, -1, 1);
-    }
+    if (this.activePointerId !== event.pointerId) return;
+    this.updateTargetFromPad(event.clientX, event.clientY);
   }
 
   updateTargetFromPad(clientX, clientY) {
@@ -330,14 +317,7 @@ export class VoyageScene {
     if (this.activePointerId !== event.pointerId) return;
     this.steeringPad?.releasePointerCapture?.(event.pointerId);
     this.activePointerId = null;
-    this.pointerTarget.x = 0;
-    this.pointerTarget.y = 0;
-  }
-
-  onPointerLeave() {
-    if (this.activePointerId !== null) return;
-    this.pointerTarget.x = 0;
-    this.pointerTarget.y = 0;
+    // The helm is latched: releasing the pad keeps the selected heading.
   }
 
   onKeyDown(event) {
@@ -465,7 +445,11 @@ export class VoyageScene {
     if (this.sceneTime >= this.nextCourseAt) this.chooseNewCourse();
 
     const keyboardTarget = this.getKeyboardTarget();
-    const target = keyboardTarget || this.pointerTarget;
+    if (keyboardTarget) {
+      this.pointerTarget.x = keyboardTarget.x;
+      this.pointerTarget.y = keyboardTarget.y;
+    }
+    const target = this.pointerTarget;
     const pointerEase = 1 - Math.exp(-deltaSeconds * 3.8);
     const courseEase = 1 - Math.exp(-deltaSeconds * 0.5);
     this.pointer.x += (target.x - this.pointer.x) * pointerEase;

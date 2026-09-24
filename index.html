@@ -279,7 +279,7 @@
           id="steering-pad"
           class="steering-pad"
           role="group"
-          aria-label="드래그하거나 방향키와 WASD로 함선을 조향합니다"
+          aria-label="드래그하거나 방향키와 WASD로 항로를 설정합니다. 입력을 놓아도 마지막 방향을 유지합니다"
           tabindex="0"
         >
           <span class="steering-pad__axis" aria-hidden="true"></span>
@@ -293,7 +293,7 @@
 
       <aside id="help-overlay" class="help-overlay" aria-label="조작 도움말">
         <span class="help-overlay__signal" aria-hidden="true"></span>
-        <span><kbd>드래그</kbd> 또는 <kbd>WASD</kbd>로 조향</span>
+        <span><kbd>드래그</kbd>해 항로 고정 · <kbd>WASD</kbd> 조향</span>
         <span class="help-overlay__separator" aria-hidden="true">/</span>
         <span><kbd>SCAN</kbd>으로 신호 탐색</span>
       </aside>
@@ -450,6 +450,6 @@
       </footer>
     </section>
 
-    <script type="module" src="./src/main.js?v=cockpit-1"></script>
+    <script type="module" src="./src/main.js?v=steering-1"></script>
   </body>
 </html>

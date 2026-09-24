@@ -14,7 +14,7 @@ Then open [http://localhost:4173](http://localhost:4173) in a browser. To use a 
 
 ## Controls and game loop
 
-- Steer with the pointer, the on-screen control pad, `WASD`, or the arrow keys.
+- Set a persistent course with the on-screen control pad, `WASD`, or the arrow keys.
 - Use **SCAN** or the space bar to accelerate long-range contact detection.
 - When a hostile ship is identified, select **전투 시작** to enter the top-down crew battle.
 - Win the boarding action, collect the enemy ship's supplies, and return to begin a new search.
