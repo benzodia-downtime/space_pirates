@@ -10,16 +10,16 @@
     />
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./voyage.css?v=voyage-1" />
+    <link rel="stylesheet" href="./voyage.css?v=cockpit-1" />
     <link rel="stylesheet" href="./battle.css?v=loot-1" />
   </head>
   <body>
-    <a class="skip-link" href="#spaceship">함선으로 바로가기</a>
+    <a class="skip-link" href="#steering-pad">항해 조작으로 바로가기</a>
 
     <main
       id="space-scene"
       class="space-scene"
-      aria-label="별빛이 흐르는 깊은 우주와 중앙의 해적선"
+      aria-label="노틸러스 조종석에서 전면 창밖의 깊은 우주를 항해하는 화면"
     >
       <canvas id="starfield" aria-hidden="true"></canvas>
 
@@ -70,7 +70,40 @@
 
       <p id="voyage-announcement" class="sr-only" aria-live="polite"></p>
 
-      <section id="ship-stage" class="ship-stage ship-stage--player" aria-label="플레이어 함선">
+      <div id="cockpit-shell" class="cockpit-shell" aria-hidden="true">
+        <div class="cockpit-shell__glass">
+          <span class="cockpit-shell__reflection cockpit-shell__reflection--left"></span>
+          <span class="cockpit-shell__reflection cockpit-shell__reflection--right"></span>
+        </div>
+
+        <div class="cockpit-shell__canopy">
+          <span class="cockpit-shell__beam cockpit-shell__beam--top"></span>
+          <span class="cockpit-shell__beam cockpit-shell__beam--left"></span>
+          <span class="cockpit-shell__beam cockpit-shell__beam--right"></span>
+        </div>
+
+        <div class="cockpit-reticle">
+          <span></span>
+          <i></i>
+        </div>
+
+        <div class="cockpit-console">
+          <div class="cockpit-console__panel cockpit-console__panel--left">
+            <span>NAV BUS</span>
+            <i></i><i></i><i></i>
+          </div>
+          <div class="cockpit-console__core">
+            <span>NAUTILUS</span>
+            <strong>HELM ONLINE</strong>
+          </div>
+          <div class="cockpit-console__panel cockpit-console__panel--right">
+            <span>HULL 100</span>
+            <i></i><i></i><i></i>
+          </div>
+        </div>
+      </div>
+
+      <section id="ship-stage" class="ship-stage ship-stage--player" aria-hidden="true">
         <div class="ship-stage__halo" aria-hidden="true"></div>
         <div class="ship-stage__orbit" aria-hidden="true">
           <span></span>
@@ -85,7 +118,6 @@
           viewBox="0 0 520 520"
           role="img"
           aria-labelledby="ship-title ship-description"
-          tabindex="0"
           xmlns="http://www.w3.org/2000/svg"
         >
           <title id="ship-title">우주 해적선 노틸러스</title>
@@ -418,6 +450,6 @@
       </footer>
     </section>
 
-    <script type="module" src="./src/main.js?v=voyage-1"></script>
+    <script type="module" src="./src/main.js?v=cockpit-1"></script>
   </body>
 </html>

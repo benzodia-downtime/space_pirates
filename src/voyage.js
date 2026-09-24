@@ -669,6 +669,9 @@ export class VoyageScene {
     const engineFlicker = allowMotion
       ? clamp(0.76 + Math.sin(this.sceneTime * 27) * 0.12 + Math.sin(this.sceneTime * 61) * 0.055, 0.54, 0.98)
       : 0.76;
+    const cockpitVibration = allowMotion
+      ? Math.sin(this.sceneTime * 19) * 0.22 + Math.sin(this.sceneTime * 31) * 0.12
+      : 0;
 
     if (this.spaceScene) {
       this.spaceScene.style.setProperty("--flight-x", `${x.toFixed(2)}px`);
@@ -676,6 +679,7 @@ export class VoyageScene {
       this.spaceScene.style.setProperty("--flight-bank", `${bank.toFixed(2)}deg`);
       this.spaceScene.style.setProperty("--flight-pitch", `${pitch.toFixed(2)}deg`);
       this.spaceScene.style.setProperty("--wake-length", wakeLength.toFixed(3));
+      this.spaceScene.style.setProperty("--cockpit-vibration", `${cockpitVibration.toFixed(2)}px`);
     }
     if (this.steeringKnob) {
       this.steeringKnob.style.setProperty("--knob-x", `${(steering.x * 22).toFixed(1)}px`);

@@ -19,7 +19,7 @@ Then open [http://localhost:4173](http://localhost:4173) in a browser. To use a 
 - When a hostile ship is identified, select **전투 시작** to enter the top-down crew battle.
 - Win the boarding action, collect the enemy ship's supplies, and return to begin a new search.
 
-The voyage uses an engine-free perspective starfield and CSS 3D ship rig. The interface adapts to desktop and mobile screens and supports reduced-motion preferences.
+The voyage uses an engine-free perspective starfield framed by a first-person cockpit. The interface adapts to desktop and mobile screens and supports reduced-motion preferences.
 
 ## Project structure
 
@@ -27,7 +27,7 @@ The voyage uses an engine-free perspective starfield and CSS 3D ship rig. The in
 .
 ├── index.html      Voyage, encounter, and battle structure
 ├── styles.css      Shared space and ship presentation
-├── voyage.css      Navigation HUD, controls, and chase-view styling
+├── voyage.css      Navigation HUD, controls, and cockpit-view styling
 ├── battle.css      Top-down crew battle styling
 ├── assets/         Player and enemy crew sprites
 ├── src/

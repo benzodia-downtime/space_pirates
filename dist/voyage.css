@@ -15,6 +15,10 @@
   --flight-pitch: 0deg;
   --flight-x: 0px;
   --flight-y: 0px;
+  --cockpit-shift-x: 0px;
+  --cockpit-shift-y: 0px;
+  --cockpit-roll: 0deg;
+  --cockpit-vibration: 0px;
   --contact-x: 50%;
   --contact-y: 36%;
   --contact-opacity: 0;
@@ -270,10 +274,266 @@
   transform: translateX(-50%);
 }
 
+.cockpit-shell {
+  position: absolute;
+  z-index: 24;
+  inset: -3% -3% 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform:
+    translate3d(
+      calc(var(--cockpit-shift-x) + var(--cockpit-vibration)),
+      var(--cockpit-shift-y),
+      0
+    )
+    rotate(var(--cockpit-roll));
+  transform-origin: 50% 78%;
+  will-change: transform;
+}
+
+.cockpit-shell__glass {
+  position: absolute;
+  z-index: 1;
+  inset: 3.5% 2.5% 17%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 78%, rgba(48, 191, 213, 0.06), transparent 33%),
+    linear-gradient(115deg, rgba(152, 241, 255, 0.035), transparent 24% 72%, rgba(69, 162, 181, 0.045));
+  clip-path: polygon(7% 0, 93% 0, 100% 100%, 0 100%);
+}
+
+.cockpit-shell__glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.38;
+  background:
+    linear-gradient(103deg, transparent 0 15%, rgba(214, 252, 255, 0.08) 15.2% 15.7%, transparent 16% 100%),
+    linear-gradient(76deg, transparent 0 78%, rgba(214, 252, 255, 0.055) 78.2% 78.7%, transparent 79% 100%);
+}
+
+.cockpit-shell__reflection {
+  position: absolute;
+  top: -24%;
+  width: 4.5%;
+  height: 136%;
+  opacity: 0.18;
+  background: linear-gradient(90deg, transparent, #c8f9ff, transparent);
+  filter: blur(5px);
+  transform: rotate(16deg);
+}
+
+.cockpit-shell__reflection--left { left: 18%; }
+
+.cockpit-shell__reflection--right {
+  right: 14%;
+  width: 2.5%;
+  opacity: 0.1;
+  transform: rotate(-14deg);
+}
+
+.cockpit-shell__canopy {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+}
+
+.cockpit-shell__beam {
+  position: absolute;
+  display: block;
+  background:
+    linear-gradient(90deg, rgba(202, 146, 71, 0.72), transparent 10% 90%, rgba(202, 146, 71, 0.72)),
+    linear-gradient(180deg, #1c2938, #070c14 52%, #111b28);
+  box-shadow:
+    inset 0 -1px rgba(124, 225, 233, 0.18),
+    0 12px 28px rgba(0, 0, 0, 0.64);
+}
+
+.cockpit-shell__beam--top {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: clamp(3.8rem, 10vh, 7rem);
+  clip-path: polygon(0 0, 100% 0, 100% 48%, 72% 40%, 64% 65%, 36% 65%, 28% 40%, 0 48%);
+}
+
+.cockpit-shell__beam--left,
+.cockpit-shell__beam--right {
+  top: 2%;
+  bottom: 12%;
+  width: clamp(4.3rem, 10vw, 9.5rem);
+  filter: drop-shadow(0 0 1px rgba(219, 173, 94, 0.4));
+}
+
+.cockpit-shell__beam--left {
+  left: 0;
+  clip-path: polygon(0 0, 59% 0, 100% 100%, 0 100%);
+}
+
+.cockpit-shell__beam--right {
+  right: 0;
+  clip-path: polygon(41% 0, 100% 0, 100% 100%, 0 100%);
+}
+
+.cockpit-reticle {
+  position: absolute;
+  z-index: 2;
+  top: 45%;
+  left: 50%;
+  width: clamp(4.5rem, 8vw, 7rem);
+  aspect-ratio: 1;
+  opacity: 0.35;
+  border: 1px solid rgba(105, 222, 232, 0.32);
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  filter: drop-shadow(0 0 5px rgba(78, 211, 226, 0.22));
+  transform: translate(-50%, -50%);
+}
+
+.cockpit-reticle::before,
+.cockpit-reticle::after {
+  content: "";
+  position: absolute;
+  background: rgba(112, 231, 237, 0.62);
+}
+
+.cockpit-reticle::before {
+  top: 50%;
+  left: 14%;
+  width: 72%;
+  height: 1px;
+}
+
+.cockpit-reticle::after {
+  top: 14%;
+  left: 50%;
+  width: 1px;
+  height: 72%;
+}
+
+.cockpit-reticle span {
+  position: absolute;
+  inset: 37%;
+  border: 1px solid rgba(120, 239, 242, 0.74);
+  transform: rotate(45deg);
+}
+
+.cockpit-reticle i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: #a9fbff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #61eaf4;
+  transform: translate(-50%, -50%);
+}
+
+.cockpit-console {
+  position: absolute;
+  z-index: 4;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: clamp(9.5rem, 24vh, 15rem);
+  color: #86aabb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background:
+    radial-gradient(ellipse at 50% 0, rgba(51, 173, 193, 0.12), transparent 25%),
+    linear-gradient(90deg, rgba(173, 114, 50, 0.18), transparent 5% 95%, rgba(173, 114, 50, 0.18)),
+    linear-gradient(180deg, #1b2734 0, #0b111b 19%, #040810 100%);
+  border-top: 1px solid rgba(197, 151, 84, 0.52);
+  box-shadow:
+    inset 0 5px 18px rgba(75, 179, 195, 0.04),
+    0 -18px 38px rgba(0, 0, 0, 0.72);
+  clip-path: polygon(0 30%, 8% 12%, 34% 15%, 40% 0, 60% 0, 66% 15%, 92% 12%, 100% 30%, 100% 100%, 0 100%);
+}
+
+.cockpit-console::before {
+  content: "";
+  position: absolute;
+  top: 20%;
+  right: 10%;
+  left: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(92, 218, 229, 0.34), transparent);
+}
+
+.cockpit-console__panel,
+.cockpit-console__core {
+  position: absolute;
+  bottom: 16%;
+  padding: 0.55rem 0.75rem;
+  background: rgba(3, 10, 17, 0.72);
+  border: 1px solid rgba(103, 161, 176, 0.18);
+  border-top-color: rgba(207, 159, 87, 0.34);
+  clip-path: polygon(0.45rem 0, 100% 0, 100% calc(100% - 0.45rem), calc(100% - 0.45rem) 100%, 0 100%, 0 0.45rem);
+}
+
+.cockpit-console__panel {
+  min-width: 8.5rem;
+  font-size: 0.5rem;
+  letter-spacing: 0.15em;
+}
+
+.cockpit-console__panel--left { left: 20%; }
+.cockpit-console__panel--right { right: 7%; }
+
+.cockpit-console__panel i {
+  display: inline-block;
+  width: 1.7rem;
+  height: 3px;
+  margin: 0.55rem 0.2rem 0 0;
+  background: #4adddb;
+  box-shadow: 0 0 6px rgba(74, 221, 219, 0.52);
+}
+
+.cockpit-console__panel i:nth-of-type(2) {
+  width: 0.8rem;
+  background: #d9a85b;
+  box-shadow: 0 0 6px rgba(217, 168, 91, 0.48);
+}
+
+.cockpit-console__panel i:nth-of-type(3) {
+  width: 0.45rem;
+  background: #75a3b3;
+  box-shadow: none;
+}
+
+.cockpit-console__core {
+  bottom: 8%;
+  left: 50%;
+  min-width: 9rem;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.cockpit-console__core span,
+.cockpit-console__core strong {
+  display: block;
+}
+
+.cockpit-console__core span {
+  color: #d5a85e;
+  font-size: 0.5rem;
+  letter-spacing: 0.26em;
+}
+
+.cockpit-console__core strong {
+  margin-top: 0.28rem;
+  color: #83d9df;
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+}
+
 .ship-stage--player {
-  z-index: 13;
+  z-index: 0;
   top: 77%;
   width: min(68vmin, 40rem);
+  opacity: 0;
+  pointer-events: none;
   transform:
     translate(-50%, -50%)
     translate3d(var(--flight-x), var(--flight-y), 0)
@@ -360,7 +620,7 @@
 .flight-controls {
   position: absolute;
   z-index: 36;
-  bottom: max(1.2rem, env(safe-area-inset-bottom));
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
   left: max(1.2rem, env(safe-area-inset-left));
   display: flex;
   gap: 0.8rem;
@@ -453,7 +713,7 @@
 }
 
 .help-overlay {
-  bottom: max(1.35rem, env(safe-area-inset-bottom));
+  bottom: max(3.35rem, calc(env(safe-area-inset-bottom) + 2rem));
 }
 
 @keyframes radar-sweep {
@@ -511,6 +771,29 @@
     right: 0;
     width: 4.7rem;
     height: 4.7rem;
+  }
+
+  .cockpit-shell__beam--left,
+  .cockpit-shell__beam--right {
+    width: clamp(3.2rem, 13vw, 5.5rem);
+  }
+
+  .cockpit-console {
+    height: clamp(8rem, 21vh, 11rem);
+  }
+
+  .cockpit-console__panel--left {
+    display: none;
+  }
+
+  .cockpit-console__panel--right {
+    right: 5%;
+    bottom: 12%;
+    min-width: 6.5rem;
+  }
+
+  .cockpit-console__core {
+    bottom: 7%;
   }
 
   .ship-stage--player {
@@ -574,6 +857,28 @@
     height: 4rem;
   }
 
+  .cockpit-shell__beam--left,
+  .cockpit-shell__beam--right {
+    width: clamp(2.8rem, 14vw, 4rem);
+  }
+
+  .cockpit-console {
+    height: clamp(7.2rem, 19vh, 9rem);
+  }
+
+  .cockpit-console__panel--right {
+    display: none;
+  }
+
+  .cockpit-console__core {
+    right: 0.65rem;
+    bottom: 8%;
+    left: auto;
+    min-width: 7.4rem;
+    padding: 0.45rem 0.55rem;
+    transform: none;
+  }
+
   .ship-stage--player {
     top: 74%;
     width: 100vw;
@@ -582,6 +887,12 @@
 
 @media (max-width: 360px) {
   .title-overlay {
+    display: none;
+  }
+}
+
+@media (max-width: 320px) {
+  .cockpit-console__core {
     display: none;
   }
 }
@@ -602,6 +913,25 @@
 
   .voyage-readout { padding-block: 0.45rem; }
   .voyage-radar { width: 4rem; height: 4rem; }
+
+  .cockpit-shell__beam--top {
+    height: 3.5rem;
+  }
+
+  .cockpit-console {
+    height: min(29vh, 7.5rem);
+  }
+
+  .cockpit-console__panel {
+    display: none;
+  }
+
+  .cockpit-console__core {
+    right: 1rem;
+    bottom: 7%;
+    left: auto;
+    transform: none;
+  }
 
   .ship-stage--player {
     top: 75%;
@@ -644,4 +974,17 @@
   .voyage-readout p {
     color: #fff;
   }
+}
+
+/* Keep the SVG definitions available to the enemy ship without drawing the player exterior. */
+#ship-stage.ship-stage--player {
+  position: absolute;
+  top: -10000px;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: none;
 }
