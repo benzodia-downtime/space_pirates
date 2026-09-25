@@ -1,16 +1,14 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=hud-1";
-import { AssaultSequence, ASSAULT_CONFIG, ASSAULT_COPY } from "./assault.js?v=hud-1";
-import { AssaultAudio } from "./assault-audio.js?v=hud-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=settings-1";
+import { AssaultSequence, ASSAULT_CONFIG, ASSAULT_COPY } from "./assault.js?v=settings-1";
+import { AssaultAudio } from "./assault-audio.js?v=settings-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt } from "./navigation.js?v=hud-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt } from "./navigation.js?v=settings-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const VOYAGE_CONFIG = Object.freeze({
   searchBaseRate: 0.026,
   searchAlignedRate: 0.044,
-  scanBoost: 0.13,
-  scanCooldownSeconds: 4,
   signalProgress: 0.27,
   approachProgress: 0.64,
 });
@@ -45,8 +43,6 @@ export class VoyageScene {
     this.boardingActionLabel = document.getElementById("boarding-action-label");
     this.steeringPad = document.getElementById("steering-pad");
     this.steeringKnob = document.getElementById("steering-knob");
-    this.scanButton = document.getElementById("scan-button");
-    this.scanButtonState = document.getElementById("scan-button-state");
     this.assault = new AssaultSequence();
     this.navigation = new OrbitNavigation();
     this.orbitControls = document.getElementById("orbit-controls");
@@ -67,7 +63,35 @@ export class VoyageScene {
     this.audio = new AssaultAudio();
     this.soundButton = document.getElementById("sound-button");
     this.assaultCue = document.getElementById("assault-cue");
-    this.onSoundToggle = () => { const enabled = this.audio.toggle(); this.soundButton.textContent = enabled ? "SFX ON" : "SFX OFF"; this.soundButton.setAttribute("aria-pressed", String(enabled)); };
+    this.settingsButton = document.getElementById("settings-button");
+    this.settingsDialog = document.getElementById("settings-dialog");
+    this.settingsClose = document.getElementById("settings-close");
+    this.resumeAfterSettings = false;
+    this.onSettingsOpen = () => this.openSettings();
+    this.onSettingsClose = () => this.settingsDialog?.close();
+    this.onSettingsKeyDown = event => {
+      if (event.key !== "Tab") return;
+      const controls = [this.settingsClose, this.soundButton].filter(button => button && !button.disabled);
+      if (!controls.length) return;
+      event.preventDefault();
+      const index = controls.indexOf(document.activeElement);
+      controls[(index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length].focus();
+    };
+    this.onSettingsClosed = () => {
+      this.settingsButton?.setAttribute("aria-expanded", "false");
+      const resume = this.resumeAfterSettings;
+      this.resumeAfterSettings = false;
+      if (this.destroyed || this.spaceScene?.hidden) return;
+      if (resume) this.resume();
+      this.settingsButton?.focus({ preventScroll: true });
+    };
+    try { this.audio.enabled = localStorage.getItem("space-pirates:sfx") !== "off"; } catch { /* Storage is optional. */ }
+    this.updateSoundSetting();
+    this.onSoundToggle = () => {
+      this.audio.toggle();
+      this.updateSoundSetting();
+      try { localStorage.setItem("space-pirates:sfx", this.audio.enabled ? "on" : "off"); } catch { /* Keep the in-memory setting. */ }
+    };
     this.visuals = new VoyageRenderer(canvas);
     this.visuals.onLost = () => { this.audio.stop(); this.onBlur(); };
     this.visuals.onRestore = () => { this.renderStill(); this.startLoop(); };
@@ -85,9 +109,6 @@ export class VoyageScene {
     this.journeyDistance = 0;
     this.searchProgress = 0;
     this.cruiseElapsed = 0;
-    this.scanCooldown = 0;
-    this.scanPulse = 0;
-    this.spaceScene?.classList.remove("is-scanning");
     this.nextCourseAt = 3;
     this.lastFrameTime = 0;
     this.frameId = 0;
@@ -115,7 +136,6 @@ export class VoyageScene {
     this.onPointerEnd = this.onPointerEnd.bind(this);
     this.onKeyDown = this.onKeyDown.bind(this);
     this.onKeyUp = this.onKeyUp.bind(this);
-    this.onScan = this.triggerScan.bind(this);
     this.onBoardingAction = this.handleBoardingAction.bind(this);
     this.onMotionPreferenceChange = this.onMotionPreferenceChange.bind(this);
 
@@ -150,6 +170,10 @@ export class VoyageScene {
     this.orbitDirection?.addEventListener("click", this.onReverse);
     window.addEventListener("blur", this.onBlur);
     this.soundButton?.addEventListener("click", this.onSoundToggle);
+    this.settingsButton?.addEventListener("click", this.onSettingsOpen);
+    this.settingsClose?.addEventListener("click", this.onSettingsClose);
+    this.settingsDialog?.addEventListener("close", this.onSettingsClosed);
+    this.settingsDialog?.addEventListener("keydown", this.onSettingsKeyDown);
     window.addEventListener("resize", this.onResize, { passive: true });
     document.addEventListener("visibilitychange", this.onVisibilityChange);
     window.addEventListener("pointermove", this.onPointerMove, { passive: true });
@@ -158,7 +182,6 @@ export class VoyageScene {
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
     this.steeringPad?.addEventListener("pointerdown", this.onPointerDown);
-    this.scanButton?.addEventListener("click", this.onScan);
     this.boardingAction?.addEventListener("click", this.onBoardingAction);
 
     if (this.motionPreference) {
@@ -180,6 +203,10 @@ export class VoyageScene {
     this.orbitDirection?.removeEventListener("click", this.onReverse);
     window.removeEventListener("blur", this.onBlur);
     this.soundButton?.removeEventListener("click", this.onSoundToggle);
+    this.settingsButton?.removeEventListener("click", this.onSettingsOpen);
+    this.settingsClose?.removeEventListener("click", this.onSettingsClose);
+    this.settingsDialog?.removeEventListener("close", this.onSettingsClosed);
+    this.settingsDialog?.removeEventListener("keydown", this.onSettingsKeyDown);
     window.removeEventListener("resize", this.onResize);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     window.removeEventListener("pointermove", this.onPointerMove);
@@ -188,7 +215,6 @@ export class VoyageScene {
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
     this.steeringPad?.removeEventListener("pointerdown", this.onPointerDown);
-    this.scanButton?.removeEventListener("click", this.onScan);
     this.boardingAction?.removeEventListener("click", this.onBoardingAction);
 
     if (this.motionPreference) {
@@ -293,12 +319,28 @@ export class VoyageScene {
     return `너무 가까워 선회 불가 · 후진해 중심 거리 ${ORBIT.minRadius}m 이상 확보`;
   }
 
+  updateSoundSetting() {
+    if (!this.soundButton) return;
+    this.soundButton.textContent = this.audio.enabled ? "켜짐" : "꺼짐";
+    this.soundButton.setAttribute("aria-pressed", String(this.audio.enabled));
+  }
+
+  openSettings() {
+    if (this.destroyed || this.spaceScene?.hidden || !this.settingsDialog || this.settingsDialog.open) return;
+    this.resumeAfterSettings = !this.manuallyPaused;
+    this.pause(); // Release held controls and freeze navigation while the modal is open.
+    this.settingsDialog.showModal();
+    this.settingsButton?.setAttribute("aria-expanded", "true");
+  }
+
   onKeyDown(event) {
+    if (this.settingsDialog?.open) return; // Keep native dialog Tab, Space, Enter and Escape behavior.
     const tagName = event.target?.tagName;
     const isTextControl = tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
     const isNativeButtonAction = tagName === "BUTTON" && (event.code === "Space" || event.key === "Enter");
     if (isTextControl) return;
     if (this.spaceScene?.hidden) return;
+    if (isNativeButtonAction && event.target === this.settingsButton) return;
     if (this.manuallyPaused || this.destroyed) {
       if (event.code === "Space" || event.key === "Enter") event.preventDefault();
       return;
@@ -329,9 +371,7 @@ export class VoyageScene {
       if (!this.assault.committed && (!event.repeat || this.keys.has(key))) this.keys.add(key);
       event.preventDefault();
     } else if (event.code === "Space") {
-      if (this.isSearching) {
-        this.triggerScan();
-      } else if (this.encounterReady) {
+      if (this.encounterReady) {
         this.battleButton?.click();
       } else {
         this.handleBoardingAction();
@@ -405,9 +445,6 @@ export class VoyageScene {
     this.mode = "cruise";
     this.searchProgress = 0;
     this.cruiseElapsed = 0;
-    this.scanCooldown = 0;
-    this.scanPulse = 0;
-    this.spaceScene?.classList.remove("is-scanning");
     this.resetBoardingState();
     this.contactBearing = {
       x: this.pointer.x * 0.68 + (Math.random() < 0.5 ? -1 : 1) * (0.2 + Math.random() * 0.24),
@@ -420,9 +457,6 @@ export class VoyageScene {
     }
     this.navigation.begin(this.contactBearing, { position, radius: FLIGHT.contactDistance, active: false });
     if (this.battleButtonStatus) this.battleButtonStatus.textContent = "후방 하강문 파열 · 진입 가능";
-    if (this.scanButton) this.scanButton.disabled = false;
-    this.scanButton?.setAttribute("aria-label", "장거리 센서 펄스 방출");
-    if (this.scanButtonState) this.scanButtonState.textContent = "SCAN";
     this.spaceScene?.setAttribute("data-voyage-state", "cruise");
     this.updateHud(true);
 
@@ -454,7 +488,6 @@ export class VoyageScene {
     if (this.boardingPanel) this.boardingPanel.hidden = false;
     if (this.boardingAction) this.boardingAction.hidden = false;
     if (this.battleButton) { this.battleButton.hidden = true; this.battleButton.disabled = true; }
-    if (this.scanButton) this.scanButton.disabled = true;
     this.setVoyageMode("survey", "적함에 접근했습니다. 자동 선회로 뒤쪽을 살펴보고 하강문을 찾으십시오.");
     this.updateHud(true);
   }
@@ -499,30 +532,6 @@ export class VoyageScene {
 
   getBoardingProgress() { return this.assault.progress; }
 
-  triggerScan() {
-    if (
-      this.destroyed ||
-      this.manuallyPaused ||
-      !this.isSearching ||
-      this.scanCooldown > 0 ||
-      this.spaceScene?.hidden
-    ) {
-      return;
-    }
-
-    this.searchProgress = Math.min(0.96, this.searchProgress + VOYAGE_CONFIG.scanBoost);
-    this.scanCooldown = VOYAGE_CONFIG.scanCooldownSeconds;
-    this.scanPulse = 0.82;
-    this.spaceScene?.classList.add("is-scanning");
-    if (this.scanButton) this.scanButton.disabled = true;
-    this.scanButton?.setAttribute("aria-label", "장거리 센서 펄스 재충전 중");
-    if (this.announcement) {
-      this.announcement.textContent = "센서 펄스를 방출했습니다. 다음 펄스까지 4초입니다.";
-    }
-    this.updateMode();
-    this.updateHud(true);
-  }
-
   updateBoardingControls() {
     if (!this.isBoardingActive) return;
     const nav = this.navigation, a = this.assault;
@@ -543,10 +552,8 @@ export class VoyageScene {
     if (this.boardingActionLabel) this.boardingActionLabel.textContent = label;
     if (this.boardingActionStatus) this.boardingActionStatus.textContent = status;
     this.boardingAction?.setAttribute("aria-label", status + ". " + label);
-    if (this.scanButtonState) this.scanButtonState.textContent = nav.anchor ? "HOOK" : "LOOK";
     this.steeringPad?.setAttribute("aria-disabled", String(a.committed));
     this.spaceScene?.setAttribute("data-helm-locked", String(a.committed));
-    this.scanButton?.setAttribute("aria-label", "후방 하강문은 선회하며 직접 찾아야 합니다");
     if (this.orbitControls) this.orbitControls.hidden = this.encounterReady || a.committed;
     if (this.orbitButton) {
       this.orbitButton.disabled = !nav.orbiting && !nav.canOrbit;
@@ -611,23 +618,6 @@ export class VoyageScene {
     // explicitly triggered tether charge adds a cosmetic star streak effect.
     this.starSpeedFactor = this.mode === "charge" ? 1 + this.assault.charge * 8 : 0;
     if (!this.reducedMotion) this.starTravel += deltaSeconds * 305 * this.starSpeedFactor;
-
-    if (this.scanCooldown > 0) {
-      const previousCooldown = this.scanCooldown;
-      this.scanCooldown = Math.max(0, this.scanCooldown - deltaSeconds);
-      if (this.scanCooldown === 0 && this.scanButton && this.isSearching) {
-        this.scanButton.disabled = false;
-        this.scanButton.setAttribute("aria-label", "장거리 센서 펄스 방출");
-        if (previousCooldown > 0 && this.announcement) {
-          this.announcement.textContent = "센서 펄스가 다시 준비되었습니다.";
-        }
-      }
-    }
-
-    if (this.scanPulse > 0) {
-      this.scanPulse = Math.max(0, this.scanPulse - deltaSeconds);
-      if (this.scanPulse === 0) this.spaceScene?.classList.remove("is-scanning");
-    }
 
     if (this.isSearching) {
       const { relativeX, relativeY } = this.getTrackingMetrics();
@@ -711,12 +701,6 @@ export class VoyageScene {
       const y = Math.round(this.navigation.position.z).toString().padStart(3, "0");
       this.coordinateLabel.textContent = `X ${x} · Y ${y}`;
     }
-    if (this.scanButtonState && this.scanCooldown > 0 && this.isSearching) {
-      this.scanButtonState.textContent = `${Math.ceil(this.scanCooldown)}s`;
-    } else if (this.scanButtonState && this.isSearching) {
-      this.scanButtonState.textContent = "SCAN";
-    }
-
     if (this.isBoardingActive) {
       const a = this.assault;
       if (this.boardingDistanceType) this.boardingDistanceType.textContent = a.breach > 0 ? "BREACH DEPTH" : this.mode === "survey" ? "CENTRE" : "GAP";
@@ -835,6 +819,7 @@ export class VoyageScene {
   }
 
   resume() {
+    if (this.destroyed || this.settingsDialog?.open) return;
     this.manuallyPaused = false;
     this.visuals.resize();
     this.renderStill();
@@ -845,9 +830,6 @@ export class VoyageScene {
     if (this.destroyed || this.spaceScene?.hidden) return;
 
     this.searchProgress = 1;
-    this.scanCooldown = 0;
-    this.scanPulse = 0;
-    this.spaceScene?.classList.remove("is-scanning");
     this.resetBoardingState();
     this.beginIntercept({ force: true });
     this.updateHud(true);
@@ -862,9 +844,6 @@ export class VoyageScene {
     if (this.destroyed || this.spaceScene?.hidden) return;
 
     this.searchProgress = 1;
-    this.scanCooldown = 0;
-    this.scanPulse = 0;
-    this.spaceScene?.classList.remove("is-scanning");
     this.resetBoardingState();
     this.beginIntercept({ force: true });
     const view = this.navigation.forceRear();
@@ -886,6 +865,7 @@ export class VoyageScene {
       mode: this.mode,
       boardingStage: this.isBoardingActive ? this.mode : null,
       searchProgress: this.searchProgress,
+      settingsOpen: Boolean(this.settingsDialog?.open), sfxEnabled: this.audio.enabled,
       encounterReady: this.encounterReady,
       journeyDistance: this.journeyDistance,
       thrust: this.getThrust(), speed: this.assault.committed ? this.assault.speed : this.navigation.speed,
@@ -908,7 +888,7 @@ export class VoyageScene {
   }
 
   focusControls() {
-    this.scanButton?.focus({ preventScroll: true });
+    this.steeringPad?.focus({ preventScroll: true });
   }
 
   destroy() {
@@ -917,9 +897,11 @@ export class VoyageScene {
     this.destroyed = true;
     this.stopLoop();
     this.removeListeners();
+    this.resumeAfterSettings = false;
+    this.settingsDialog?.close();
+    this.settingsButton?.setAttribute("aria-expanded", "false");
     this.visuals.dispose();
     this.audio.destroy();
-    this.spaceScene?.classList.remove("is-scanning");
     this.keys.clear();
 
   }

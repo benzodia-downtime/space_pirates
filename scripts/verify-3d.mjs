@@ -42,6 +42,60 @@ try {
       await drag(Math.max(-35, Math.min(35, dx)), Math.max(-25, Math.min(25, dy)));
     }
   }
+  async function checkSettings() {
+    assert.equal(await page.locator('#scan-button, #scan-button-state').count(), 0);
+    assert.equal(await page.locator('#sound-button').isVisible(), false);
+    await page.keyboard.down('w');
+    await tap('#settings-button');
+    assert.equal(await page.evaluate(() => SpacePiratesAmbient.paused), true);
+    const frozen = await read();
+    await page.keyboard.up('w');
+    for (const key of ['w','a','o','q','f']) await page.keyboard.press(key);
+    await page.waitForTimeout(200);
+    assert.deepEqual((await read()).navigation.position, frozen.navigation.position, 'Settings freeze navigation');
+    assert.deepEqual((await read()).steering, frozen.steering, 'Settings reject flight controls');
+    assert.equal((await read()).searchProgress, frozen.searchProgress);
+    assert.equal((await read()).thrust, 0);
+    await tap('#sound-button');
+    assert.equal((await read()).sfxEnabled, false);
+    await page.keyboard.press('Space');
+    assert.equal((await read()).sfxEnabled, true, 'Native keyboard sound toggle works inside modal');
+    await page.keyboard.press('Space');
+    assert.equal((await read()).sfxEnabled, false);
+    for (let i=0;i<4;i++) {
+      await page.keyboard.press('Tab');
+      assert.equal(await page.evaluate(() => document.getElementById('settings-dialog').contains(document.activeElement)), true, 'Focus stays in modal');
+    }
+    const viewport = page.viewportSize();
+    for (const [width,height] of [[1440,900],[390,844],[320,568],[568,320]]) {
+      await page.setViewportSize({width,height});
+      const b=await page.locator('#settings-dialog').boundingBox();
+      assert.ok(b.x>=0 && b.y>=0 && b.x+b.width<=width && b.y+b.height<=height, 'Settings fits '+width+'x'+height);
+      for(const id of ['sound-button','settings-close']) {
+        const r=await page.locator('#'+id).boundingBox();
+        assert.ok(r.width>=44 && r.height>=44 && r.y+r.height<=height, id+' touch target');
+      }
+      await page.screenshot({path:`qa-output/settings-${width}x${height}.png`});
+    }
+    await page.setViewportSize(viewport);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !SpacePiratesAmbient.paused);
+    assert.equal(await page.locator('#settings-dialog').isVisible(), false);
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'settings-button');
+    assert.equal((await read()).speed, 0, 'Closing settings never restores held thrust');
+    await page.reload(); await page.waitForFunction(() => window.SpacePiratesAmbient);
+    assert.equal((await read()).sfxEnabled, false, 'Sound preference survives reload');
+    await tap('#settings-button'); await tap('#sound-button'); await tap('#settings-close');
+    await page.waitForFunction(() => !SpacePiratesAmbient.paused);
+    assert.equal((await read()).sfxEnabled, true);
+    await page.evaluate(() => SpacePiratesAmbient.pause());
+    await tap('#settings-button'); await tap('#settings-close');
+    await page.waitForTimeout(80);
+    assert.equal(await page.evaluate(() => SpacePiratesAmbient.paused), true, 'Existing pause is preserved');
+    await page.evaluate(() => SpacePiratesAmbient.resume());
+  }
+  await checkSettings();
+
   async function checkLayout(label, matrix = true) {
     const original = page.viewportSize();
     const viewports = matrix ? [['desktop',1440,900], ['tablet',1024,768], ['portrait',390,844], ['small',320,568], ['landscape',844,390], ['short',667,375], ['compact-landscape',568,320]] : [[label,original.width,original.height]];
@@ -128,10 +182,12 @@ try {
   assert.ok(forward.speed > 0); assert.ok(forward.navigation.position.z < idle.navigation.position.z);
   const reverse = await holdThrust('thrust-reverse', 500, true);
   assert.ok(reverse.speed < 0); assert.ok(reverse.navigation.position.z > forward.navigation.position.z);
-  const scanIdle = await read();
-  await tap('#scan-button'); await page.waitForTimeout(350);
-  assert.deepEqual((await read()).navigation.position, scanIdle.navigation.position, 'Scan cannot move the player');
-  assert.deepEqual((await read()).rendering.enemyPosition, scanIdle.rendering.enemyPosition, 'Scan cannot pull target closer');
+  const noScan = await read();
+  await page.locator('#steering-pad').focus();
+  await page.keyboard.press('Space'); await page.waitForTimeout(350);
+  assert.equal((await read()).searchProgress, noScan.searchProgress, 'Space has no sensor pulse action');
+  assert.deepEqual((await read()).navigation.position, noScan.navigation.position);
+  assert.deepEqual((await read()).rendering.enemyPosition, noScan.rendering.enemyPosition);
   await page.keyboard.down('w'); await page.keyboard.down('s');
   await page.waitForTimeout(80); const opposed = await read(); await page.waitForTimeout(200);
   assert.equal((await read()).speed, 0); assert.deepEqual((await read()).navigation.position, opposed.navigation.position);
@@ -243,6 +299,14 @@ try {
   seen.add('harpoon');
   await page.waitForFunction(() => SpacePiratesAmbient.getState().mode === 'tethered');
   seen.add('tethered');
+  // A focused settings button must open with Space instead of triggering a tether pull.
+  await page.locator('#settings-button').focus();
+  await page.keyboard.press('Space');
+  assert.equal((await read()).settingsOpen, true);
+  assert.equal((await read()).mode, 'tethered');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !SpacePiratesAmbient.paused);
+  await page.locator('#steering-pad').focus();
   const hooked = await read();
   assert.equal(hooked.navigation.orbiting, false);
   assert.equal(hooked.rendering.harpoonVisible, true);
@@ -313,8 +377,11 @@ try {
   assert.equal((await read()).speed, 0); assert.equal((await read()).thrust, 0);
   assert.equal((await read()).navigation.anchor, null);
   assert.equal((await read()).rendering.harpoonVisible, false);
-  await page.locator('#sound-button').click();
+  await tap('#settings-button');
+  await tap('#sound-button');
   assert.equal(await page.locator('#sound-button').getAttribute('aria-pressed'), 'false');
+  await tap('#settings-close');
+  await page.waitForFunction(() => !SpacePiratesAmbient.paused);
 
   await page.locator('#steering-pad').focus();
   await page.keyboard.down('d');
@@ -352,7 +419,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=hud-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=settings-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();
