@@ -17,44 +17,35 @@ Then open [http://localhost:4173](http://localhost:4173) in a browser. To use a 
 
 - Set a persistent course with the on-screen control pad, `WASD`, or the arrow keys.
 - Use **SCAN** or the space bar to accelerate long-range contact detection.
-- Track the projected intercept marker, match the hostile ship's speed and rotation, then fire the port and starboard magnetic harpoons.
-- Hold the target near the reticle while the winches pull both ships together, deploy the pressurized boarding bridge, and select **적함 돌입** once its airlock opens.
+- Approach the enemy bow and hold its forward bulkhead in the central reticle.
+- At 90 m, maintain alignment until **강습 돌입** is enabled, then click it (or press Space) to commit. Nothing rams automatically.
+- The helm locks for ram deployment → accelerating frontal charge → contact hit-stop and penetration → claw lock → sealing and pressure equalization. The entire sequence stays in the cockpit.
+- Select **적함 돌입** after the inner door opens. Use **SFX ON/OFF** to toggle the procedural ship-interior sounds.
 - Win the boarding action, collect the enemy ship's supplies, and return to begin a new search.
 
-The voyage is a real perspective 3D scene viewed from inside the cockpit. A low-poly hostile frigate turns broadside during approach; its side airlock and two magnetic anchors are actual hull-local attachment points. Cables connect those anchors to our foredeck launchers. A telescoping, upright boarding passage meets the airlock, then the doors slide open after pressure equalization. Crew combat remains the existing top-down 2D encounter.
+The voyage is a real perspective 3D scene. The enemy presents its bow, not a side airlock. A hollow breaching ram tears apart the forward armour panels, seats inside the opening, and deploys mechanical claws. A short sealed passage connects our foredeck to a point inside the damaged hull. Only this local entry point is destroyed; the ship remains available to board and loot. Crew combat remains top-down 2D.
 
-One 3D world unit is one metre (equivalent to 100 Unreal units in the crew-combat rules). The docking readout describes the hatch-to-hatch gap, not the ship-centre distance. Mobile rendering caps pixel density, instances repeated hull plates, and avoids shadows/post-processing. A WebGL 2-capable browser is required; unsupported or interrupted graphics contexts show an explicit recovery message. Reduced motion, latched steering and pause/resume are retained.
+One 3D world unit is one metre (equivalent to 100 Unreal units in crew combat). The range readout describes the foredeck-to-bow gap and switches to penetration depth after contact. Mobile rendering caps pixel density and uses simple shared/instanced geometry. A WebGL 2 browser is required; unsupported/interrupted graphics show a recovery message.
 
-Dependencies are pinned in `package-lock.json`. The build copies Three.js and its MIT license into `dist/vendor/`, so the deployed game does not depend on a third-party CDN.
+Reduced motion removes collision shake, flash, star streaks and flying debris while preserving the readable stage sequence. Audio starts only after a user gesture and stops on pause, hidden tabs, GPU interruption or mute. Simulation-time cutscenes cannot advance while paused or hidden; steering stays latched before commitment and unlocks on the next search.
+
+Dependencies are pinned in `package-lock.json`. The build copies Three.js and its MIT license into `dist/vendor/`, so the deployed game has no third-party CDN dependency.
 
 ## Project structure
 
-```text
-.
-├── index.html      Voyage, encounter, and battle structure
-├── styles.css      Shared space and ship presentation
-├── voyage.css      Navigation HUD, controls, and cockpit-view styling
-├── battle.css      Top-down crew battle styling
-├── assets/         Player and enemy crew sprites
-├── src/
-│   ├── main.js     Battle logic and scene integration
-│   ├── voyage.js   Flight controls, scanning, and boarding state machine
-│   └── voyage-renderer.js  3D ships, cockpit, anchors, bridge and projection
-├── scripts/
-│   └── build-static.mjs  Static deployment build
-├── server.mjs      Dependency-free local static server
-├── package.json    Project scripts and metadata
-└── README.md       Project overview and usage
-```
+- `src/main.js`: crew combat and scene integration
+- `src/voyage.js`: persistent steering, search, assault UI and lifecycle
+- `src/assault.js`: deterministic frontal-assault state machine
+- `src/voyage-renderer.js`: 3D bow, breakable armour, ram, claws and passage
+- `src/assault-audio.js`: gesture-unlocked procedural ship-interior effects
+- `scripts/build-static.mjs`: static deployment build
+- `scripts/verify-3d.mjs`: browser regression tests
+- `tests/assault.test.mjs`: deterministic sequence tests
 
 ## Validate
 
-Build the static deployment and run the syntax checks:
+`npm test` builds the deployment into `dist/`, checks syntax, and runs the assault-state tests.
 
-```sh
-npm test
-```
+With the local server running, use `npm run test:e2e` for the full approach, ram, boarding, combat and loot loop. Use `npm run test:e2e -- --mobile` for touch input and high-density mobile rendering. Both runs check desktop/portrait/landscape layouts, passage attachment, helm locking, paused charge, persistent steering, reduced motion and graphics recovery. Screenshots go to ignored `qa-output/`.
 
-`npm test` runs `npm run build` and `npm run check`. The generated deployment is written to `dist/`.
-
-With the local server running, use `npm run test:e2e` to drive the full boarding and loot loop in a headless browser. It also checks desktop/portrait/landscape controls, bridge attachment and orientation, persistent steering, pause, reduced motion, context restoration, and the unsupported-WebGL message. Screenshots go to ignored `qa-output/`. This developer test needs Node.js 20+ and uses installed Microsoft Edge on Windows; elsewhere run `npx playwright install chromium` first. Set `QA_URL` to test the built site or deployed address instead.
+Browser tests require Node.js 20+ and use installed Microsoft Edge on Windows. On other platforms, run `npx playwright install chromium` first. Pass a URL or set `QA_URL` to test the build or deployed site, for example `node scripts/verify-3d.mjs http://localhost:4173/dist/ --mobile`.

@@ -1216,3 +1216,65 @@
 }
 .renderer-error > div { max-width: 25rem; line-height: 1.7; }
 .renderer-error a { display: inline-block; margin-top: 1rem; padding: 0.6rem 1rem; color: #8febff; border: 1px solid currentColor; }
+
+/* The collision stays in the cockpit. One warm contact flash, no cutaway or repeated strobe. */
+.impact-flash {
+  position: absolute;
+  z-index: 27;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--impact-flash, 0);
+  background: radial-gradient(ellipse at 50% 40%, #ffe6b0, #d7772b 48%, transparent 78%);
+}
+.assault-cue {
+  position: absolute;
+  z-index: 34;
+  top: 23%;
+  left: 50%;
+  width: max-content;
+  max-width: 75%;
+  padding: 0.45rem 1rem;
+  color: #ffd69e;
+  background: linear-gradient(90deg, transparent, rgba(19, 11, 5, 0.76), transparent);
+  border-top: 1px solid rgba(255, 177, 89, 0.4);
+  text-align: center;
+  text-shadow: 0 2px 8px #000;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.assault-cue span, .assault-cue strong { display: block; }
+.assault-cue span { color: #d7a064; font-size: 0.5rem; letter-spacing: 0.2em; }
+.assault-cue strong { margin-top: 0.2rem; font-size: 1rem; letter-spacing: 0.18em; }
+.space-scene[data-boarding-state="armed"] .contact-marker { color: #85f3cf; }
+.space-scene[data-boarding-state="charge"] .cockpit-reticle { color: #ffac68; opacity: 0.8; }
+.space-scene[data-boarding-state="charge"] .boarding-panel { border-color: #d6904b; }
+.steering-pad[aria-disabled="true"] { opacity: 0.4; cursor: default; }
+.space-scene[data-helm-locked="true"] .help-overlay > span { display: none; }
+.space-scene[data-helm-locked="true"] .help-overlay::before { content: "충각 강습 · 항로 자동 고정"; color: #d7b68a; }
+.sound-button {
+  min-height: 2.5rem;
+  min-width: 2.8rem;
+  margin-bottom: 0.3rem;
+  padding: 0.4rem;
+  color: #88a8b7;
+  background: #091725;
+  border: 1px solid #345666;
+  font: 0.55rem ui-monospace, monospace;
+  cursor: pointer;
+}
+.sound-button[aria-pressed="true"] { color: #b2eff2; }
+.sound-button:focus-visible { outline: 2px solid #b8fbff; outline-offset: 3px; }
+@media (max-width: 720px) {
+  .assault-cue { top: 22%; }
+  .assault-cue strong { font-size: 0.85rem; }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .assault-cue { top: 29%; padding: 0.2rem 0.65rem; }
+  .assault-cue strong { font-size: 0.7rem; }
+  .assault-cue span { font-size: 0.42rem; }
+  .flight-controls { gap: 0.55rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .impact-flash { display: none; }
+}
