@@ -40,6 +40,16 @@ test('Separate confirmation pulls from the actual tether length and preserves th
   assert.deepEqual(stages, ['ram-deploy','charge','impact','clamp','seal','pressurize','ready']);
   assert.equal(a.breach, 1); assert.equal(a.clamps, 1); assert.equal(a.pressure, 1);
 });
+test('Tether impact updates the pull distance and bearing after the firing ship has moved', () => {
+  const a=new AssaultSequence(); a.begin();
+  const impact={distance:121,bearing:{yaw:2.3,pitch:.1}};
+  assert.equal(a.lockTether(impact),false);
+  a.fireHarpoon({distance:100,bearing:{yaw:2,pitch:0}});
+  advance(a,.3); assert.equal(a.lockTether(impact),false);
+  advance(a,.5); assert.equal(a.lockTether(impact),true);
+  assert.equal(a.distance,121); assert.equal(a.chargeStartDistance,121);
+  assert.equal(a.commit(),true); assert.deepEqual(a.attackBearing,impact.bearing);
+});
 test('Contact holds before tearing, then claws and sealing precede pressure', () => {
   const a = tethered(); a.commit();
   while (a.stage !== 'impact') a.update(0.02);

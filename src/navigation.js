@@ -10,7 +10,7 @@ const rotate = (v, yaw) => ({ x: Math.cos(yaw) * v.x + Math.sin(yaw) * v.z, y: v
 
 export const HELM = Object.freeze({ yawScale: 0.442, pitchScale: 0.312, dragRadians: 0.006 });
 export const FLIGHT = Object.freeze({ contactDistance: 1100, surveyDistance: 220, forwardSpeed: 80, reverseSpeed: 45, closeSpeed: 22, safetyRadius: 85 });
-export const ORBIT = Object.freeze({ radius: 155, minRadius: 120, speed: 0.19, sternZ: -51, doorHalfSize: 3.65 });
+export const ORBIT = Object.freeze({ radius: 155, minRadius: 120, speed: 0.095, sternZ: -51, doorHalfSize: 3.65 });
 
 export function relativeHelm(origin, dragX, dragY) {
   // An orbit can carry the camera over a pole. Regripping must not clamp that view back.
@@ -47,7 +47,7 @@ export class OrbitNavigation {
     this.orbitNormal = null;
     this.enemyYaw = 0; this.enemyPosition = { x: 0, y: 0, z: 0 };
     this.position = { x: 0, y: 0, z: 6 };
-    this.discovered = false; this.observeTime = 0; this.anchor = null; this.pullVector = null;
+    this.discovered = false; this.observeTime = 0; this.anchor = null; this.harpoonTarget = null; this.pullVector = null;
     this.solution = { visible: false, canFire: false, distance: 0, incidence: 0, aimError: Math.PI };
   }
   begin(bearing, { position = this.position, radius = ORBIT.radius, active = true } = {}) {
@@ -63,7 +63,7 @@ export class OrbitNavigation {
     return { x: r.x + this.enemyPosition.x, y: r.y + this.enemyPosition.y, z: r.z + this.enemyPosition.z };
   }
   get door() { return this.world({ x: 0, y: 0, z: ORBIT.sternZ }); }
-  get target() { return this.anchor || (this.discovered && this.solution.visible ? this.door : this.enemyPosition); }
+  get target() { return this.anchor || this.harpoonTarget || (this.discovered && this.solution.visible ? this.door : this.enemyPosition); }
   updatePosition() {
     const flat = Math.cos(this.elevation) * this.radius;
     this.position = this.world({ x: Math.sin(this.angle) * flat, y: Math.sin(this.elevation) * this.radius, z: Math.cos(this.angle) * flat });
@@ -106,6 +106,7 @@ export class OrbitNavigation {
     this.direction *= -1;
     if (this.orbitNormal) this.orbitNormal = scale(this.orbitNormal, -1);
   }
+  stopOrbit() { this.orbiting = false; this.speed = 0; }
   steerOrbit(input, view) {
     if (!this.orbiting || !this.canOrbit || Math.hypot(input.x, input.y) < 0.15) return false;
     const radial = unit(subtract(this.position, this.enemyPosition));
@@ -152,20 +153,30 @@ export class OrbitNavigation {
     if (this.observeTime >= 0.3) this.discovered = true;
     const t = Math.abs(direction.z) > 1e-6 ? (ORBIT.sternZ - local.z) / direction.z : -1;
     const hit = { x: local.x + direction.x * t, y: local.y + direction.y * t, z: ORBIT.sternZ };
-    const canFire = !this.anchor && this.discovered && visible && incidence >= 0.9 && t > 0 && Math.abs(hit.x) < ORBIT.doorHalfSize && Math.abs(hit.y) < ORBIT.doorHalfSize;
+    const canFire = !this.anchor && !this.harpoonTarget && this.discovered && visible && incidence >= 0.9 && t > 0 && Math.abs(hit.x) < ORBIT.doorHalfSize && Math.abs(hit.y) < ORBIT.doorHalfSize;
     this.solution = { visible, canFire, distance, incidence, aimError, hit: canFire ? this.world(hit) : null };
     return this.solution;
   }
-  attach(view) {
+  launch(view) {
     const s = this.inspect(view);
     if (!s.canFire) return null;
-    this.anchor = { ...s.hit }; this.orbiting = false; this.speed = 0;
+    // Reserve the ray-hit point, but continue the current orbit during projectile flight.
+    this.harpoonTarget = { ...s.hit };
+    this.solution.canFire = false;
+    return { distance: length(subtract(this.position, this.harpoonTarget)) - 14, bearing: lookAt(this.position, this.harpoonTarget, view) };
+  }
+  attach(view) {
+    if (this.anchor || (!this.harpoonTarget && !this.launch(view))) return null;
+    this.anchor = this.harpoonTarget; this.harpoonTarget = null;
+    this.stopOrbit();
+    // The ship can move during flight. Lock the cable from the impact-time position.
     const v = subtract(this.position, this.anchor); const distance = length(v);
     this.pullVector = { x: v.x / distance, y: v.y / distance, z: v.z / distance };
     return { distance: distance - 14, bearing: lookAt(this.position, this.anchor, view) };
   }
   pull(distance) {
     if (!this.anchor) return;
+    this.stopOrbit();
     this.position = { x: this.anchor.x + this.pullVector.x * (distance + 14), y: this.anchor.y + this.pullVector.y * (distance + 14), z: this.anchor.z + this.pullVector.z * (distance + 14) };
   }
   forceRear(viewOnly = false) {
@@ -181,6 +192,7 @@ export class OrbitNavigation {
       orbitNormal: this.orbitNormal && { ...this.orbitNormal }, elevationDegrees: this.elevation * 180 / Math.PI,
       doorDiscovered: this.discovered, doorVisible: this.solution.visible, canHarpoon: this.solution.canFire,
       doorDistance: this.solution.distance, incidence: this.solution.incidence, anchor: this.anchor && { ...this.anchor },
+      harpoonTarget: this.harpoonTarget && { ...this.harpoonTarget },
       doorBearing: lookAt(this.position, this.door) };
   }
 }

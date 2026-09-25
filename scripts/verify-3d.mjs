@@ -48,7 +48,7 @@ try {
     assert.ok((await read()).rendering.farClipMetres >= 18000);
     await page.evaluate(async () => {
       SpacePiratesAmbient.destroy();
-      const { VoyageScene } = await import(new URL('./src/voyage.js?v=orbit3d-1', location.href));
+      const { VoyageScene } = await import(new URL('./src/voyage.js?v=orbitfire-1', location.href));
       window.qaVisibilityScene = new VoyageScene(document.getElementById('starfield'));
       qaVisibilityScene.pause();
     });
@@ -354,11 +354,12 @@ try {
   assert.deepEqual((await read()).rendering.enemyPosition, fixedEnemy, 'Enemy stays fixed as player orbits');
   assert.deepEqual((await read()).rendering.enemyRotation, fixedRotation, 'Orbit is not a spinning enemy model');
   assert.equal((await read()).navigation.doorVisible, false, 'Rear hatch is occluded from the side');
-  await tap('#orbit-direction');
+  assert.equal(await page.locator('#orbit-direction').count(), 0);
+  await drag(-30, 0);
   const reverseAngle = (await read()).navigation.angleDegrees;
   await page.waitForTimeout(350);
   assert.ok((await read()).navigation.angleDegrees < reverseAngle, 'Reverse autopilot direction');
-  await tap('#orbit-direction');
+  await drag(30, 0);
   await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.angleDegrees > 178, null, { timeout: 25000 });
   await tap('#orbit-button');
   const parked = (await read()).navigation.position;
@@ -369,13 +370,17 @@ try {
   assert.equal(state.navigation.doorDiscovered, true);
   assert.equal(state.navigation.canHarpoon, true);
   await page.screenshot({ path: 'qa-output/orbit-rear.png' });
-  for (const id of ['orbit-button', 'orbit-direction', 'boarding-action']) {
+  for (const id of ['orbit-button', 'boarding-action']) {
     const b = await page.locator('#' + id).boundingBox();
     assert.ok(b.x >= 0 && b.y >= 0 && b.x+b.width <= page.viewportSize().width+1 && b.y+b.height <= page.viewportSize().height+1, id+' fits');
   }
   const seen = new Set(['survey']);
+  await tap('#orbit-button');
+  assert.equal((await read()).navigation.orbiting, true, 'No need to stop orbit before firing');
   await tap('#boarding-action');
   await page.waitForFunction(() => SpacePiratesAmbient.getState().mode === 'harpoon');
+  assert.equal((await read()).navigation.orbiting, true, 'Orbit continues during projectile flight');
+  assert.equal((await read()).navigation.anchor, null, 'No premature attachment at launch');
   seen.add('harpoon');
   await page.waitForFunction(() => SpacePiratesAmbient.getState().mode === 'tethered');
   seen.add('tethered');
@@ -503,7 +508,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=orbit3d-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=orbitfire-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();

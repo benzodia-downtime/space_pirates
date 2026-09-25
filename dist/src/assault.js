@@ -60,6 +60,13 @@ export class AssaultSequence {
     return this.stage === "tethered" && this.harpoon === 1;
   }
 
+  lockTether(solution) {
+    if (!this.canCommit() || !solution || !Number.isFinite(solution.distance) || solution.distance <= ASSAULT_CONFIG.contactDistance) return false;
+    this.distance = this.chargeStartDistance = solution.distance;
+    this.tetherBearing = { ...solution.bearing };
+    return true;
+  }
+
   commit() {
     if (!this.canCommit()) return false;
     this.attackBearing = { ...this.tetherBearing };

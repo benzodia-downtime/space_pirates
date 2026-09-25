@@ -148,7 +148,6 @@
 :is(.voyage-ui, .settings-dialog) button:focus-visible, .steering-pad:focus-visible { outline: 2px solid #b8fbff; outline-offset: 3px; }
 :is(.voyage-ui, .settings-dialog) button[aria-pressed="true"], .voyage-ui button.is-held { background: #204747; border-color: #83e2c6; color: #d0fff0; }
 #orbit-button { width: 140px; }
-#orbit-direction { width: 44px; padding-inline: 0; font-size: 20px; }
 .voyage-ui .voyage-action { width: 148px; flex: 0 0 auto; }
 .voyage-action strong { font: inherit; font-weight: 700; }
 .flight-controls { display: flex; align-items: flex-end; gap: 12px; }

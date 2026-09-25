@@ -65,7 +65,7 @@ test('A vertical orbit crosses both poles smoothly, reverses and resumes the sel
   n.steerOrbit({x:0,y:-1}, view);
   const start = {...n.position}, normal = {...n.orbitNormal};
   let maxHeight = 0, minHeight = 0;
-  for (let i=0; i<1800; i++) {
+  for (let i=0; i<3600; i++) {
     const shift = n.update(.02, view); view.yaw += shift.yaw; view.pitch += shift.pitch;
     assert.ok(Math.abs(shift.yaw)<.01 && Math.abs(shift.pitch)<.01, 'No polar camera flip');
     maxHeight = Math.max(maxHeight, n.position.y-n.enemyPosition.y);
@@ -77,7 +77,7 @@ test('A vertical orbit crosses both poles smoothly, reverses and resumes the sel
   assert.equal(n.steerOrbit({x:1,y:0}, view), false);
   n.toggleOrbit(); assert.deepEqual(n.orbitNormal, normal);
   n.reverse();
-  for (let i=0; i<1800; i++) {
+  for (let i=0; i<3600; i++) {
     const shift = n.update(.02, view); view.yaw += shift.yaw; view.pitch += shift.pitch;
   }
   near(lengthFrom(n.position, start), 0, 1e-6);
@@ -104,6 +104,31 @@ test('Harpooning after an over-the-top orbit preserves the current camera orient
   const attachment=n.attach(view);
   assert.ok(attachment);
   near(attachment.bearing.yaw,view.yaw); near(attachment.bearing.pitch,view.pitch);
+});
+test('Orbit runs at half the former angular speed', () => {
+  const n = new OrbitNavigation(); n.begin({x:0,y:0}); n.toggleOrbit();
+  for(let i=0;i<50;i++) n.update(.02,lookAt(n.position,n.enemyPosition));
+  near(ORBIT.speed,.19/2); near(n.angle,.095); near(n.speed,ORBIT.radius*.095);
+});
+test('A shot can launch during orbit and only the impact locks its current position', () => {
+  const n = setup(); let view=n.forceRear(true); n.toggleOrbit();
+  const firedFrom={...n.position}, normal={...n.orbitNormal};
+  assert.ok(n.launch(view));
+  const hit={...n.harpoonTarget};
+  assert.equal(n.orbiting,true); assert.equal(n.anchor,null);
+  assert.equal(n.getState().canHarpoon,false); assert.equal(n.launch(view),null);
+  for(let i=0;i<35;i++) {
+    const shift=n.update(.02,view); view.yaw+=shift.yaw; view.pitch+=shift.pitch;
+  }
+  assert.notDeepEqual(n.position,firedFrom); assert.deepEqual(n.orbitNormal,normal);
+  const impact={...n.position}, attachment=n.attach(view);
+  assert.deepEqual(n.anchor,hit); assert.equal(n.harpoonTarget,null);
+  assert.equal(n.orbiting,false); assert.equal(n.speed,0); assert.equal(n.toggleOrbit(),false);
+  near(attachment.distance,lengthFrom(impact,hit)-14);
+  n.update(.05,view); assert.deepEqual(n.position,impact);
+  n.pull(attachment.distance); near(lengthFrom(n.position,impact),0);
+  n.pull(attachment.distance-10); assert.equal(n.orbiting,false);
+  n.reset(); assert.equal(n.harpoonTarget,null);
 });
 test('Discovery requires actually looking at the rear, and firing requires a ray hitting its door', () => {
   const n = setup(); n.angle = Math.PI; n.elevation = 0; n.updatePosition();

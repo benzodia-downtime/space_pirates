@@ -34,7 +34,7 @@ try {
     // Set up a stopped contact, then test the real touch/mouse and keyboard input paths.
     await page.evaluate(async ()=>{
       SpacePiratesAmbient.destroy();
-      const {VoyageScene}=await import(new URL("./src/voyage.js?v=orbit3d-1",location.href));
+      const {VoyageScene}=await import(new URL("./src/voyage.js?v=orbitfire-1",location.href));
       window.orbitQA=new VoyageScene(document.getElementById("starfield"));
       const s=orbitQA; s.stopLoop(); s.forceContact();
       const b=s.getActualBearing();
@@ -47,7 +47,7 @@ try {
     const chosen=(await read()).navigation.orbitNormal;
     assert.deepEqual((await read()).navigation.position,start.navigation.position,'No input teleport');
     assert.deepEqual((await read()).steering,start.steering,'Orbit pad changes path, not just camera');
-    await advance(150);
+    await advance(300);
     let state=await read();
     assert.ok(state.navigation.position.y>start.navigation.position.y+50,'Pad up causes real vertical travel');
     assert.deepEqual(state.navigation.orbitNormal,chosen,'Release preserves selected orbit');
@@ -61,7 +61,7 @@ try {
     // Cross a pole via the integrated scene: camera and radar must agree, without a flip.
     const polar=await page.evaluate(()=>{
       const s=orbitQA; let maxYaw=0,maxPitch=0,maxRadar=0;
-      for(let i=0;i<900;i++) {
+      for(let i=0;i<1800;i++) {
         const prev=s.getView(); s.update(.02); const next=s.getView();
         maxYaw=Math.max(maxYaw,Math.abs(next.yaw-prev.yaw));
         maxPitch=Math.max(maxPitch,Math.abs(next.pitch-prev.pitch));
@@ -72,7 +72,10 @@ try {
     assert.ok(polar.maxYaw<.02 && polar.maxPitch<.02,JSON.stringify(polar));
     // The hatch may become the guidance target after discovery; allow its physical offset.
     assert.ok(polar.maxRadar<20,JSON.stringify(polar));
-    await tap('#orbit-direction');
+    assert.equal(await page.locator('#orbit-direction').count(),0);
+    await page.keyboard.press('q');
+    assert.deepEqual((await read()).navigation.orbitNormal,chosen,'Removed Q shortcut does nothing');
+    await drag(0,30);
     const reversed=(await read()).navigation.orbitNormal;
     for(const key of ['x','y','z']) assert.ok(Math.abs(reversed[key]+chosen[key])<1e-8);
     await drag(25,-25);
@@ -89,9 +92,47 @@ try {
     assert.deepEqual(manual.navigation.position,state.navigation.position,'Stopped orbit stays still');
     assert.ok(manual.steering.x>state.steering.x+.1,'Stopped orbit restores manual aiming');
     assert.ok(Math.abs(manual.steering.y-state.steering.y)<1e-8,'No pitch reset after crossing poles');
+    // Fire with orbit engaged, without a stop command, through both real input paths.
+    // Isolate this scenario from the preceding low-level CDP touch gestures.
+    await page.reload();
+    await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type === 'webgl2');
+    await page.evaluate(async ()=>{
+      SpacePiratesAmbient.destroy();
+      const {VoyageScene}=await import(new URL('./src/voyage.js?v=orbitfire-1',location.href));
+      window.orbitQA=new VoyageScene(document.getElementById('starfield'));
+      const s=orbitQA; s.stopLoop(); s.forceContact();
+      const view=s.navigation.forceRear(true);
+      s.pointer={x:view.yaw/.442,y:view.pitch/.312}; s.pointerTarget={...s.pointer};
+      s.renderStill();
+    });
+    await tap('#orbit-button');
+    await page.waitForFunction(()=>orbitQA.navigation.orbiting,null,{timeout:1500});
+    const shotStart=await read();
+    assert.equal(shotStart.navigation.orbiting,true,JSON.stringify(shotStart.navigation));
+    assert.equal(await page.locator('#boarding-action').isEnabled(),true);
+    if(mobile) await tap('#boarding-action'); else await page.keyboard.press('f');
+    await advance(15);
+    const flying=await read();
+    assert.equal(flying.mode,'harpoon'); assert.equal(flying.navigation.orbiting,true);
+    assert.equal(flying.navigation.anchor,null); assert.ok(flying.navigation.harpoonTarget);
+    assert.equal(flying.rendering.harpoonVisible,true);
+    assert.notDeepEqual(flying.navigation.position,shotStart.navigation.position);
+    await advance(21);
+    const hooked=await read();
+    assert.equal(hooked.mode,'tethered'); assert.equal(hooked.navigation.orbiting,false);
+    assert.deepEqual(hooked.navigation.anchor,flying.navigation.harpoonTarget);
+    assert.equal(hooked.navigation.harpoonTarget,null);
+    await page.keyboard.press('o'); await advance(30);
+    assert.equal((await read()).navigation.orbiting,false);
+    assert.deepEqual((await read()).navigation.position,hooked.navigation.position,'Anchored ship cannot resume orbit');
+    await tap('#boarding-action');
+    assert.equal((await read()).mode,'ram-deploy');
+    assert.deepEqual((await read()).navigation.position,hooked.navigation.position,'Pull begins at impact position without a jump');
+    await page.keyboard.press('o'); await drag(25,-25); await advance(220);
+    assert.equal((await read()).navigation.orbiting,false,'Pull never resumes orbit');
     assert.equal(await page.locator('#boarding-panel, #assault-cue').count(),0);
     assert.deepEqual(errors,[]);
-    console.log(`3D orbit ${mobile?'touch':'mouse'}: PASS (vertical, diagonal, release/regrip, poles, reverse, keyboard, manual aim)`);
+    console.log(`3D orbit ${mobile?'touch':'mouse'}: PASS (steering, half speed, orbital shot, flight, impact stop, tether/pull lock)`);
     await page.close();
   }
 } finally {await browser.close();}

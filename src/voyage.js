@@ -1,8 +1,8 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=orbit3d-1";
-import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=orbit3d-1";
-import { AssaultAudio } from "./assault-audio.js?v=orbit3d-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=orbitfire-1";
+import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=orbitfire-1";
+import { AssaultAudio } from "./assault-audio.js?v=orbitfire-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=orbit3d-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=orbitfire-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -29,10 +29,8 @@ export class VoyageScene {
     this.navigation = new OrbitNavigation();
     this.orbitControls = document.getElementById("orbit-controls");
     this.orbitButton = document.getElementById("orbit-button");
-    this.orbitDirection = document.getElementById("orbit-direction");
     this.orbitReadout = document.getElementById("orbit-readout");
     this.onOrbit = () => this.toggleOrbit();
-    this.onReverse = () => { if (!this.manuallyPaused) { this.navigation.reverse(); this.updateHud(true); } };
     this.thrustButtons = [...document.querySelectorAll("[data-thrust]")];
     this.thrustPointers = new Map();
     this.thrustKeyButton = 0;
@@ -147,7 +145,6 @@ export class VoyageScene {
       button.addEventListener("contextmenu", this.onThrustContext);
     }
     this.orbitButton?.addEventListener("click", this.onOrbit);
-    this.orbitDirection?.addEventListener("click", this.onReverse);
     window.addEventListener("blur", this.onBlur);
     this.soundButton?.addEventListener("click", this.onSoundToggle);
     this.settingsButton?.addEventListener("click", this.onSettingsOpen);
@@ -180,7 +177,6 @@ export class VoyageScene {
       button.removeEventListener("contextmenu", this.onThrustContext);
     }
     this.orbitButton?.removeEventListener("click", this.onOrbit);
-    this.orbitDirection?.removeEventListener("click", this.onReverse);
     window.removeEventListener("blur", this.onBlur);
     this.soundButton?.removeEventListener("click", this.onSoundToggle);
     this.settingsButton?.removeEventListener("click", this.onSettingsOpen);
@@ -335,7 +331,6 @@ export class VoyageScene {
       return;
     }
     if (!event.repeat && event.code === "KeyO") { this.toggleOrbit(); event.preventDefault(); return; }
-    if (!event.repeat && event.code === "KeyQ") { this.onReverse(); event.preventDefault(); return; }
     if ((event.code === "Space" || event.code === "KeyF") && this.isBoardingActive && !this.encounterReady) {
       event.preventDefault();
       if (!event.repeat && (event.code === "Space" || this.assault.stage === "survey")) this.handleBoardingAction();
@@ -494,7 +489,7 @@ export class VoyageScene {
   handleBoardingAction() {
     if (this.destroyed || this.manuallyPaused || !this.visuals.available || this.spaceScene?.hidden) return;
     if (this.assault.stage === "survey") {
-      const solution = this.navigation.attach(this.getView());
+      const solution = this.navigation.launch(this.getView());
       if (!solution || !this.assault.fireHarpoon(solution)) return;
       this.audio.unlock();
       this.releasePad(); this.keys.clear(); this.clearThrust();
@@ -502,6 +497,7 @@ export class VoyageScene {
       if (!this.assault.canCommit()) return;
       this.audio.unlock();
       if (!this.assault.commit()) return;
+      this.navigation.stopOrbit();
       this.keys.clear(); this.releasePad();
       const bearing = this.assault.attackBearing;
       const delta = bearing.yaw - this.getView().yaw;
@@ -523,7 +519,7 @@ export class VoyageScene {
       this.boardingAction.disabled = !(fire || pull);
     }
     // Only compact actions are visible; detailed guidance stays in accessible labels/tooltips.
-    const label = pull ? "견인 돌입" : a.committed ? "돌입 중…" : nav.anchor ? "작살 고정 중…" : "작살 발사";
+    const label = pull ? "견인 돌입" : a.committed ? "돌입 중…" : a.stage === "harpoon" ? "작살 비행 중…" : "작살 발사";
     const hint = pull ? "Space · 케이블을 감아 하강문으로 돌진" : fire ? "Space / F · 조준한 문에 작살 발사" : a.committed ? "강습 완료까지 대기" : nav.discovered ? "후방 문 중앙을 조준하세요" : "자동 선회로 후방 하강문을 찾으세요";
     if (this.boardingActionLabel) this.boardingActionLabel.textContent = label;
     this.boardingAction?.setAttribute("aria-label", label + ". " + hint);
@@ -535,10 +531,6 @@ export class VoyageScene {
       this.orbitButton.disabled = !nav.orbiting && !nav.canOrbit;
       this.orbitButton.setAttribute("aria-pressed", String(nav.orbiting));
       this.orbitButton.textContent = nav.orbiting ? "선회 정지" : "자동 선회";
-    }
-    if (this.orbitDirection) {
-      this.orbitDirection.disabled = !nav.canOrbit;
-      this.orbitDirection.textContent = nav.direction > 0 ? "↶" : "↷";
     }
     // Keep the requested clearance warning, but no permanent status panel.
     const tooClose = nav.orbitTooClose && !nav.anchor;
@@ -556,9 +548,14 @@ export class VoyageScene {
         value.x += shift.yaw / HELM.yawScale;
         value.y += shift.pitch / HELM.pitchScale;
       }
-      if (!this.navigation.anchor) this.assault.distance = this.navigation.solution.distance;
+      if (this.assault.stage === "survey") this.assault.distance = this.navigation.solution.distance;
     }
+    const wasFlying = this.assault.stage === "harpoon";
     this.assault.update(deltaSeconds);
+    if (wasFlying && this.assault.stage === "tethered") {
+      this.assault.lockTether(this.navigation.attach(this.getView()));
+      this.keys.clear(); this.releasePad(); this.clearThrust();
+    }
     if (this.assault.committed) this.navigation.pull(this.assault.distance);
     if (this.mode !== this.assault.stage) this.setVoyageMode(this.assault.stage, ASSAULT_COPY[this.assault.stage][1]);
   }

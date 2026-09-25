@@ -445,10 +445,11 @@ export class VoyageRenderer {
     }
     this.impactLight.intensity = shock*150;
     this.scene.updateMatrixWorld(true);
-    this.harpoonCable.visible = this.harpoonBolt.visible = a.harpoon > 0 && a.breach < 0.1 && Boolean(nav?.anchor);
+    const harpoonTarget = nav?.anchor || nav?.harpoonTarget;
+    this.harpoonCable.visible = this.harpoonBolt.visible = a.harpoon > 0 && a.breach < 0.1 && Boolean(harpoonTarget);
     if (this.harpoonCable.visible) {
       const launch = this.launcher.getWorldPosition(new THREE.Vector3());
-      const anchor = new THREE.Vector3(nav.anchor.x, nav.anchor.y, nav.anchor.z);
+      const anchor = new THREE.Vector3(harpoonTarget.x, harpoonTarget.y, harpoonTarget.z);
       const bolt = launch.clone().lerp(anchor, a.harpoon);
       this.barBetween(this.harpoonCable, launch, bolt, 0.08, true);
       this.harpoonBolt.position.copy(bolt);
