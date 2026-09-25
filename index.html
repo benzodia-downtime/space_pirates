@@ -4,13 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#030713" />
+    <link rel="icon" href="data:," />
     <meta
       name="description"
       content="깊은 우주를 항해하는 한 척의 해적선, Space Pirates."
     />
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./voyage.css?v=cockpit-1" />
+    <link rel="stylesheet" href="./voyage.css?v=boarding-1" />
     <link rel="stylesheet" href="./battle.css?v=loot-1" />
   </head>
   <body>
@@ -68,7 +69,35 @@
         <output id="contact-bearing">희미한 신호</output>
       </div>
 
+      <div id="intercept-marker" class="intercept-marker" aria-hidden="true" hidden>
+        <span class="intercept-marker__ring"></span>
+        <span class="intercept-marker__vector"></span>
+        <output>INTERCEPT</output>
+      </div>
+
       <p id="voyage-announcement" class="sr-only" aria-live="polite"></p>
+
+      <section id="boarding-panel" class="boarding-panel" aria-label="적함 승선 정보" hidden>
+        <header>
+          <span>BOARDING SOLUTION</span>
+          <output id="boarding-phase" aria-live="polite">요격 대기</output>
+        </header>
+        <p id="boarding-objective" class="boarding-panel__objective">적함의 예상 항로를 추적하십시오.</p>
+        <div class="boarding-panel__metrics">
+          <p><span>DISTANCE</span><strong id="boarding-distance">1,200 m</strong></p>
+          <p><span>REL SPEED</span><strong id="relative-speed">85.0 m/s</strong></p>
+          <p><span>ROTATION</span><strong id="rotation-error">5.5°/s</strong></p>
+          <p><span>TENSION</span><strong id="cable-tension">—</strong></p>
+        </div>
+        <div class="boarding-panel__progress" aria-hidden="true">
+          <span id="boarding-progress-bar"></span>
+        </div>
+        <footer>
+          <span id="harpoon-port-state" data-state="standby">PORT · STANDBY</span>
+          <span id="harpoon-starboard-state" data-state="standby">STARBOARD · STANDBY</span>
+          <span id="boarding-seal-state" data-state="standby">BRIDGE · STOWED</span>
+        </footer>
+      </section>
 
       <div id="cockpit-shell" class="cockpit-shell" aria-hidden="true">
         <div class="cockpit-shell__glass">
@@ -269,9 +298,29 @@
         </svg>
       </section>
 
+      <svg
+        id="boarding-rig"
+        class="boarding-rig"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+        hidden
+      >
+        <line id="harpoon-port-line" class="boarding-rig__cable boarding-rig__cable--port" x1="25" y1="88" x2="50" y2="38" />
+        <line id="harpoon-starboard-line" class="boarding-rig__cable boarding-rig__cable--starboard" x1="75" y1="88" x2="50" y2="38" />
+        <path id="boarding-bridge-shadow" class="boarding-rig__bridge-shadow" pathLength="1" d="M 50 89 L 50 42" />
+        <path id="boarding-bridge" class="boarding-rig__bridge" pathLength="1" d="M 50 89 L 50 42" />
+        <circle id="boarding-collar" class="boarding-rig__collar" cx="50" cy="42" r="2.2" />
+      </svg>
+
+      <button id="boarding-action" class="battle-start boarding-action" type="button" disabled hidden>
+        <span id="boarding-action-status">요격 해법 계산 중</span>
+        <strong id="boarding-action-label">항로 추적</strong>
+      </button>
+
       <button id="battle-start" class="battle-start" type="button" disabled hidden>
-        <span>미확인 함선 포착</span>
-        전투 시작
+        <span>적함 에어록 개방</span>
+        <strong>적함 돌입</strong>
       </button>
 
       <section class="flight-controls" aria-label="항해 조종 장치">
@@ -450,6 +499,6 @@
       </footer>
     </section>
 
-    <script type="module" src="./src/main.js?v=steering-1"></script>
+    <script type="module" src="./src/main.js?v=boarding-1"></script>
   </body>
 </html>

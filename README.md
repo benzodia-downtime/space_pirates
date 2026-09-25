@@ -16,7 +16,8 @@ Then open [http://localhost:4173](http://localhost:4173) in a browser. To use a 
 
 - Set a persistent course with the on-screen control pad, `WASD`, or the arrow keys.
 - Use **SCAN** or the space bar to accelerate long-range contact detection.
-- When a hostile ship is identified, select **전투 시작** to enter the top-down crew battle.
+- Track the projected intercept marker, match the hostile ship's speed and rotation, then fire the port and starboard magnetic harpoons.
+- Hold the target near the reticle while the winches pull both ships together, deploy the pressurized boarding bridge, and select **적함 돌입** once its airlock opens.
 - Win the boarding action, collect the enemy ship's supplies, and return to begin a new search.
 
 The voyage uses an engine-free perspective starfield framed by a first-person cockpit. The interface adapts to desktop and mobile screens and supports reduced-motion preferences.

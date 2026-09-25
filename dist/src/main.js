@@ -1,4 +1,4 @@
-import { VoyageScene } from "./voyage.js?v=steering-1";
+import { VoyageScene } from "./voyage.js?v=boarding-1";
 
 (() => {
   "use strict";
@@ -575,14 +575,36 @@ import { VoyageScene } from "./voyage.js?v=steering-1";
     }
 
     start() {
-      if (!this.ready || (this.ambientScene && !this.ambientScene.encounterReady)) return;
+      const canRetryDefeat = !this.level.hidden && this.phase === "result" && !this.playerWon;
+      if (
+        !this.ready ||
+        (!this.level.hidden && !canRetryDefeat) ||
+        (this.ambientScene && !this.ambientScene.encounterReady)
+      ) {
+        return;
+      }
 
       this.spaceScene.hidden = true;
       this.level.hidden = false;
       this.startButton.disabled = true;
       this.ambientScene?.pause();
       this.resetBattle();
-      this.setPhase("탑승교 연결");
+      this.setPhase("적함 에어록 돌입");
+      this.level.focus({ preventScroll: true });
+      this.schedule(() => this.beginWalk(), BATTLE_CONFIG.introMilliseconds);
+    }
+
+    reset() {
+      if (!this.ready || (this.ambientScene && !this.ambientScene.encounterReady)) return;
+      if (this.level.hidden) {
+        this.start();
+        return;
+      }
+
+      this.startButton.disabled = true;
+      this.ambientScene?.pause();
+      this.resetBattle();
+      this.setPhase("적함 에어록 돌입");
       this.level.focus({ preventScroll: true });
       this.schedule(() => this.beginWalk(), BATTLE_CONFIG.introMilliseconds);
     }
@@ -609,7 +631,7 @@ import { VoyageScene } from "./voyage.js?v=steering-1";
         this.schedule(() => this.exchangeFire(), 350);
       } else if (suspendedPhase === "idle") {
         this.phase = "idle";
-        this.setPhase("탑승교 연결");
+        this.setPhase("적함 에어록 돌입");
         this.schedule(() => this.beginWalk(), BATTLE_CONFIG.introMilliseconds);
       }
     }
@@ -907,7 +929,7 @@ import { VoyageScene } from "./voyage.js?v=steering-1";
     }
 
     returnToSpace() {
-      if (!this.ready) return;
+      if (!this.ready || this.level.hidden) return;
       const returnedWithLoot = this.playerWon && this.lootRecovered;
       this.clearActivity();
       this.level.hidden = true;
@@ -960,7 +982,8 @@ import { VoyageScene } from "./voyage.js?v=steering-1";
       resume: () => scene.resume(),
       destroy: () => scene.destroy(),
       redraw: () => scene.onResize(),
-      forceEncounter: () => scene.forceEncounter(),
+      forceContact: () => scene.forceContact(),
+      forceEncounter: (options) => scene.forceEncounter(options),
       getState: () => scene.getState(),
       get paused() {
         return scene.manuallyPaused || document.hidden;
@@ -970,7 +993,7 @@ import { VoyageScene } from "./voyage.js?v=steering-1";
     window.SpacePiratesBattle = {
       start: () => battle.start(),
       exit: () => battle.returnToSpace(),
-      reset: () => battle.start(),
+      reset: () => battle.reset(),
       getCargo: () => ({ ...battle.cargo }),
       destroy: () => battle.destroy(),
       config: BATTLE_CONFIG,
