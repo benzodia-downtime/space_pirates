@@ -325,9 +325,10 @@ export class VoyageRenderer {
     const positions = new Float32Array(950 * 3);
     const colors = new Float32Array(positions.length);
     for (let i = 0; i < positions.length; i += 3) {
-      positions[i] = (Math.random() - 0.5) * 18000;
-      positions[i + 1] = (Math.random() - 0.5) * 12000;
-      positions[i + 2] = (Math.random() - 0.5) * 18000;
+      const near = i < 210 * 3;
+      positions[i] = (Math.random() - 0.5) * (near ? 2000 : 18000);
+      positions[i + 1] = (Math.random() - 0.5) * (near ? 1600 : 12000);
+      positions[i + 2] = (Math.random() - 0.5) * (near ? 2000 : 18000);
       const light = 0.45 + Math.random() * 0.5;
       colors.set([light * 0.84, light * 0.93, light], i);
     }
@@ -396,11 +397,11 @@ export class VoyageRenderer {
     const shock = motion && a.impactAge >= 0 ? Math.exp(-a.impactAge * 4.5) : 0;
     const chargeMotion = motion && a.stage === "charge" ? a.charge : 0;
     const nav = frame.navigation;
-    const origin = nav?.active ? nav.position : { x: 0, y: 0, z: 6 };
+    const origin = nav?.placed ? nav.position : { x: 0, y: 0, z: 6 };
     this.camera.position.set(origin.x + Math.sin(a.impactAge*71)*shock*0.06, origin.y + Math.sin(a.impactAge*53)*shock*0.1, origin.z + shock*0.48 - chargeMotion*0.2);
     this.camera.rotation.set(-steering.y*0.312 + Math.sin(a.impactAge*49)*shock*0.016, -steering.x*0.442, Math.sin(a.impactAge*63)*shock*0.012);
     const range = distance;
-    if (nav?.active) {
+    if (nav?.placed) {
       this.enemy.position.set(nav.enemyPosition.x, nav.enemyPosition.y, nav.enemyPosition.z);
       this.enemy.rotation.set(0, nav.enemyYaw, 0);
     } else {

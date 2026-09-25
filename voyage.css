@@ -1303,3 +1303,29 @@
   .orbit-controls output { font-size: 0.55rem; margin-bottom: 0.25rem; }
   .orbit-controls button { font-size: 0.58rem; }
 }
+
+.thrust-controls {
+  position: absolute; z-index: 38; right: max(1.2rem, env(safe-area-inset-right));
+  bottom: max(1.2rem, env(safe-area-inset-bottom)); width: 6.5rem;
+  display: grid; gap: 0.4rem; color: #a8cfdb; font: 0.65rem ui-monospace, monospace;
+}
+.thrust-controls small { text-align: center; color: #7198ac; font-size: 0.52rem; }
+.thrust-controls output { min-height: 1rem; text-align: center; line-height: 1.4; }
+.thrust-controls button {
+  min-height: 44px; border: 1px solid #517b8c; border-radius: 0.35rem;
+  background: rgba(9, 31, 43, 0.95); color: #c5f7ff; cursor: pointer;
+  font: inherit; touch-action: none; user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.thrust-controls kbd { margin-left: 0.4rem; opacity: 0.6; font: inherit; }
+.thrust-controls button.is-held { color: #051b20; background: #9de8df; border-color: #d4ffff; }
+.thrust-controls button:disabled { opacity: 0.35; cursor: default; }
+.thrust-controls button:focus-visible { outline: 2px solid #b8fbff; outline-offset: 3px; }
+@media (max-width: 720px) {
+  .thrust-controls { right: max(0.8rem, env(safe-area-inset-right)); bottom: max(0.8rem, env(safe-area-inset-bottom)); width: 4.9rem; }
+  .thrust-controls output { font-size: 0.58rem; }
+  .cockpit-console__core { display: none; }
+  .flight-controls { gap: 0.45rem; }
+  .orbit-controls { width: min(18rem, calc(100vw - 8rem)); }
+  .orbit-controls button { font-size: 0.6rem; }
+}

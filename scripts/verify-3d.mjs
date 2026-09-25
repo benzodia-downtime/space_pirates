@@ -42,6 +42,61 @@ try {
       await drag(Math.max(-35, Math.min(35, dx)), Math.max(-25, Math.min(25, dy)));
     }
   }
+  // Stationary startup: neither simulation position nor cosmetic star travel advances.
+  const idle = await read(); await page.waitForTimeout(700);
+  assert.deepEqual((await read()).navigation.position, idle.navigation.position);
+  assert.deepEqual((await read()).rendering.cameraPosition, idle.rendering.cameraPosition);
+  assert.equal((await read()).journeyDistance, idle.journeyDistance);
+  assert.equal((await read()).starTravel, idle.starTravel);
+  assert.equal((await read()).speed, 0);
+
+  async function holdThrust(id, ms, cancel = false) {
+    const b = await page.locator('#'+id).boundingBox(), x = b.x+b.width/2, y = b.y+b.height/2;
+    if (mobile) await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    else { await page.mouse.move(x,y); await page.mouse.down(); }
+    await page.waitForTimeout(ms);
+    const moving = await read();
+    if (mobile) await touch.send('Input.dispatchTouchEvent', { type: cancel ? 'touchCancel' : 'touchEnd', touchPoints: [] });
+    else await page.mouse.up();
+    await page.waitForTimeout(70);
+    const stopped = await read();
+    await page.waitForTimeout(200);
+    assert.equal((await read()).speed, 0, 'Released/cancelled thrust stops');
+    assert.deepEqual((await read()).navigation.position, stopped.navigation.position, 'No coast after release');
+    return moving;
+  }
+  const forward = await holdThrust('thrust-forward', 500);
+  assert.ok(forward.speed > 0); assert.ok(forward.navigation.position.z < idle.navigation.position.z);
+  const reverse = await holdThrust('thrust-reverse', 500, true);
+  assert.ok(reverse.speed < 0); assert.ok(reverse.navigation.position.z > forward.navigation.position.z);
+  const scanIdle = await read();
+  await tap('#scan-button'); await page.waitForTimeout(350);
+  assert.deepEqual((await read()).navigation.position, scanIdle.navigation.position, 'Scan cannot move the player');
+  assert.deepEqual((await read()).rendering.enemyPosition, scanIdle.rendering.enemyPosition, 'Scan cannot pull target closer');
+  await page.keyboard.down('w'); await page.keyboard.down('s');
+  await page.waitForTimeout(80); const opposed = await read(); await page.waitForTimeout(200);
+  assert.equal((await read()).speed, 0); assert.deepEqual((await read()).navigation.position, opposed.navigation.position);
+  await page.keyboard.up('w'); await page.keyboard.up('s');
+  await page.keyboard.down('w'); await page.waitForTimeout(150);
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await page.keyboard.up('w');
+  const blurred = await read(); await page.waitForTimeout(180);
+  assert.equal((await read()).thrust, 0); assert.deepEqual((await read()).navigation.position, blurred.navigation.position);
+
+  if (mobile) {
+    const p = await page.locator('#steering-pad').boundingBox(), b = await page.locator('#thrust-forward').boundingBox();
+    const pad = { x: p.x+p.width/2, y: p.y+p.height/2, id: 1 };
+    const forwardPoint = { x: b.x+b.width/2, y: b.y+b.height/2, id: 2 };
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pad] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pad, forwardPoint] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{...pad, x:pad.x+12}, forwardPoint] });
+    await page.waitForTimeout(200);
+    assert.equal((await read()).thrust, 1, 'Two-finger steering and forward thrust coexist');
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+    await page.waitForTimeout(80);
+    assert.equal((await read()).thrust, 0); assert.equal((await read()).speed, 0);
+  }
+
   // A fresh press anywhere on the pad must preserve the current heading.
   await drag(25, -8);
   const firstDrag = await read();
@@ -57,8 +112,15 @@ try {
   assert.ok(highPitch > 1);
   await page.keyboard.down('d'); await page.waitForTimeout(120); await page.keyboard.up('d');
   assert.ok(Math.abs((await read()).steering.y - highPitch) < .001, 'Keyboard does not reset an existing pad pitch');
-  await page.evaluate(() => SpacePiratesAmbient.forceContact());
   let state = await read();
+  await aim({ yaw: state.guidanceBearing.x*.65, pitch: state.guidanceBearing.y*.65 });
+  const approachStart = state.navigation.radius;
+  await page.keyboard.down('w');
+  await page.waitForFunction(() => SpacePiratesAmbient.getState().mode === 'survey', null, { timeout: 45000 });
+  await page.keyboard.up('w'); await page.waitForTimeout(100);
+  state = await read();
+  assert.ok(state.navigation.radius < approachStart, 'Real forward travel reaches the contact');
+  assert.equal(state.speed, 0, 'Contact never engages automatic forward thrust');
   await aim({ yaw: state.guidanceBearing.x * .65, pitch: state.guidanceBearing.y * .65 });
   await page.waitForTimeout(600);
   assert.equal((await read()).navigation.doorDiscovered, false);
@@ -66,6 +128,12 @@ try {
   await page.keyboard.press('Space');
   assert.equal((await read()).mode, 'survey', 'Blind attack is rejected');
   await page.screenshot({ path: 'qa-output/orbit-front.png' });
+  // Manual reverse overrides autopilot; releasing holds the new position.
+  await tap('#orbit-button');
+  await page.waitForTimeout(120);
+  await holdThrust('thrust-reverse', 200);
+  assert.equal((await read()).navigation.orbiting, false);
+  await aim({ yaw: (await read()).guidanceBearing.x*.65, pitch: (await read()).guidanceBearing.y*.65 });
   const fixedEnemy = (await read()).rendering.enemyPosition;
   const fixedRotation = (await read()).rendering.enemyRotation;
   await tap('#orbit-button');
@@ -102,6 +170,8 @@ try {
   const hooked = await read();
   assert.equal(hooked.navigation.orbiting, false);
   assert.equal(hooked.rendering.harpoonVisible, true);
+  await page.keyboard.down('s'); await page.waitForTimeout(120); await page.keyboard.up('s');
+  assert.deepEqual((await read()).navigation.position, hooked.navigation.position, 'Tether prevents manual thrust');
   await page.waitForTimeout(1100);
   assert.equal((await read()).mode, 'tethered', 'Hooking alone never triggers the ram');
   assert.deepEqual((await read()).navigation.position, hooked.navigation.position);
@@ -158,7 +228,7 @@ try {
     const target = await page.locator('#contact-marker').boundingBox();
     const cue = await page.locator('#assault-cue').boundingBox();
     assert.ok(cue.y + cue.height < target.y + target.height / 2, name + ': cue leaves breach centre clear');
-    for (const id of ['steering-pad', 'scan-button', 'sound-button', 'battle-start']) {
+    for (const id of ['steering-pad', 'scan-button', 'sound-button', 'battle-start', 'thrust-forward', 'thrust-reverse']) {
       const bounds = await page.locator('#' + id).boundingBox();
       assert.ok(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= width + 1 && bounds.y + bounds.height <= height + 1, name + ': ' + id + ' fits');
     }
@@ -177,6 +247,7 @@ try {
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().steeringLocked), false);
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().rendering.ramVisible), false);
   assert.equal((await read()).navigation.active, false);
+  assert.equal((await read()).speed, 0); assert.equal((await read()).thrust, 0);
   assert.equal((await read()).navigation.anchor, null);
   assert.equal((await read()).rendering.harpoonVisible, false);
   await page.locator('#sound-button').click();
@@ -218,7 +289,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=orbit-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=flight-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();

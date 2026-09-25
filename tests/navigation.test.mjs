@@ -60,3 +60,46 @@ test('Pause and reset stop orbit and clear discovered/tether state', () => {
   n.forceRear(); n.reset();
   assert.equal(n.active, false); assert.equal(n.orbiting, false); assert.equal(n.discovered, false); assert.equal(n.anchor, null);
 });
+
+test('Manual flight starts stopped, moves along the view, reverses and stops without drift', () => {
+  const n = setup(); const initial = { ...n.position }, enemy = { ...n.enemyPosition };
+  for (let i = 0; i < 100; i++) n.move(.02, { yaw: Math.PI / 2, pitch: 0 }, 0);
+  assert.deepEqual(n.position, initial); assert.equal(n.speed, 0);
+  n.move(.05, { yaw: Math.PI / 2, pitch: 0 }, 1);
+  assert.ok(n.position.x > initial.x); near(n.position.z, initial.z);
+  n.move(.05, { yaw: Math.PI / 2, pitch: 0 }, -1);
+  near(n.position.x, initial.x); near(n.position.z, initial.z);
+  assert.ok(n.speed < 0);
+  const stopped = { ...n.position };
+  for (let i = 0; i < 100; i++) n.move(.02, { yaw: 0, pitch: 1 }, 0);
+  assert.deepEqual(n.position, stopped); assert.equal(n.speed, 0);
+  assert.deepEqual(n.enemyPosition, enemy);
+});
+test('Manual thrust cancels orbit without a teleport; restarting orbit keeps the new distance', () => {
+  const n = setup(); n.toggleOrbit(); n.update(.05, lookAt(n.position, n.enemyPosition));
+  const before = { ...n.position };
+  n.move(.05, lookAt(n.position, n.enemyPosition), -1);
+  assert.equal(n.orbiting, false);
+  assert.ok(Math.hypot(n.position.x-before.x, n.position.y-before.y, n.position.z-before.z) < 2);
+  const manual = { ...n.position }, radius = n.radius;
+  n.toggleOrbit(); n.update(0, lookAt(n.position, n.enemyPosition));
+  near(n.position.x, manual.x); near(n.position.y, manual.y); near(n.position.z, manual.z);
+  near(n.radius, radius);
+});
+test('Normal thrust cannot penetrate the hull or move an attached tether', () => {
+  const n = setup();
+  for (let i = 0; i < 1000; i++) n.move(.05, lookAt(n.position, n.enemyPosition), 1);
+  assert.ok(n.radius >= 85); assert.equal(n.safetyStop, true); assert.equal(n.speed, 0);
+  n.forceRear();
+  const anchored = { ...n.position };
+  n.move(.05, { yaw: 0, pitch: 0 }, -1);
+  assert.deepEqual(n.position, anchored); assert.equal(n.speed, 0);
+});
+test('Far contacts have a fixed world pose before activation, even while reversing', () => {
+  const n = new OrbitNavigation();
+  n.begin({ x: 0, y: 0 }, { radius: 1100, active: false });
+  const enemy = { ...n.enemyPosition };
+  n.move(.05, { yaw: 0, pitch: 0 }, -1);
+  assert.equal(n.active, false); assert.ok(n.radius > 1100);
+  assert.deepEqual(n.enemyPosition, enemy);
+});

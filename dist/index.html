@@ -11,7 +11,7 @@
     />
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./voyage.css?v=orbit-1" />
+    <link rel="stylesheet" href="./voyage.css?v=flight-1" />
     <link rel="stylesheet" href="./battle.css?v=loot-1" />
   </head>
   <body>
@@ -50,13 +50,13 @@
       <section class="voyage-hud" aria-label="장거리 항해 정보">
         <div class="voyage-readout">
           <span class="voyage-readout__label"><i aria-hidden="true"></i> LONG RANGE SENSOR</span>
-          <strong id="voyage-state">막막한 항해 중</strong>
+          <strong id="voyage-state">정지 · 입력 대기</strong>
           <output id="voyage-distance">확인된 신호 없음</output>
           <div class="voyage-progress" aria-hidden="true">
             <span id="voyage-progress-bar"></span>
           </div>
           <p>
-            <span>SPEED <output id="voyage-speed">0.06c</output></span>
+            <span>SPEED <output id="voyage-speed">0.0 m/s</output></span>
             <span id="voyage-coordinate">X 000 · Y 000</span>
           </p>
         </div>
@@ -165,7 +165,7 @@
           id="steering-pad"
           class="steering-pad"
           role="group"
-          aria-label="현재 시선을 기준으로 드래그하거나 방향키와 WASD로 조향합니다. 놓거나 다시 눌러도 시선이 초기화되지 않습니다"
+          aria-label="현재 시선을 기준으로 드래그하거나 방향키와 AD로 조향합니다. WS는 전진과 후진입니다. 놓거나 다시 눌러도 시선이 초기화되지 않습니다"
           tabindex="0"
         >
           <span class="steering-pad__axis" aria-hidden="true"></span>
@@ -178,9 +178,16 @@
         <button id="sound-button" class="sound-button" type="button" aria-label="효과음 사용" aria-pressed="true">SFX ON</button>
       </section>
 
+      <section class="thrust-controls" aria-label="전진 후진 · 누르는 동안 이동">
+        <output id="thrust-state">정지</output>
+        <small>누를 때만 이동</small>
+        <button id="thrust-forward" data-thrust="1" type="button" aria-label="누르는 동안 전진, W 키" aria-keyshortcuts="w">전진 <kbd>W</kbd></button>
+        <button id="thrust-reverse" data-thrust="-1" type="button" aria-label="누르는 동안 후진, S 키" aria-keyshortcuts="s">후진 <kbd>S</kbd></button>
+      </section>
+
       <aside id="help-overlay" class="help-overlay" aria-label="조작 도움말">
         <span class="help-overlay__signal" aria-hidden="true"></span>
-        <span><kbd>드래그</kbd>해 항로 고정 · <kbd>WASD</kbd> 조향</span>
+        <span><kbd>드래그</kbd>해 항로 고정 · <kbd>방향키 / AD</kbd> 조향 · <kbd>W/S</kbd> 전진·후진</span>
         <span class="help-overlay__separator" aria-hidden="true">/</span>
         <span><kbd>O</kbd> 선회 · <kbd>Q</kbd> 역방향 · <kbd>Space</kbd> 작살 / 돌입</span>
       </aside>
@@ -337,6 +344,6 @@
       </footer>
     </section>
 
-    <script type="module" src="./src/main.js?v=orbit-1"></script>
+    <script type="module" src="./src/main.js?v=flight-1"></script>
   </body>
 </html>

@@ -1,13 +1,12 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=orbit-1";
-import { AssaultSequence, ASSAULT_CONFIG, ASSAULT_COPY } from "./assault.js?v=orbit-1";
-import { AssaultAudio } from "./assault-audio.js?v=orbit-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=flight-1";
+import { AssaultSequence, ASSAULT_CONFIG, ASSAULT_COPY } from "./assault.js?v=flight-1";
+import { AssaultAudio } from "./assault-audio.js?v=flight-1";
 
-import { OrbitNavigation, HELM, relativeHelm, lookAt } from "./navigation.js?v=orbit-1";
+import { OrbitNavigation, HELM, FLIGHT, relativeHelm, lookAt } from "./navigation.js?v=flight-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const VOYAGE_CONFIG = Object.freeze({
-  cruiseSpeed: 0.058,
   searchBaseRate: 0.026,
   searchAlignedRate: 0.044,
   scanBoost: 0.13,
@@ -58,7 +57,14 @@ export class VoyageScene {
     this.orbitReadout = document.getElementById("orbit-readout");
     this.onOrbit = () => this.toggleOrbit();
     this.onReverse = () => { if (!this.manuallyPaused) { this.navigation.reverse(); this.updateHud(true); } };
-    this.onBlur = () => { this.keys.clear(); this.releasePad(); };
+    this.thrustButtons = [...document.querySelectorAll("[data-thrust]")];
+    this.thrustPointers = new Map();
+    this.thrustKeyButton = 0;
+    this.thrustState = document.getElementById("thrust-state");
+    this.onThrustContext = event => event.preventDefault();
+    this.onThrustDown = this.onThrustDown.bind(this);
+    this.onThrustLost = event => this.endThrustPointer(event.pointerId);
+    this.onBlur = () => { this.keys.clear(); this.releasePad(); this.clearThrust(); };
     this.padOrigin = null; this.padDrag = { x: 0, y: 0 };
     this.audio = new AssaultAudio();
     this.soundButton = document.getElementById("sound-button");
@@ -77,7 +83,7 @@ export class VoyageScene {
     this.activePointerId = null;
     this.sceneTime = 0;
     this.starTravel = 0;
-    this.starSpeedFactor = 1;
+    this.starSpeedFactor = 0;
     this.journeyDistance = 0;
     this.searchProgress = 0;
     this.cruiseElapsed = 0;
@@ -137,6 +143,11 @@ export class VoyageScene {
   get isBoardingActive() { return this.assault.active; }
 
   addListeners() {
+    for (const button of this.thrustButtons) {
+      button.addEventListener("pointerdown", this.onThrustDown);
+      button.addEventListener("lostpointercapture", this.onThrustLost);
+      button.addEventListener("contextmenu", this.onThrustContext);
+    }
     this.orbitButton?.addEventListener("click", this.onOrbit);
     this.orbitDirection?.addEventListener("click", this.onReverse);
     window.addEventListener("blur", this.onBlur);
@@ -162,6 +173,11 @@ export class VoyageScene {
   }
 
   removeListeners() {
+    for (const button of this.thrustButtons) {
+      button.removeEventListener("pointerdown", this.onThrustDown);
+      button.removeEventListener("lostpointercapture", this.onThrustLost);
+      button.removeEventListener("contextmenu", this.onThrustContext);
+    }
     this.orbitButton?.removeEventListener("click", this.onOrbit);
     this.orbitDirection?.removeEventListener("click", this.onReverse);
     window.removeEventListener("blur", this.onBlur);
@@ -217,7 +233,50 @@ export class VoyageScene {
   }
 
   onPointerEnd(event) {
+    this.endThrustPointer(event.pointerId);
     if (this.activePointerId === event.pointerId) this.releasePad();
+  }
+
+  onThrustDown(event) {
+    if (this.manuallyPaused || this.destroyed || this.spaceScene?.hidden || this.navigation.anchor || !this.visuals.available) return;
+    const button = event.currentTarget;
+    this.thrustPointers.set(event.pointerId, { direction: Number(button.dataset.thrust), button });
+    button.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+    this.updateThrustUi();
+  }
+
+  endThrustPointer(pointerId) {
+    const input = this.thrustPointers.get(pointerId);
+    if (!input) return;
+    this.thrustPointers.delete(pointerId);
+    if (input.button.hasPointerCapture?.(pointerId)) input.button.releasePointerCapture(pointerId);
+    this.updateThrustUi();
+  }
+
+  clearThrust() {
+    this.thrustKeyButton = 0;
+    for (const id of [...this.thrustPointers.keys()]) this.endThrustPointer(id);
+    this.navigation.speed = 0;
+    this.updateThrustUi();
+  }
+
+  getThrust() {
+    if (this.manuallyPaused || this.destroyed || this.spaceScene?.hidden || this.navigation.anchor || !this.visuals.available) return 0;
+    const inputs = [...this.thrustPointers.values()].map(input => input.direction);
+    const forward = this.keys.has("w") || inputs.includes(1) || this.thrustKeyButton === 1;
+    const reverse = this.keys.has("s") || inputs.includes(-1) || this.thrustKeyButton === -1;
+    return Number(forward) - Number(reverse);
+  }
+
+  updateThrustUi() {
+    const thrust = this.getThrust();
+    const locked = Boolean(this.navigation.anchor);
+    for (const button of this.thrustButtons) {
+      button.disabled = locked;
+      button.classList.toggle("is-held", thrust === Number(button.dataset.thrust));
+    }
+    if (this.thrustState) this.thrustState.textContent = locked ? "견인 고정" : this.navigation.safetyStop ? "충돌 방지 정지" : this.navigation.orbiting ? "자동 선회" : thrust > 0 ? "전진" : thrust < 0 ? "후진" : "정지";
   }
 
   getView() { return { yaw: this.pointer.x * HELM.yawScale, pitch: this.pointer.y * HELM.pitchScale }; }
@@ -240,6 +299,11 @@ export class VoyageScene {
       if (event.code === "Space" || event.key === "Enter") event.preventDefault();
       return;
     }
+    if (event.target?.dataset?.thrust && (event.code === "Space" || event.key === "Enter")) {
+      event.preventDefault();
+      if (!this.navigation.anchor) this.thrustKeyButton = Number(event.target.dataset.thrust);
+      return;
+    }
     if (!event.repeat && event.code === "KeyO") { this.toggleOrbit(); event.preventDefault(); return; }
     if (!event.repeat && event.code === "KeyQ") { this.onReverse(); event.preventDefault(); return; }
     if ((event.code === "Space" || event.code === "KeyF") && this.isBoardingActive && !this.encounterReady) {
@@ -256,9 +320,9 @@ export class VoyageScene {
       return;
     }
 
-    const key = event.key.toLowerCase();
+    const key = /^Key[WASD]$/.test(event.code) ? event.code.slice(3).toLowerCase() : event.key.toLowerCase();
     if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
-      if (!this.assault.committed) this.keys.add(key);
+      if (!this.assault.committed && (!event.repeat || this.keys.has(key))) this.keys.add(key);
       event.preventDefault();
     } else if (event.code === "Space") {
       if (this.isSearching) {
@@ -273,12 +337,15 @@ export class VoyageScene {
   }
 
   onKeyUp(event) {
-    this.keys.delete(event.key.toLowerCase());
+    const key = /^Key[WASD]$/.test(event.code) ? event.code.slice(3).toLowerCase() : event.key.toLowerCase();
+    this.keys.delete(key);
+    if (event.code === "Space" || event.key === "Enter") this.thrustKeyButton = 0;
+    this.updateThrustUi();
   }
 
   getKeyboardTarget() {
     const x = Number(this.keys.has("d") || this.keys.has("arrowright")) - Number(this.keys.has("a") || this.keys.has("arrowleft"));
-    const y = Number(this.keys.has("s") || this.keys.has("arrowdown")) - Number(this.keys.has("w") || this.keys.has("arrowup"));
+    const y = Number(this.keys.has("arrowdown")) - Number(this.keys.has("arrowup"));
     if (!x && !y) return null;
     const length = Math.hypot(x, y) || 1;
     return { x: x / length, y: y / length };
@@ -315,6 +382,7 @@ export class VoyageScene {
 
   resetBoardingState() {
     this.assault.reset();
+    this.keys.clear(); this.clearThrust();
     this.navigation.reset();
     this.releasePad();
     if (this.orbitControls) this.orbitControls.hidden = true;
@@ -330,6 +398,7 @@ export class VoyageScene {
   }
 
   startNewSearch({ announce = true } = {}) {
+    const position = { ...this.navigation.position };
     this.mode = "cruise";
     this.searchProgress = 0;
     this.cruiseElapsed = 0;
@@ -346,6 +415,7 @@ export class VoyageScene {
       this.battleButton.hidden = true;
       this.battleButton.disabled = true;
     }
+    this.navigation.begin(this.contactBearing, { position, radius: FLIGHT.contactDistance, active: false });
     if (this.battleButtonStatus) this.battleButtonStatus.textContent = "후방 하강문 파열 · 진입 가능";
     if (this.contactMarker) this.contactMarker.hidden = true;
     if (this.scanButton) this.scanButton.disabled = false;
@@ -355,7 +425,7 @@ export class VoyageScene {
     this.updateHud(true);
 
     if (announce && this.announcement) {
-      this.announcement.textContent = "새 항로에서 장거리 탐색을 시작합니다.";
+      this.announcement.textContent = "정지 상태로 복귀했습니다. W / S 또는 전진·후진 버튼으로 이동하십시오.";
     }
   }
 
@@ -375,9 +445,10 @@ export class VoyageScene {
     this.updateBoardingControls();
   }
 
-  beginIntercept() {
+  beginIntercept({ force = false } = {}) {
     this.assault.begin();
-    this.navigation.begin(this.contactBearing);
+    if (force) this.navigation.begin(this.contactBearing);
+    else this.navigation.active = true;
     if (this.boardingPanel) this.boardingPanel.hidden = false;
     if (this.boardingAction) this.boardingAction.hidden = false;
     if (this.battleButton) { this.battleButton.hidden = true; this.battleButton.disabled = true; }
@@ -387,7 +458,7 @@ export class VoyageScene {
   }
 
   getActualBearing() {
-    if (!this.isBoardingActive) return { ...this.contactBearing };
+    if (!this.navigation.placed) return { ...this.contactBearing };
     const view = lookAt(this.navigation.position, this.navigation.target);
     return { x: view.yaw / 0.65, y: view.pitch / 0.65 };
   }
@@ -409,7 +480,7 @@ export class VoyageScene {
       const solution = this.navigation.attach(this.getView());
       if (!solution || !this.assault.fireHarpoon(solution)) return;
       this.audio.unlock();
-      this.releasePad(); this.keys.clear();
+      this.releasePad(); this.keys.clear(); this.clearThrust();
     } else {
       if (!this.assault.canCommit()) return;
       this.audio.unlock();
@@ -481,7 +552,7 @@ export class VoyageScene {
       this.orbitButton.textContent = nav.orbiting ? "선회 정지 [O]" : "자동 선회 [O]";
     }
     if (this.orbitDirection) { this.orbitDirection.disabled = Boolean(nav.anchor); this.orbitDirection.textContent = nav.direction > 0 ? "반대 방향 ↶ [Q]" : "반대 방향 ↷ [Q]"; }
-    if (this.orbitReadout) this.orbitReadout.textContent = nav.anchor ? "작살 고정 · 돌입 명령 대기" : nav.discovered ? (nav.solution.visible ? "하강문 시야 확보 · 직접 조준" : "하강문이 선체 뒤에 가려짐") : (nav.orbiting ? "155 m 유지 · 후방 하강문 탐색" : "선회 대기 · 함선 뒤를 살펴보세요");
+    if (this.orbitReadout) this.orbitReadout.textContent = nav.anchor ? "작살 고정 · 돌입 명령 대기" : nav.discovered ? (nav.solution.visible ? "하강문 시야 확보 · 직접 조준" : "하강문이 선체 뒤에 가려짐") : (nav.orbiting ? Math.round(nav.radius) + " m 유지 · 후방 하강문 탐색" : "선회 대기 · 함선 뒤를 살펴보세요");
     if (this.assaultCue) {
       this.assaultCue.hidden = !a.committed;
       this.assaultCue.querySelector("span").textContent = copy?.[2] || "";
@@ -506,7 +577,7 @@ export class VoyageScene {
 
   update(deltaSeconds) {
     this.sceneTime += deltaSeconds;
-    this.journeyDistance += deltaSeconds * VOYAGE_CONFIG.cruiseSpeed * 820;
+    const previousPosition = { ...this.navigation.position };
     this.cruiseElapsed += deltaSeconds;
     this.hudAccumulator += deltaSeconds;
 
@@ -531,12 +602,12 @@ export class VoyageScene {
     this.course.y += (this.courseTarget.y - this.course.y) * courseEase;
     this.course.roll += (this.courseTarget.roll - this.course.roll) * courseEase;
 
-    const targetStarSpeed = this.isSearching ? 1 : this.mode === "charge" ? 1 + this.assault.charge * 8 : 0;
-    const starSpeedEase = 1 - Math.exp(-deltaSeconds * 1.8);
-    this.starSpeedFactor = this.assault.impactAge >= 0 ? 0 : this.starSpeedFactor + (targetStarSpeed - this.starSpeedFactor) * starSpeedEase;
-    if (!this.reducedMotion) {
-      this.starTravel += deltaSeconds * 305 * this.starSpeedFactor;
-    }
+    const thrust = this.getThrust();
+    this.navigation.move(deltaSeconds, this.getView(), thrust);
+    // Ordinary movement comes from the camera's actual position. Only the
+    // explicitly triggered tether charge adds a cosmetic star streak effect.
+    this.starSpeedFactor = this.mode === "charge" ? 1 + this.assault.charge * 8 : 0;
+    if (!this.reducedMotion) this.starTravel += deltaSeconds * 305 * this.starSpeedFactor;
 
     if (this.scanCooldown > 0) {
       const previousCooldown = this.scanCooldown;
@@ -556,20 +627,23 @@ export class VoyageScene {
     }
 
     if (this.isSearching) {
-      const relativeX = this.contactBearing.x - this.pointer.x * 0.68;
-      const relativeY = this.contactBearing.y - this.pointer.y * 0.48;
+      const { relativeX, relativeY } = this.getTrackingMetrics();
       const alignment = clamp(1 - Math.hypot(relativeX, relativeY) / 0.9, 0, 1);
       const launchRamp = clamp(this.cruiseElapsed / 4, 0.35, 1);
       this.searchProgress = Math.min(
         1,
-        this.searchProgress + deltaSeconds * launchRamp * (
+        this.searchProgress + (thrust ? deltaSeconds : 0) * launchRamp * (
           VOYAGE_CONFIG.searchBaseRate + alignment * VOYAGE_CONFIG.searchAlignedRate
         ),
       );
+      if (this.navigation.radius <= FLIGHT.surveyDistance) this.searchProgress = 1;
       this.updateMode();
     } else if (this.isBoardingActive && !this.encounterReady) {
       this.updateBoarding(deltaSeconds);
     }
+
+    const p = this.navigation.position;
+    this.journeyDistance += Math.hypot(p.x - previousPosition.x, p.y - previousPosition.y, p.z - previousPosition.z);
 
     if (this.hudAccumulator >= 0.12) {
       this.hudAccumulator = 0;
@@ -579,7 +653,7 @@ export class VoyageScene {
 
   updateMode() {
     const previousMode = this.mode;
-    if (this.searchProgress >= 1) {
+    if (this.searchProgress >= 1 && this.navigation.radius <= FLIGHT.surveyDistance) {
       this.beginIntercept();
       return;
     } else if (this.searchProgress >= VOYAGE_CONFIG.approachProgress) {
@@ -596,14 +670,15 @@ export class VoyageScene {
     if (this.mode === "signal" && this.announcement) {
       this.announcement.textContent = "장거리 센서에 희미한 열원이 감지되었습니다.";
     } else if (this.mode === "approach" && this.announcement) {
-      this.announcement.textContent = "미확인 함선을 식별했습니다. 접근 중입니다.";
+      this.announcement.textContent = "미확인 함선을 식별했습니다. 조준한 뒤 전진해 접근하십시오.";
     }
   }
 
   updateHud(force = false) {
     const progressPercent = Math.round((this.isSearching ? this.searchProgress : this.getBoardingProgress()) * 100);
-    const distanceKm = Math.max(1.2, 28.4 * (1 - this.searchProgress) + 1.2);
-    const bearingDegrees = Math.round(this.contactBearing.x * 42 - this.pointer.x * 28);
+    const distanceKm = this.navigation.radius / 1000;
+    const bearingDegrees = Math.round(this.getTrackingMetrics().relativeX * 0.65 * 180 / Math.PI);
+    this.updateThrustUi();
     const bearingText = bearingDegrees === 0
       ? "정면"
       : bearingDegrees > 0
@@ -611,13 +686,13 @@ export class VoyageScene {
         : `좌현 ${Math.abs(bearingDegrees)}°`;
 
     if (this.mode === "cruise") {
-      if (this.stateLabel) this.stateLabel.textContent = "막막한 항해 중";
+      if (this.stateLabel) this.stateLabel.textContent = this.navigation.speed ? "수동 항해 중" : "정지 · 입력 대기";
       if (this.distanceLabel) this.distanceLabel.textContent = "확인된 신호 없음";
     } else if (this.mode === "signal") {
       if (this.stateLabel) this.stateLabel.textContent = "희미한 열원 감지";
       if (this.distanceLabel) this.distanceLabel.textContent = `미확인 신호 · ${bearingText}`;
     } else if (this.mode === "approach") {
-      if (this.stateLabel) this.stateLabel.textContent = "미확인 함선 접근 중";
+      if (this.stateLabel) this.stateLabel.textContent = this.navigation.speed ? "미확인 함선 접근" : "미확인 함선 · 정지 중";
       if (this.distanceLabel) this.distanceLabel.textContent = `${distanceKm.toFixed(1)} km · ${bearingText}`;
     } else if (this.isBoardingActive) {
       if (this.stateLabel) this.stateLabel.textContent = ASSAULT_COPY[this.mode][0];
@@ -626,11 +701,11 @@ export class VoyageScene {
 
     if (this.progressBar) this.progressBar.style.width = `${progressPercent}%`;
     if (this.speedLabel) {
-      this.speedLabel.textContent = this.isBoardingActive ? `${(this.navigation.orbiting ? this.navigation.radius * 0.19 : this.assault.speed).toFixed(1)} m/s` : `${(VOYAGE_CONFIG.cruiseSpeed + Math.abs(this.pointer.x) * 0.004).toFixed(3)}c`;
+      this.speedLabel.textContent = `${(this.assault.committed ? this.assault.speed : this.navigation.speed).toFixed(1)} m/s`;
     }
     if (this.coordinateLabel) {
-      const x = Math.floor((this.journeyDistance * 0.72) % 1000).toString().padStart(3, "0");
-      const y = Math.floor((this.journeyDistance * 0.39) % 1000).toString().padStart(3, "0");
+      const x = Math.round(this.navigation.position.x).toString().padStart(3, "0");
+      const y = Math.round(this.navigation.position.z).toString().padStart(3, "0");
       this.coordinateLabel.textContent = `X ${x} · Y ${y}`;
     }
     if (this.scanButtonState && this.scanCooldown > 0 && this.isSearching) {
@@ -641,8 +716,8 @@ export class VoyageScene {
 
     if (this.isBoardingActive) {
       const a = this.assault;
-      if (this.boardingDistanceLabel) this.boardingDistanceLabel.textContent = a.breach > 0 ? "관통 " + (a.breach * (ASSAULT_CONFIG.contactDistance - ASSAULT_CONFIG.seatedDistance)).toFixed(1) + " m" : this.mode === "survey" ? this.navigation.radius + " m 반경" : a.distance.toFixed(a.distance < 100 ? 1 : 0) + " m";
-      if (this.relativeSpeedLabel) this.relativeSpeedLabel.textContent = a.speed.toFixed(1) + " m/s";
+      if (this.boardingDistanceLabel) this.boardingDistanceLabel.textContent = a.breach > 0 ? "관통 " + (a.breach * (ASSAULT_CONFIG.contactDistance - ASSAULT_CONFIG.seatedDistance)).toFixed(1) + " m" : this.mode === "survey" ? Math.round(this.navigation.radius) + " m 반경" : a.distance.toFixed(a.distance < 100 ? 1 : 0) + " m";
+      if (this.relativeSpeedLabel) this.relativeSpeedLabel.textContent = (a.committed ? a.speed : this.navigation.speed).toFixed(1) + " m/s";
       if (this.alignmentLabel) this.alignmentLabel.textContent = a.committed ? "견인 고정" : this.navigation.anchor ? "작살 고정" : this.navigation.solution.canFire ? "작살 유효" : this.navigation.discovered ? "조준 필요" : "탐색 중";
       if (this.breachLabel) this.breachLabel.textContent = a.breach > 0 ? Math.round(a.breach * 100) + "%" : "대기";
       if (this.boardingProgressBar) this.boardingProgressBar.style.width = progressPercent + "%";
@@ -683,7 +758,7 @@ export class VoyageScene {
 
     const projected = this.visuals.draw({
       bearing: actual, guidance: guidance.guidance, steering: this.pointer,
-      distance: this.isBoardingActive ? this.assault.distance : 155 + (1 - enemyReveal) * 3800,
+      distance: this.isBoardingActive ? this.assault.distance : this.navigation.radius,
       navigation: this.navigation,
       reveal: enemyReveal, time: this.sceneTime, motion: !this.reducedMotion,
       travel: this.starTravel, assault: this.assault,
@@ -720,7 +795,7 @@ export class VoyageScene {
 
     const age = this.assault.impactAge;
     const impact = allowMotion && age >= 0 ? Math.exp(-age * 4.5) : 0;
-    const cockpitVibration = allowMotion ? (Math.sin(this.sceneTime * 19) * 0.16 + Math.sin(age * 67) * impact * 7) : 0;
+    const cockpitVibration = allowMotion ? (Math.sin(this.sceneTime * 19) * Math.min(1, Math.abs(this.navigation.speed) / 22) * 0.16 + Math.sin(age * 67) * impact * 7) : 0;
     this.spaceScene?.style.setProperty("--impact-flash", (allowMotion && age >= 0 ? Math.exp(-age * 11) * 0.28 : 0).toFixed(3));
 
     if (this.spaceScene) {
@@ -797,7 +872,7 @@ export class VoyageScene {
     this.scanPulse = 0;
     this.spaceScene?.classList.remove("is-scanning");
     this.resetBoardingState();
-    this.beginIntercept();
+    this.beginIntercept({ force: true });
     this.updateHud(true);
     this.renderStill();
   }
@@ -814,7 +889,7 @@ export class VoyageScene {
     this.scanPulse = 0;
     this.spaceScene?.classList.remove("is-scanning");
     this.resetBoardingState();
-    this.beginIntercept();
+    this.beginIntercept({ force: true });
     const view = this.navigation.forceRear();
     this.assault.forceReady(view);
     this.navigation.pull(this.assault.distance);
@@ -836,8 +911,10 @@ export class VoyageScene {
       searchProgress: this.searchProgress,
       encounterReady: this.encounterReady,
       journeyDistance: this.journeyDistance,
+      thrust: this.getThrust(), speed: this.assault.committed ? this.assault.speed : this.navigation.speed,
+      starTravel: this.starTravel,
       distanceMeters: this.isBoardingActive ? this.assault.distance : null,
-      relativeSpeed: this.assault.speed,
+      relativeSpeed: this.assault.committed ? this.assault.speed : this.navigation.speed,
       alignment: tracking.quality,
       steeringLocked: this.assault.committed,
       ramProgress: this.assault.ram,
@@ -859,6 +936,7 @@ export class VoyageScene {
 
   destroy() {
     if (this.destroyed) return;
+    this.onBlur();
     this.destroyed = true;
     this.stopLoop();
     this.removeListeners();
