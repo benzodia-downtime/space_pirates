@@ -1,4 +1,4 @@
-import { VoyageScene } from "./voyage.js?v=visibility-1";
+import { VoyageScene } from "./voyage.js?v=controls-1";
 
 (() => {
   "use strict";
@@ -32,7 +32,6 @@ import { VoyageScene } from "./voyage.js?v=visibility-1";
       this.startButtonStatus = this.startButton?.querySelector("span");
       this.resultActionButton = document.getElementById("battle-result-action");
       this.returnButton = document.getElementById("battle-return");
-      this.spaceStatusText = document.getElementById("space-status-text");
       this.phaseLabel = document.getElementById("battle-phase");
       this.distanceLabel = document.getElementById("battle-distance");
       this.meterPixelsLabel = document.getElementById("meter-pixels");
@@ -535,9 +534,7 @@ import { VoyageScene } from "./voyage.js?v=visibility-1";
       this.startButton.disabled = false;
       if (returnedWithLoot) {
         if (this.startButtonStatus) this.startButtonStatus.textContent = "물자 회수 완료";
-        if (this.spaceStatusText) {
-          this.spaceStatusText.textContent = `Cargo · Fuel ×${this.cargo.fuelCells} · Ammo ×${this.cargo.ammoCrates} · Medical ×${this.cargo.medicalSupplies}`;
-        }
+
       }
       this.suspendedPhase = null;
       this.ambientScene?.resolveEncounter({ lootRecovered: returnedWithLoot });

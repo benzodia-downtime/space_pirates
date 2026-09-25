@@ -1,8 +1,8 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=visibility-1";
-import { AssaultSequence, ASSAULT_CONFIG, ASSAULT_COPY } from "./assault.js?v=visibility-1";
-import { AssaultAudio } from "./assault-audio.js?v=visibility-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=controls-1";
+import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=controls-1";
+import { AssaultAudio } from "./assault-audio.js?v=controls-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=visibility-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=controls-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -17,25 +17,11 @@ export class VoyageScene {
   constructor(canvas) {
     this.spaceScene = document.getElementById("space-scene");
     this.battleButton = document.getElementById("battle-start");
-    this.battleButtonStatus = this.battleButton?.querySelector("span");
     this.announcement = document.getElementById("voyage-announcement");
     this.radar = document.getElementById("voyage-radar");
     this.radarBlip = document.getElementById("radar-blip");
     this.radarPitch = document.getElementById("radar-pitch");
-    this.boardingPanel = document.getElementById("boarding-panel");
-    this.boardingPhaseLabel = document.getElementById("boarding-phase");
-    this.boardingObjective = document.getElementById("boarding-objective");
-    this.boardingDistanceLabel = document.getElementById("boarding-distance");
-    this.boardingDistanceType = document.getElementById("boarding-distance-type");
-    this.relativeSpeedLabel = document.getElementById("relative-speed");
-    this.alignmentLabel = document.getElementById("alignment-value");
-    this.breachLabel = document.getElementById("breach-value");
-    this.boardingProgressBar = document.getElementById("boarding-progress-bar");
-    this.ramState = document.getElementById("ram-state");
-    this.clampState = document.getElementById("clamp-state");
-    this.boardingSealState = document.getElementById("boarding-seal-state");
     this.boardingAction = document.getElementById("boarding-action");
-    this.boardingActionStatus = document.getElementById("boarding-action-status");
     this.boardingActionLabel = document.getElementById("boarding-action-label");
     this.steeringPad = document.getElementById("steering-pad");
     this.steeringKnob = document.getElementById("steering-knob");
@@ -50,7 +36,6 @@ export class VoyageScene {
     this.thrustButtons = [...document.querySelectorAll("[data-thrust]")];
     this.thrustPointers = new Map();
     this.thrustKeyButton = 0;
-    this.thrustState = document.getElementById("thrust-state");
     this.onThrustContext = event => event.preventDefault();
     this.onThrustDown = this.onThrustDown.bind(this);
     this.onThrustLost = event => this.endThrustPointer(event.pointerId);
@@ -58,7 +43,6 @@ export class VoyageScene {
     this.padOrigin = null; this.padDrag = { x: 0, y: 0 };
     this.audio = new AssaultAudio();
     this.soundButton = document.getElementById("sound-button");
-    this.assaultCue = document.getElementById("assault-cue");
     this.settingsButton = document.getElementById("settings-button");
     this.settingsDialog = document.getElementById("settings-dialog");
     this.settingsClose = document.getElementById("settings-close");
@@ -296,7 +280,6 @@ export class VoyageScene {
       button.disabled = locked;
       button.classList.toggle("is-held", thrust === Number(button.dataset.thrust));
     }
-    if (this.thrustState) this.thrustState.textContent = locked ? "견인 고정" : this.navigation.safetyStop ? "충돌 방지 정지" : this.navigation.orbiting ? "자동 선회" : thrust > 0 ? "전진" : thrust < 0 ? "후진" : "정지";
   }
 
   getView() { return { yaw: this.pointer.x * HELM.yawScale, pitch: this.pointer.y * HELM.pitchScale }; }
@@ -426,8 +409,7 @@ export class VoyageScene {
     this.navigation.reset();
     this.releasePad();
     if (this.orbitControls) this.orbitControls.hidden = true;
-    if (this.boardingPanel) this.boardingPanel.hidden = true;
-    if (this.assaultCue) this.assaultCue.hidden = true;
+    if (this.orbitReadout) { this.orbitReadout.hidden = true; this.orbitReadout.textContent = ""; }
     if (this.boardingAction) { this.boardingAction.hidden = true; this.boardingAction.disabled = true; }
     this.steeringPad?.setAttribute("aria-disabled", "false");
     this.spaceScene?.removeAttribute("data-boarding-state");
@@ -452,7 +434,6 @@ export class VoyageScene {
       this.battleButton.disabled = true;
     }
     this.navigation.begin(this.contactBearing, { position, radius: FLIGHT.contactDistance, active: false });
-    if (this.battleButtonStatus) this.battleButtonStatus.textContent = "후방 하강문 파열 · 진입 가능";
     this.spaceScene?.setAttribute("data-voyage-state", "cruise");
     this.updateHud(true);
 
@@ -481,7 +462,6 @@ export class VoyageScene {
     this.assault.begin();
     if (force) this.navigation.begin(this.contactBearing);
     else this.navigation.active = true;
-    if (this.boardingPanel) this.boardingPanel.hidden = false;
     if (this.boardingAction) this.boardingAction.hidden = false;
     if (this.battleButton) { this.battleButton.hidden = true; this.battleButton.disabled = true; }
     this.setVoyageMode("survey", "적함에 접근했습니다. 자동 선회로 뒤쪽을 살펴보고 하강문을 찾으십시오.");
@@ -527,8 +507,6 @@ export class VoyageScene {
     this.updateHud(true);
   }
 
-  getBoardingProgress() { return this.assault.progress; }
-
   updateBoardingControls() {
     if (!this.isBoardingActive) return;
     const nav = this.navigation, a = this.assault;
@@ -539,31 +517,29 @@ export class VoyageScene {
       this.boardingAction.hidden = this.encounterReady;
       this.boardingAction.disabled = !(fire || pull);
     }
-    const copy = ASSAULT_COPY[this.mode];
-    let label = copy?.[0] || "", status = copy?.[1] || "";
-    if (this.mode === "survey") {
-      label = fire ? "작살 발사" : nav.discovered ? "하강문 조준" : "후방 하강문 찾기";
-      status = fire ? "Space / F · 조준한 문에 작살 발사" : nav.orbitTooClose ? "후진해 거리를 확보한 뒤 후방 하강문을 찾으세요" : nav.discovered ? "선회를 멈추고 후방 문 중앙을 조준하세요" : "자동 선회 [O] · 뒤쪽의 하강문을 찾아보세요";
-    }
-    if (pull) { label = "견인 돌입"; status = "Space · 케이블을 감아 하강문으로 돌진"; }
+    // Only compact actions are visible; detailed guidance stays in accessible labels/tooltips.
+    const label = pull ? "견인 돌입" : a.committed ? "돌입 중…" : nav.anchor ? "작살 고정 중…" : "작살 발사";
+    const hint = pull ? "Space · 케이블을 감아 하강문으로 돌진" : fire ? "Space / F · 조준한 문에 작살 발사" : a.committed ? "강습 완료까지 대기" : nav.discovered ? "후방 문 중앙을 조준하세요" : "자동 선회로 후방 하강문을 찾으세요";
     if (this.boardingActionLabel) this.boardingActionLabel.textContent = label;
-    if (this.boardingActionStatus) this.boardingActionStatus.textContent = status;
-    this.boardingAction?.setAttribute("aria-label", status + ". " + label);
+    this.boardingAction?.setAttribute("aria-label", label + ". " + hint);
+    this.boardingAction?.setAttribute("title", hint);
     this.steeringPad?.setAttribute("aria-disabled", String(a.committed));
     this.spaceScene?.setAttribute("data-helm-locked", String(a.committed));
-    if (this.orbitControls) this.orbitControls.hidden = this.encounterReady || a.committed;
+    if (this.orbitControls) this.orbitControls.hidden = Boolean(nav.anchor) || a.committed;
     if (this.orbitButton) {
       this.orbitButton.disabled = !nav.orbiting && !nav.canOrbit;
       this.orbitButton.setAttribute("aria-pressed", String(nav.orbiting));
-      this.orbitButton.textContent = nav.orbiting ? "선회 정지 [O]" : "자동 선회 [O]";
+      this.orbitButton.textContent = nav.orbiting ? "선회 정지" : "자동 선회";
     }
-    if (this.orbitDirection) { this.orbitDirection.disabled = !nav.canOrbit; this.orbitDirection.textContent = nav.direction > 0 ? "반대 방향 ↶ [Q]" : "반대 방향 ↷ [Q]"; }
-    this.orbitControls?.setAttribute("data-blocked", String(nav.orbitTooClose && !nav.anchor));
-    if (this.orbitReadout) this.orbitReadout.textContent = nav.anchor ? "작살 고정 · 돌입 명령 대기" : nav.orbitTooClose ? this.orbitTooCloseMessage : nav.discovered ? (nav.solution.visible ? "하강문 시야 확보 · 직접 조준" : "하강문이 선체 뒤에 가려짐") : (nav.orbiting ? Math.round(nav.radius) + " m 유지 · 후방 하강문 탐색" : "선회 대기 · 함선 뒤를 살펴보세요");
-    if (this.assaultCue) {
-      this.assaultCue.hidden = !a.committed;
-      this.assaultCue.querySelector("span").textContent = copy?.[2] || "";
-      this.assaultCue.querySelector("strong").textContent = copy?.[0] || "";
+    if (this.orbitDirection) {
+      this.orbitDirection.disabled = !nav.canOrbit;
+      this.orbitDirection.textContent = nav.direction > 0 ? "↶" : "↷";
+    }
+    // Keep the requested clearance warning, but no permanent status panel.
+    const tooClose = nav.orbitTooClose && !nav.anchor;
+    if (this.orbitReadout) {
+      this.orbitReadout.hidden = !tooClose;
+      this.orbitReadout.textContent = tooClose ? this.orbitTooCloseMessage : "";
     }
   }
 
@@ -666,25 +642,7 @@ export class VoyageScene {
 
   updateHud(force = false) {
     this.updateThrustUi();
-    if (this.isBoardingActive) {
-      const a = this.assault;
-      const progressPercent = Math.round(this.getBoardingProgress() * 100);
-      if (this.boardingDistanceType) this.boardingDistanceType.textContent = a.breach > 0 ? "BREACH DEPTH" : this.mode === "survey" ? "CENTRE" : "GAP";
-      if (this.boardingDistanceLabel) this.boardingDistanceLabel.textContent = a.breach > 0 ? (a.breach * (ASSAULT_CONFIG.contactDistance - ASSAULT_CONFIG.seatedDistance)).toFixed(1) + " m" : this.mode === "survey" ? this.navigation.radius.toFixed(1) + " m" : a.distance.toFixed(a.distance < 100 ? 1 : 0) + " m";
-      if (this.relativeSpeedLabel) this.relativeSpeedLabel.textContent = (a.committed ? a.speed : this.navigation.speed).toFixed(1) + " m/s";
-      if (this.alignmentLabel) this.alignmentLabel.textContent = a.committed ? "견인 고정" : this.navigation.anchor ? "작살 고정" : this.navigation.solution.canFire ? "작살 유효" : this.navigation.discovered ? "조준 필요" : "탐색 중";
-      if (this.breachLabel) this.breachLabel.textContent = a.breach > 0 ? Math.round(a.breach * 100) + "%" : "대기";
-      if (this.boardingProgressBar) this.boardingProgressBar.style.width = progressPercent + "%";
-      if (this.boardingPhaseLabel) this.boardingPhaseLabel.textContent = ASSAULT_COPY[this.mode][0];
-      if (this.boardingObjective) this.boardingObjective.textContent = this.mode === "survey" && this.navigation.discovered ? "후방 하강문 발견. 선회를 멈추고 문을 조준해 작살을 발사하십시오." : ASSAULT_COPY[this.mode][1];
-      for (const [element, progress, text] of [[this.ramState, a.ram, "RAM"], [this.clampState, a.clamps, "CLAWS"], [this.boardingSealState, a.pressure, "SEAL"]]) {
-        if (!element) continue;
-        element.dataset.state = progress >= 1 ? "locked" : "standby";
-        element.textContent = text + " · " + (progress >= 1 ? "LOCKED" : progress > 0 ? Math.round(progress * 100) + "%" : "STOWED");
-      }
-      this.updateBoardingControls();
-    }
-
+    this.updateBoardingControls();
     if (force) this.updateContactVisuals();
   }
 

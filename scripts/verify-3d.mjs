@@ -48,7 +48,7 @@ try {
     assert.ok((await read()).rendering.farClipMetres >= 18000);
     await page.evaluate(async () => {
       SpacePiratesAmbient.destroy();
-      const { VoyageScene } = await import(new URL('./src/voyage.js?v=visibility-1', location.href));
+      const { VoyageScene } = await import(new URL('./src/voyage.js?v=controls-1', location.href));
       window.qaVisibilityScene = new VoyageScene(document.getElementById('starfield'));
       qaVisibilityScene.pause();
     });
@@ -187,8 +187,11 @@ try {
       const problems = await page.evaluate(() => {
         const issues = [];
         if (document.querySelector('.voyage-readout, #voyage-state, #voyage-distance, #voyage-speed, #voyage-coordinate, #voyage-progress-bar')) issues.push('Removed navigation readout still exists');
+        if (document.querySelector('#boarding-panel, #assault-cue, #boarding-action-status, #thrust-state, #help-overlay, .status-whisper')) issues.push('Removed information panel still exists');
+        const dock = document.querySelector('.hud-bottom').getBoundingClientRect();
+        if (dock.top < innerHeight * .65) issues.push('Controls extend above bottom 35% of viewport');
         const visible = e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
-        const selectors = ['.hud-brand','#voyage-radar','#boarding-panel','#orbit-controls','#assault-cue','.assault-actions','.flight-controls','#help-overlay','.thrust-controls'];
+        const selectors = ['#voyage-radar','#orbit-controls','#orbit-readout','#boarding-action','#battle-start','.flight-controls','.thrust-controls'];
         const panels = selectors.map(s=>document.querySelector(s)).filter(visible);
         const overlap = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left) > 1 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top) > 1;
         const aim = document.querySelector('.cockpit-reticle').getBoundingClientRect();
@@ -205,12 +208,6 @@ try {
           if(r.left<0 || r.top<0 || r.right>innerWidth+.5 || r.bottom>innerHeight+.5) issues.push(button.id+' outside viewport');
           const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
           if(!button.contains(hit)) issues.push(button.id+' is obscured');
-        }
-        for (const cell of [...document.querySelectorAll('.boarding-panel__metrics p')].filter(visible)) {
-          for (const text of cell.children) {
-            const range = document.createRange(); range.selectNodeContents(text);
-            if(range.getBoundingClientRect().width > cell.getBoundingClientRect().width + .5) issues.push(text.id+' metric overflows its cell');
-          }
         }
         if(document.documentElement.scrollWidth>innerWidth) issues.push('horizontal overflow');
         if(document.querySelector('#contact-marker, #intercept-marker')) issues.push('world target overlay still exists');
@@ -342,7 +339,7 @@ try {
   await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.radius > 155);
   await page.keyboard.up('s'); await page.waitForTimeout(100);
   assert.equal(await page.locator('#orbit-button').isEnabled(), true);
-  assert.doesNotMatch(await page.locator('#orbit-readout').innerText(), /선회 불가/);
+  assert.equal(await page.locator('#orbit-readout').isVisible(), false, 'Clearance notice disappears once safe');
   // Manual reverse overrides autopilot; releasing holds the new position.
   await tap('#orbit-button');
   await page.waitForTimeout(120);
@@ -399,14 +396,18 @@ try {
   assert.equal((await read()).mode, 'tethered', 'Hooking alone never triggers the ram');
   assert.deepEqual((await read()).navigation.position, hooked.navigation.position);
   await page.screenshot({ path: 'qa-output/harpoon-locked.png' });
+  await checkLayout('tethered');
   if (mobile) await tap('#boarding-action');
   else await page.keyboard.press('Space'); // Works even when the previous button still has focus.
   let start = Date.now();
-  while (Date.now() - start < 20000) {
+  while (Date.now() - start < 45000) {
     state = await read();
     if (!seen.has(state.mode)) {
       seen.add(state.mode);
       console.log(state.mode, state.distanceMeters.toFixed(1), { drawCalls: state.rendering.drawCalls, breached: state.rendering.armourBreached });
+      await page.evaluate(() => SpacePiratesAmbient.pause());
+      await checkLayout(state.mode);
+      await page.evaluate(() => SpacePiratesAmbient.resume());
       await page.screenshot({ path: `qa-output/stage-${state.mode}.png` });
       if (state.mode === 'charge') {
         await page.evaluate(() => SpacePiratesAmbient.pause());
@@ -502,7 +503,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=visibility-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=controls-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();

@@ -33,26 +33,24 @@
   pointer-events: none;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
-.hud-top { align-items: flex-start; justify-content: space-between; flex: 0 0 auto; }
-.hud-brand { gap: 10px; flex: 0 1 260px; }
-.hud-instruments { align-items: flex-start; justify-content: flex-end; flex: 0 1 auto; }
+.hud-top { justify-content: flex-end; flex: 0 0 auto; }
+.hud-instruments { justify-content: flex-end; }
 .hud-view { flex: 1 1 0; min-height: 0; }
-.hud-bottom { flex: 0 0 auto; }
-.hud-action-row { align-items: stretch; justify-content: space-between; }
-.hud-action-row:not(:has(#orbit-controls:not([hidden]), #assault-cue:not([hidden]), .assault-actions > button:not([hidden]))) { display: none; }
-.hud-control-row { justify-content: space-between; align-items: flex-end; }
-.voyage-ui .title-overlay, .voyage-ui .help-overlay, .voyage-ui .status-whisper,
-.voyage-ui .battle-start {
-  position: static; inset: auto; transform: none; margin: 0;
+/* A single shallow dock. No action or status panel is positioned in the view. */
+.hud-bottom {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: end; gap: 8px 12px; flex: 0 0 auto;
 }
-.voyage-ui .title-overlay { max-width: none; }
-.voyage-ui .title-overlay h1 { font-size: clamp(24px, 2.8vw, 38px); line-height: 1; }
-.title-overlay h1 span { display: inline; }
-.title-overlay__eyebrow { margin-bottom: 8px; font-size: 9px; letter-spacing: .14em; }
-.title-overlay__subtitle { margin: 8px 0 0; font-size: 9px; }
-.voyage-ui .status-whisper { display: flex; gap: 7px; justify-content: flex-start; font-size: 9px; letter-spacing: .04em; }
-.boarding-panel__progress { height: 3px; margin: 10px 0 0; background: #1e3742; overflow: hidden; }
-.boarding-panel__progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #386979, #83e6e1); transition: width 180ms linear; }
+.hud-control-row { display: contents; }
+.hud-action-row { grid-column: 2; grid-row: 2; justify-content: center; align-items: center; }
+.hud-action-row:not(:has(button:not([hidden]))) { display: none; }
+.flight-controls { grid-column: 1; grid-row: 2; }
+.thrust-controls { grid-column: 3; grid-row: 2; }
+.action-notice {
+  grid-column: 2; grid-row: 1; justify-self: center;
+  margin: 0; max-width: 100%; color: #ffd09b; font-size: 11px; line-height: 1.4;
+  text-align: center; word-break: keep-all;
+}
 .voyage-radar {
   position: relative;
   width: 96px;
@@ -139,31 +137,7 @@
 
 
 .voyage-radar { flex: 0 0 96px; }
-.boarding-panel {
-  width: 360px; min-width: 0; padding: 12px;
-  background: rgba(4, 14, 25, .94); border: 1px solid #3d626e; border-radius: 6px;
-}
-.boarding-panel header, .boarding-panel footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.boarding-panel header > span { color: #92b0bd; font-size: 9px; letter-spacing: .1em; }
-.boarding-panel header output { color: #e5bb7c; font-size: 12px; font-weight: 700; }
-.boarding-panel__objective { margin: 8px 0; font-size: 11px; line-height: 1.4; color: #b6cbd6; }
-.boarding-panel__metrics { display: flex; gap: 8px; }
-.boarding-panel__metrics p { flex: 1; min-width: 0; margin: 0; padding-top: 6px; border-top: 1px solid #243e4a; }
-.boarding-panel__metrics span, .boarding-panel__metrics strong { display: block; }
-.boarding-panel__metrics span { font-size: 8px; letter-spacing: .04em; color: #91acbb; }
-.boarding-panel__metrics strong { margin-top: 4px; font-size: 11px; color: #effdff; white-space: nowrap; }
-.boarding-panel footer { margin-top: 8px; }
-.boarding-panel footer span { font-size: 8px; color: #87a5b6; white-space: nowrap; }
-.boarding-panel footer span[data-state="locked"] { color: #9af6ff; }
-.orbit-controls {
-  flex: 0 1 360px; min-width: 0; padding: 10px;
-  border: 1px solid #3d626e; border-radius: 6px; background: rgba(4, 15, 25, .94);
-}
-.orbit-controls output { word-break: keep-all; display: block; margin-bottom: 8px; color: #b3cbd7; font-size: 11px; line-height: 1.4; min-height: 1.4em; }
-.orbit-controls[data-blocked="true"] { border-color: #ba874e; }
-.orbit-controls[data-blocked="true"] output { color: #ffd09b; }
-.orbit-controls > div { display: flex; gap: 8px; }
-.orbit-controls button { flex: 1; }
+.orbit-controls { gap: 8px; flex: 0 0 auto; }
 :is(.voyage-ui, .settings-dialog) button {
   min-height: 44px; padding: 8px 10px; border: 1px solid #507c8b; border-radius: 5px;
   font: 12px ui-monospace, monospace; color: #c5f7ff; background: rgba(9, 31, 43, .96);
@@ -172,34 +146,15 @@
 :is(.voyage-ui, .settings-dialog) button:hover:not(:disabled) { background: #224655; border-color: #a0e8e6; }
 :is(.voyage-ui, .settings-dialog) button:disabled { opacity: .48; cursor: default; }
 :is(.voyage-ui, .settings-dialog) button:focus-visible, .steering-pad:focus-visible { outline: 2px solid #b8fbff; outline-offset: 3px; }
-:is(.voyage-ui, .settings-dialog) button[aria-pressed="true"], :is(.voyage-ui, .settings-dialog) button.is-held { background: #204747; border-color: #83e2c6; color: #d0fff0; }
-.assault-actions { flex: 0 1 360px; justify-content: stretch; margin-left: auto; }
-.assault-actions:not(:has(> button:not([hidden]))) { display: none; }
-.voyage-ui .battle-start {
-  flex: 1; width: 100%; min-width: 0; min-height: 64px; padding: 12px;
-  white-space: normal; letter-spacing: .02em; animation: none;
-  background: rgba(12, 39, 48, .96); box-shadow: none;
-}
-.voyage-ui .battle-start span { display: block; margin: 0 0 6px; font: 10px/1.4 ui-monospace, monospace; letter-spacing: 0; color: #a7c8d5; }
-.voyage-ui .battle-start strong { display: block; font: 700 16px/1.3 ui-sans-serif, sans-serif; }
-.voyage-ui .battle-start:disabled { opacity: .72; }
-.assault-cue {
-  flex: 0 1 360px; gap: 5px; align-self: center; padding: 12px;
-  border-left: 2px solid #dbaa6a; background: rgba(25, 17, 9, .9); border-radius: 4px;
-  color: #ffd69e;
-}
-.assault-cue span { font-size: 9px; letter-spacing: .1em; }
-.assault-cue strong { font-size: 18px; }
-.flight-controls { display: flex; align-items: flex-end; gap: 12px; flex: 0 0 auto; }
-.thrust-controls { gap: 8px; width: 120px; flex: 0 0 auto; }
-.thrust-controls output, .thrust-controls small { text-align: center; font-size: 11px; line-height: 1.2; color: #b0d4dc; }
-.thrust-controls small { color: #8daebb; font-size: 9px; }
+:is(.voyage-ui, .settings-dialog) button[aria-pressed="true"], .voyage-ui button.is-held { background: #204747; border-color: #83e2c6; color: #d0fff0; }
+#orbit-button { width: 140px; }
+#orbit-direction { width: 44px; padding-inline: 0; font-size: 20px; }
+.voyage-ui .voyage-action { width: 148px; flex: 0 0 auto; }
+.voyage-action strong { font: inherit; font-weight: 700; }
+.flight-controls { display: flex; align-items: flex-end; gap: 12px; }
+.thrust-controls { gap: 8px; width: 112px; }
 .voyage-ui .thrust-controls button { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .thrust-controls kbd { margin-left: 8px; opacity: .7; font: inherit; }
-.voyage-ui .help-overlay { flex: 0 1 420px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; white-space: normal; font-size: 10px; line-height: 1.6; text-align: center; }
-.help-overlay__signal, .help-overlay__separator { display: none; }
-.space-scene[data-helm-locked="true"] .help-overlay > span { display: none; }
-.space-scene[data-helm-locked="true"] .help-overlay::before { content: "충각 강습 · 항로 자동 고정"; color: #d7b68a; }
 .steering-pad {
   position: relative;
   width: 5.5rem;
@@ -442,62 +397,37 @@
 .renderer-error a { display: inline-block; margin-top: 16px; padding: 10px 16px; color: #8febff; border: 1px solid currentColor; }
 .impact-flash { position: absolute; z-index: 27; inset: 0; pointer-events: none; opacity: var(--impact-flash, 0); background: radial-gradient(ellipse at 50% 40%, #ffe6b0, #d7772b 48%, transparent 78%); }
 @keyframes radar-sweep { to { transform: rotate(360deg); } }
-@media (max-width: 1100px) {
-  .space-scene[data-boarding-state] .voyage-radar { display: none; }
-  .voyage-ui .help-overlay { display: none; }
-}
-@media (max-width: 720px) {
+@media (max-width: 720px) and (orientation: portrait) {
   .voyage-ui { --panel-gap: 8px; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
-  .hud-brand { display: none; }
-  .hud-instruments { width: 100%; }
-  .boarding-panel { width: 100%; padding: 10px; }
-  .boarding-panel header output { font-size: 11px; }
-  .boarding-panel__metrics strong { font-size: 10px; }
-  .boarding-panel__metrics span, .boarding-panel footer span { font-size: 7px; }
-  .hud-action-row { flex-wrap: wrap; }
-  .orbit-controls, .assault-actions { flex: 1 1 100%; }
-  .orbit-controls { padding: 8px; }
-  .orbit-controls output { font-size: 10px; margin-bottom: 6px; }
-  .assault-cue { flex: 1 1 100%; padding: 8px; gap: 3px; }
-  .assault-cue strong { font-size: 14px; }
-  .voyage-ui .battle-start { padding: 8px; min-height: 56px; }
-  .voyage-ui .battle-start strong { font-size: 14px; }
+  .hud-bottom { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+  .hud-control-row { display: flex; justify-content: space-between; align-items: flex-end; }
+  .hud-action-row { gap: 6px; flex-wrap: nowrap; }
+  .orbit-controls { gap: 6px; }
+  #orbit-button { width: 96px; }
+  .voyage-ui .voyage-action { width: 104px; }
+  .action-notice { font-size: 10px; }
   .flight-controls { gap: 8px; }
   .steering-pad { width: 88px; height: 88px; }
   .thrust-controls { width: 92px; gap: 6px; }
-  .thrust-controls output { font-size: 10px; }
-  .thrust-controls small { font-size: 8px; }
-  :is(.voyage-ui, .settings-dialog) button { font-size: 11px; padding: 7px; }
+  .voyage-ui button { font-size: 11px; padding: 7px; }
 }
-/* Short landscape screens use a single action row and a shallow control row. */
+/* Landscape keeps all actions between the helm and thrust buttons, along the bottom edge. */
 @media (max-height: 560px) and (orientation: landscape) {
   .voyage-ui { --panel-gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
-  .hud-brand, .voyage-ui .help-overlay { display: none; }
-  .hud-instruments { width: 100%; }
-  .voyage-radar { width: 96px; height: 96px; flex-basis: 96px; }
-  .boarding-panel { width: 100%; padding: 8px; }
-  .boarding-panel__objective, .boarding-panel footer, .boarding-panel__progress { display: none; }
-  .boarding-panel__metrics { margin-top: 6px; }
-  .boarding-panel__metrics p { padding-top: 4px; }
-  .boarding-panel__metrics strong { font-size: 10px; margin-top: 3px; }
-  .hud-action-row { flex-wrap: nowrap; align-items: stretch; }
-  .orbit-controls, .assault-actions, .assault-cue { flex: 0 1 50%; }
-  .orbit-controls { padding: 7px; }
-  .orbit-controls output { font-size: 10px; margin-bottom: 5px; }
-  .assault-cue { padding: 8px; }
-  .assault-cue strong { font-size: 14px; }
-  .voyage-ui .battle-start { min-height: 56px; padding: 8px; }
-  .voyage-ui .battle-start strong { font-size: 14px; }
-  .flight-controls { align-items: center; gap: 10px; }
+  .hud-bottom { gap: 6px 8px; }
+  .hud-action-row, .orbit-controls { gap: 6px; }
+  #orbit-button { width: 96px; }
+  .voyage-ui .voyage-action { width: 104px; }
+  .voyage-ui button { font-size: 11px; padding: 7px; }
+  .action-notice { font-size: 10px; }
+  .flight-controls { align-items: center; gap: 6px; }
+  .voyage-ui .settings-button { min-width: 44px; }
   .steering-pad { width: 64px; height: 64px; }
-  .thrust-controls { flex-direction: row; align-items: center; gap: 8px; width: auto; }
-  .thrust-controls button { width: 70px; }
-  .thrust-controls output { width: 68px; font-size: 10px; }
-  .thrust-controls small { display: none; }
+  .thrust-controls { flex-direction: row; align-items: center; gap: 6px; width: auto; }
+  .thrust-controls button { width: 60px; }
   .cockpit-console { height: 26vh; }
 }
 @media (max-width: 360px) and (orientation: portrait) {
-  .voyage-radar { width: 96px; height: 96px; flex-basis: 96px; }
   .steering-pad { width: 76px; height: 76px; }
   .thrust-controls { width: 80px; }
 }
@@ -506,7 +436,7 @@
   .impact-flash { display: none; }
 }
 @media (prefers-contrast: more) {
-  .boarding-panel, .orbit-controls, :is(.voyage-ui, .settings-dialog) button { background-color: #020711; border-color: #dffcff; }
+  :is(.voyage-ui, .settings-dialog) button { background-color: #020711; border-color: #dffcff; }
 }
 
 /* Native modal supplies focus trapping, an inert background and Escape dismissal. */
