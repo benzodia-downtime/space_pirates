@@ -6,14 +6,17 @@ export const ASSAULT_CONFIG = Object.freeze({
   contactDistance: 4, seatedDistance: 1.2,
   deploySeconds: 1.4, chargeSeconds: 2.4, impactSeconds: 1.05,
   hitStopSeconds: 0.13, clampSeconds: 1.3, sealSeconds: 1.4, pressureSeconds: 2.2,
+  cleanRadius: 1.35, grazeRadius: 5.5, alignSeconds: .35, reboundSeconds: .8,
 });
 
 export const ASSAULT_COPY = Object.freeze({
   survey: ["진입점 탐색", "자동 선회로 적함 뒤를 살펴보고 하강문을 직접 조준하십시오.", "FIND THE AFT RAMP"],
   harpoon: ["작살 발사", "후방 하강문에 작살을 박고 견인 케이블을 고정합니다.", "HARPOON AWAY"],
-  tethered: ["작살 고정", "연결 완료. Space 또는 견인 돌입을 누르면 문을 찢고 진입합니다.", "TETHER LOCKED / AWAITING INPUT"],
-  "ram-deploy": ["충각 전개", "항로 고정. 선수 돌파 장치와 완충기를 전개합니다.", "01 / RAM DEPLOYING"],
-  charge: ["급속 견인", "케이블 급속 회수. 적함 후방 하강문으로 끌려갑니다.", "02 / WINCH OVERDRIVE"],
+  tethered: ["작살 고정", "패드로 후방 포격을 피하십시오. Space 또는 견인 돌입으로 돌파를 시작합니다.", "TETHER LOCKED / AWAITING INPUT"],
+  "ram-deploy": ["충각 전개", "선수 돌파 장치를 전개합니다. 패드로 문 중앙에 진입 위치를 맞추십시오.", "01 / RAM DEPLOYING"],
+  charge: ["진입 보정", "패드로 기체를 옮겨 문 중앙을 조준선에 맞추십시오.", "02 / GUIDED RAM"],
+  jammed: ["충각 걸림", "패드로 문 중앙에 다시 정렬하면 돌파합니다.", "REALIGN TO BREACH"],
+  rebound: ["진입 이탈", "충돌 완충 후 작살을 해제합니다. 다시 접근하십시오.", "BREAK AWAY"],
   impact: ["하강문 파열", "하강문을 찢고 충각을 밀어 넣어 진입구를 확보합니다.", "03 / RAMP TORN OPEN"],
   clamp: ["선체 고정", "고정 발톱을 펼쳐 충각을 적함 격벽에 고정합니다.", "04 / CLAW LOCK"],
   seal: ["진입구 밀폐", "충각 내부의 기밀 통로를 손상된 격벽에 결합합니다.", "05 / BREACH SEAL"],
@@ -41,10 +44,12 @@ export class AssaultSequence {
     this.harpoon = 0;
     this.tetherBearing = null;
     this.chargeStartDistance = 0;
+    this.landingError = 0; this.collision = null; this.alignedTime = 0;
   }
 
   get active() { return this.stage !== "inactive"; }
   get committed() { return this.attackBearing !== null; }
+  get canCorrect() { return ['tethered','ram-deploy','charge','jammed'].includes(this.stage); }
   enter(stage) { this.stage = stage; this.elapsed = 0; }
   begin() { this.reset(); this.enter("survey"); }
 
@@ -94,8 +99,15 @@ export class AssaultSequence {
         this.distance = c.contactDistance;
         this.speed = 0;
         this.impactAge = 0;
-        this.enter("impact");
+        this.collision = this.landingError <= c.cleanRadius ? 'clean' : this.landingError <= c.grazeRadius ? 'graze' : 'miss';
+        this.enter(this.collision === 'clean' ? "impact" : this.collision === 'graze' ? "jammed" : "rebound");
       }
+    } else if (this.stage === 'jammed') {
+      this.alignedTime = this.landingError <= c.cleanRadius ? this.alignedTime + dt : 0;
+      if(this.alignedTime >= c.alignSeconds) {this.impactAge=0;this.enter('impact');}
+    } else if (this.stage === 'rebound') {
+      this.distance = c.contactDistance + (80-c.contactDistance)*easeOut(this.elapsed/c.reboundSeconds);
+      if(this.elapsed >= c.reboundSeconds) this.enter('retry');
     } else if (this.stage === "impact") {
       // Brief contact hold, then a short, visibly separate penetration stroke.
       this.breach = easeOut((this.elapsed - c.hitStopSeconds) / (c.impactSeconds - c.hitStopSeconds));
@@ -114,7 +126,7 @@ export class AssaultSequence {
   }
 
   get progress() {
-    return ({ survey: 0, harpoon: 0.15 + this.harpoon * 0.15, tethered: 0.3, "ram-deploy": 0.3 + this.ram * 0.1, charge: 0.4 + this.charge * 0.2, impact: 0.6 + this.breach * 0.12, clamp: 0.72 + this.clamps * 0.1, seal: 0.82 + this.seal * 0.08, pressurize: 0.9 + this.pressure * 0.1, ready: 1 })[this.stage] || 0;
+    return ({ survey: 0, harpoon: 0.15 + this.harpoon * 0.15, tethered: 0.3, "ram-deploy": 0.3 + this.ram * 0.1, charge: 0.4 + this.charge * 0.2, jammed: .6, rebound: .3, impact: 0.6 + this.breach * 0.12, clamp: 0.72 + this.clamps * 0.1, seal: 0.82 + this.seal * 0.08, pressurize: 0.9 + this.pressure * 0.1, ready: 1 })[this.stage] || 0;
   }
 
   forceReady(bearing) {

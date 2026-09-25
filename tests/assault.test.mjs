@@ -70,3 +70,23 @@ test('Reset clears tether, damage, effects, and helm lock', () => {
   assert.equal(a.breach, 0); assert.equal(a.ram, 0); assert.equal(a.clamps, 0);
   assert.equal(a.seal, 0); assert.equal(a.pressure, 0); assert.equal(a.committed, false); assert.equal(a.impactAge, -1);
 });
+test('A glancing ram jams until the player holds a corrected line; time alone never breaches',()=>{
+  const a=tethered();assert.equal(a.canCorrect,true);a.commit();a.landingError=3;
+  advance(a,4);assert.equal(a.stage,'jammed');assert.equal(a.collision,'graze');
+  advance(a,30);assert.equal(a.breach,0);assert.equal(a.canCorrect,true);
+  a.landingError=0;advance(a,.2);assert.equal(a.stage,'jammed');
+  a.landingError=3;a.update(.02);assert.equal(a.alignedTime,0);
+  a.landingError=0;advance(a,.4);assert.equal(a.stage,'impact');assert.equal(a.canCorrect,false);
+  advance(a,10);assert.equal(a.stage,'ready');
+});
+test('A fully missed ram rebounds for retry without opening the door',()=>{
+  const a=tethered();a.commit();a.landingError=C.grazeRadius+.01;
+  advance(a,4);assert.equal(a.stage,'rebound');assert.equal(a.collision,'miss');assert.equal(a.canCorrect,false);
+  advance(a,1);assert.equal(a.stage,'retry');assert.equal(a.breach,0);assert.equal(a.distance,80);
+  a.begin();assert.equal(a.committed,false);assert.equal(a.collision,null);assert.equal(a.landingError,0);
+});
+test('Landing classification includes the exact clean and glancing boundaries',()=>{
+  for(const [error,stage] of [[C.cleanRadius,'impact'],[C.cleanRadius+.01,'jammed'],[C.grazeRadius,'jammed'],[Infinity,'rebound']]) {
+    const a=tethered();a.commit();a.landingError=error;advance(a,3.9);assert.equal(a.stage,stage);
+  }
+});

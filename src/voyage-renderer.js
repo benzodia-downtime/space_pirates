@@ -261,10 +261,20 @@ export class VoyageRenderer {
     const glowTexture=this.keep(new THREE.CanvasTexture(glowCanvas));
     this.gunGlowMaterial=this.keep(new THREE.SpriteMaterial({map:glowTexture,color:0xffa33a,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
     this.gunGlow=new THREE.Sprite(this.gunGlowMaterial);this.gunGlow.position.set(0,0,5.5);this.cannon.add(this.gunGlow);
+    this.guns=[{group:this.cannon,charge:this.chargeMaterial,light:this.cannonLight,glow:this.gunGlow,mount:'bow',restYaw:0}];
+    const rear=this.cannon.clone(), rearCharge=this.keep(this.chargeMaterial.clone());
+    const rearGun={group:rear,charge:rearCharge,mount:'aft',restYaw:Math.PI};
+    rear.position.set(0,9,-52); rear.rotation.y=Math.PI;
+    rear.traverse(object=>{
+      if(object.material===this.chargeMaterial) object.material=rearCharge;
+      if(object.isPointLight) rearGun.light=object;
+      if(object.isSprite) {object.material=this.keep(object.material.clone());rearGun.glow=object;}
+    });
+    this.enemy.add(rear);this.guns.push(rearGun);
     this.aimMaterial=this.keep(new THREE.MeshBasicMaterial({color:0xff9c3b,transparent:true,opacity:.65,depthWrite:false}));
-    this.aimBeam=this.mesh(this.scene,this.cylinderGeometry,this.aimMaterial);
+    this.aimBeams=Array.from({length:9},()=>this.mesh(this.scene,this.cylinderGeometry,this.aimMaterial));
     const boltMaterial=this.keep(new THREE.MeshBasicMaterial({color:0xffdb98}));
-    this.enemyBolts=Array.from({length:4},()=>this.mesh(this.scene,this.cylinderGeometry,boltMaterial));
+    this.enemyBolts=Array.from({length:18},()=>this.mesh(this.scene,this.cylinderGeometry,boltMaterial));
     this.turnJets=[];
     const jetGeometry=this.keep(new THREE.ConeGeometry(.8,4,6));
     for(const side of [-1,1]) for(const z of [-23,23]) {
@@ -278,22 +288,30 @@ export class VoyageRenderer {
 
   drawDefense(defense, nav, motion) {
     this.enemy.updateWorldMatrix(true,false);
-    if(defense?.aimPoint) this.cannon.lookAt(new THREE.Vector3(defense.aimPoint.x,defense.aimPoint.y,defense.aimPoint.z));
-    else this.cannon.rotation.set(0,0,0);
     const charge=defense?.charge || 0, locked=defense?.gunPhase==='locked';
-    this.chargeMaterial.color.setHex(locked?0xff4830:charge>0?0xffae48:0x50331e);
-    this.cannonLight.color.setHex(locked?0xff4830:0xffae48);
     const muzzle=defense?.muzzleAge>=0 && motion ? Math.exp(-defense.muzzleAge*14)*80 : 0;
-    this.cannonLight.intensity=charge*35+muzzle;
-    this.gunGlow.visible=charge>0 || muzzle>.2;
-    this.gunGlowMaterial.color.setHex(locked?0xff4e25:0xffb545);
-    this.gunGlow.scale.setScalar((locked?10:4+charge*5)+muzzle*.08);
-    this.aimBeam.visible=Boolean(defense?.aimPoint && ['aim','locked'].includes(defense.gunPhase));
-    if(this.aimBeam.visible) {
-      const origin=defense.muzzle(nav), target=defense.aimPoint;
-      this.aimMaterial.color.setHex(locked?0xff4932:0xffbb54);
-      this.barBetween(this.aimBeam,new THREE.Vector3(origin.x,origin.y,origin.z),new THREE.Vector3(target.x,target.y,target.z),locked?.12:.055,true);
-    }
+    this.guns.forEach(gun=>{
+      const active=gun.mount===defense?.mount;
+      if(active && defense.aimPoint) gun.group.lookAt(new THREE.Vector3(defense.aimPoint.x,defense.aimPoint.y,defense.aimPoint.z));
+      else gun.group.rotation.set(0,gun.restYaw,0);
+      gun.charge.color.setHex(active && locked?0xff4830:active && charge>0?0xffae48:0x50331e);
+      gun.light.color.setHex(locked?0xff4830:0xffae48);
+      gun.light.intensity=active?charge*35+muzzle:0;
+      gun.glow.visible=active && (charge>0 || muzzle>.2);
+      gun.glow.material.color.setHex(locked?0xff4e25:0xffb545);
+      gun.glow.scale.setScalar((locked?10:4+charge*5)+muzzle*.08);
+    });
+    const aiming=Boolean(defense?.aimPoint && ['aim','locked'].includes(defense.gunPhase));
+    const directions=aiming?defense.directions(nav):[];
+    this.aimMaterial.color.setHex(locked?0xff4932:0xffbb54);
+    this.aimBeams.forEach((beam,i)=>{
+      beam.visible=i<directions.length;
+      if(!beam.visible) return;
+      const origin=defense.muzzle(nav), target=defense.aimPoint, direction=directions[i];
+      const start=new THREE.Vector3(origin.x,origin.y,origin.z);
+      const length=start.distanceTo(new THREE.Vector3(target.x,target.y,target.z));
+      this.barBetween(beam,start,start.clone().addScaledVector(new THREE.Vector3(direction.x,direction.y,direction.z),length),locked?.12:.055,true);
+    });
     this.enemyBolts.forEach((mesh,i)=>{
       const bolt=defense?.bolts[i]; mesh.visible=Boolean(bolt);
       if(!bolt) return;
@@ -576,8 +594,9 @@ export class VoyageRenderer {
       hatch: this.hatch.getWorldPosition(new THREE.Vector3()).toArray(),
       enemyPosition: this.enemy.position.toArray(), enemyRotation: this.enemy.rotation.toArray().slice(0,3),
       harpoonVisible: this.harpoonCable.visible, harpoonTip: this.harpoonBolt.position.toArray(),
-      enemyAimVisible: this.aimBeam.visible, enemyBoltsVisible: this.enemyBolts.filter(b=>b.visible).length,
-      turretChargeColor: this.chargeMaterial.color.getHex(),
+      enemyAimVisible: this.aimBeams.some(b=>b.visible), enemyAimRays: this.aimBeams.filter(b=>b.visible).length,
+      enemyBoltsVisible: this.enemyBolts.filter(b=>b.visible).length,
+      turretChargeColor: this.guns.find(g=>g.mount===this.lastFrame.defense?.mount)?.charge.color.getHex(),
       bowFacing: new THREE.Vector3(0,0,1).applyQuaternion(this.enemy.quaternion).toArray(),
       passageEnd: this.passageEnd.getWorldPosition(new THREE.Vector3()).toArray(),
       armourBreached: this.lastFrame.assault.breach >= 1, ramVisible: this.ramHead.visible,

@@ -1,9 +1,9 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=defender-1";
-import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=defender-1";
-import { AssaultAudio } from "./assault-audio.js?v=defender-1";
-import { EnemyDefense } from "./enemy-defense.js?v=defender-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=breachplay-1";
+import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=breachplay-1";
+import { AssaultAudio } from "./assault-audio.js?v=breachplay-1";
+import { EnemyDefense } from "./enemy-defense.js?v=breachplay-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=defender-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=breachplay-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -139,6 +139,7 @@ export class VoyageScene {
   }
 
   get isBoardingActive() { return this.assault.active; }
+  get helmLocked() { return this.assault.committed && !this.assault.canCorrect; }
 
   addListeners() {
     for (const button of this.thrustButtons) {
@@ -205,19 +206,19 @@ export class VoyageScene {
   }
 
   onPointerDown(event) {
-    if (this.manuallyPaused || this.destroyed || this.assault.committed || this.enemyDefense.defeated) return;
+    if (this.manuallyPaused || this.destroyed || this.helmLocked || this.enemyDefense.defeated) return;
     this.audio.unlock();
     if (this.activePointerId !== null && this.activePointerId !== event.pointerId) return;
     this.activePointerId = event.pointerId;
     this.steeringPad?.setPointerCapture?.(event.pointerId);
     this.pointerTarget = { ...this.pointer };
-    this.padOrigin = { clientX: event.clientX, clientY: event.clientY, heading: { ...this.pointer } };
+    this.padOrigin = { clientX: event.clientX, clientY: event.clientY, heading: { ...this.pointer }, correction: {...this.navigation.correction} };
     this.padDrag = { x: 0, y: 0 };
     event.preventDefault();
   }
 
   onPointerMove(event) {
-    if (this.manuallyPaused || this.destroyed || this.assault.committed) return;
+    if (this.manuallyPaused || this.destroyed || this.helmLocked || this.enemyDefense.defeated) return;
     if (this.activePointerId !== event.pointerId) return;
     this.updateTargetFromPad(event.clientX, event.clientY);
   }
@@ -226,6 +227,10 @@ export class VoyageScene {
     if (!this.padOrigin) return;
     const dx = clientX - this.padOrigin.clientX, dy = clientY - this.padOrigin.clientY;
     this.padDrag = { x: clamp(dx / 35, -1, 1), y: clamp(dy / 35, -1, 1) };
+    if(this.assault.canCorrect) {
+      this.navigation.correct(this.padOrigin.correction.x+dx*.18,this.padOrigin.correction.y-dy*.18);
+      return;
+    }
     if (this.navigation.orbiting) {
       this.navigation.steerOrbit(this.padDrag, this.getView());
       return;
@@ -357,7 +362,7 @@ export class VoyageScene {
     const key = /^Key[WASD]$/.test(event.code) ? event.code.slice(3).toLowerCase() : event.key.toLowerCase();
     if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
       if (!event.repeat) this.audio.unlock();
-      if (!this.assault.committed && (!event.repeat || this.keys.has(key))) this.keys.add(key);
+      if (!this.helmLocked && (!event.repeat || this.keys.has(key))) this.keys.add(key);
       event.preventDefault();
     } else if (event.code === "Space") {
       if (this.encounterReady) {
@@ -549,13 +554,13 @@ export class VoyageScene {
       this.boardingAction.disabled = !(fire || pull);
     }
     // Only compact actions are visible; detailed guidance stays in accessible labels/tooltips.
-    const label = pull ? "견인 돌입" : a.committed ? "돌입 중…" : a.stage === "harpoon" ? "작살 비행 중…" : "작살 발사";
-    const hint = pull ? "Space · 케이블을 감아 하강문으로 돌진" : fire ? "Space / F · 조준한 문에 작살 발사" : a.committed ? "강습 완료까지 대기" : nav.discovered ? "후방 문 중앙을 조준하세요" : "자동 선회로 후방 하강문을 찾으세요";
+    const label = a.stage==='jammed' ? "걸림 · 패드로 정렬" : a.stage==='charge' ? "문 중앙에 맞추기" : a.stage==='rebound' ? "이탈 중…" : pull ? "견인 돌입" : a.committed ? "돌입 중…" : a.stage === "harpoon" ? "작살 비행 중…" : "작살 발사";
+    const hint = a.canCorrect ? "패드나 방향키로 기체를 옮겨 포격을 피하고 문 중앙에 맞추세요." + (pull ? " Space로 견인 돌입." : "") : fire ? "Space / F · 조준한 문에 작살 발사" : a.committed ? "강습 완료까지 대기" : nav.discovered ? "후방 문 중앙을 조준하세요" : "자동 선회로 후방 하강문을 찾으세요";
     if (this.boardingActionLabel) this.boardingActionLabel.textContent = label;
     this.boardingAction?.setAttribute("aria-label", label + ". " + hint);
     this.boardingAction?.setAttribute("title", hint);
-    this.steeringPad?.setAttribute("aria-disabled", String(a.committed));
-    this.spaceScene?.setAttribute("data-helm-locked", String(a.committed));
+    this.steeringPad?.setAttribute("aria-disabled", String(this.helmLocked));
+    this.spaceScene?.setAttribute("data-helm-locked", String(this.helmLocked));
     if (this.orbitControls) this.orbitControls.hidden = Boolean(nav.anchor) || a.committed;
     if (this.orbitButton) {
       this.orbitButton.disabled = !nav.orbiting && !nav.canOrbit;
@@ -580,6 +585,11 @@ export class VoyageScene {
       }
       if (this.assault.stage === "survey") this.assault.distance = this.navigation.solution.distance;
     }
+    if(this.navigation.anchor) {
+      this.navigation.pull(this.assault.committed?this.assault.distance:this.navigation.tetherDistance);
+      this.assault.landingError=this.navigation.landingError(this.getView());
+    }
+    const previousStage=this.assault.stage, couldCorrect=this.assault.canCorrect;
     const wasFlying = this.assault.stage === "harpoon";
     this.assault.update(deltaSeconds);
     if (wasFlying && this.assault.stage === "tethered") {
@@ -587,6 +597,15 @@ export class VoyageScene {
       this.keys.clear(); this.releasePad(); this.clearThrust();
     }
     if (this.assault.committed) this.navigation.pull(this.assault.distance);
+    if(previousStage==='charge' && ['jammed','rebound'].includes(this.assault.stage)) {
+      this.enemyDefense.damage(this.assault.stage==='jammed'?10:20);
+      this.audio.play('enemy-hit');
+    }
+    if(couldCorrect && !this.assault.canCorrect) {this.keys.clear();this.releasePad();}
+    if(this.assault.stage==='retry') {
+      this.navigation.releaseTether();this.assault.begin();
+      this.navigation.inspect(this.getView());
+    }
     if (this.mode !== this.assault.stage) this.setVoyageMode(this.assault.stage, ASSAULT_COPY[this.assault.stage][1]);
   }
 
@@ -600,8 +619,10 @@ export class VoyageScene {
     if (this.sceneTime >= this.nextCourseAt) this.chooseNewCourse();
 
     const keyboardTarget = this.getKeyboardTarget();
-    if (keyboardTarget && !this.assault.committed) {
-      if (this.navigation.orbiting && !this.getThrust()) {
+    if (keyboardTarget && !this.helmLocked) {
+      if(this.assault.canCorrect) {
+        this.navigation.correct(this.navigation.correction.x+keyboardTarget.x*8*deltaSeconds,this.navigation.correction.y-keyboardTarget.y*8*deltaSeconds);
+      } else if (this.navigation.orbiting && !this.getThrust()) {
         this.navigation.steerOrbit(keyboardTarget, this.getView());
       } else {
         const nudgeRate = this.isBoardingActive ? 0.62 : 1.05;
@@ -642,17 +663,18 @@ export class VoyageScene {
       this.updateBoarding(deltaSeconds);
     }
 
-    const defenseEvents = this.enemyDefense.update(deltaSeconds, this.navigation);
+    const breached=['impact','clamp','seal','pressurize','ready'].includes(this.assault.stage);
+    const defenseEvents = this.enemyDefense.update(deltaSeconds, this.navigation, {breached});
     for (const event of defenseEvents) {
       this.audio.play(event);
-      if (event === "enemy-lock" && this.announcement) this.announcement.textContent = "적 선수 포격 조준 고정. 선회 방향을 바꿔 회피하십시오.";
+      if (event === "enemy-lock" && this.announcement) this.announcement.textContent = this.enemyDefense.pattern==='fan' ? "적 수평 확산 포격. 위나 아래로 회피하십시오." : "적 포격 조준 고정. 진행 방향을 바꿔 회피하십시오.";
       if (event === "enemy-hit" && this.announcement) this.announcement.textContent = `피격. 함선 내구도 ${this.enemyDefense.hull}.`;
-      if (event === "defeated") {
+    }
+    if(this.enemyDefense.defeated && this.mode!=='defeated') {
         this.navigation.stopOrbit(); this.navigation.active = false;
         this.navigation.harpoonTarget = this.navigation.harpoonLocalTarget = null;
         this.assault.reset(); this.keys.clear(); this.releasePad(); this.clearThrust();
         this.setVoyageMode("defeated", "함선 기동 불능. 하단의 다시 도전 버튼으로 재출격할 수 있습니다.");
-      }
     }
     if (this.isBoardingActive && !this.navigation.anchor) this.navigation.inspect(this.getView());
 
@@ -856,7 +878,8 @@ export class VoyageScene {
       relativeSpeed: this.assault.committed ? this.assault.speed : this.navigation.speed,
       alignment: tracking.quality,
       radarPitchDegrees: tracking.pitchDegrees,
-      steeringLocked: this.assault.committed,
+      steeringLocked: this.helmLocked,
+      canCorrect: this.assault.canCorrect, landingError: this.assault.landingError, collision: this.assault.collision,
       ramProgress: this.assault.ram,
       chargeProgress: this.assault.charge,
       breachProgress: this.assault.breach,

@@ -29,7 +29,7 @@ jobs:
         run: npm ci --omit=dev
 
       - name: Validate game and assault sequence
-        run: npm run check && node --test tests/assault.test.mjs tests/navigation.test.mjs
+        run: npm run check && node --test tests/assault.test.mjs tests/navigation.test.mjs tests/enemy-defense.test.mjs
 
       - name: Build static site
         run: npm run build

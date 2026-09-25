@@ -253,3 +253,15 @@ test('Radar pitch is relative to the current view: positive up, negative down, z
   near(pitchOffsetDegrees(0, above.pitch), 45);
   near(pitchOffsetDegrees(0, below.pitch), -45);
 });
+test('Tether corrections persist into the ram, shift its physical landing ray, and release without teleport',()=>{
+  const n=setup(),view=n.forceRear(),p={...n.position};
+  n.pull(n.tetherDistance);near(lengthFrom(n.position,p),0);near(n.landingError(view),0,1e-7);
+  n.correct(3,4);n.pull(n.tetherDistance);near(lengthFrom(n.position,p),5);near(n.landingError(view),5,1e-7);
+  n.pull(4);near(n.landingError(view),5,1e-7);
+  n.correct(0,0);n.pull(4);near(n.landingError(view),0,1e-7);
+  n.correct(100,-100);assert.deepEqual(n.correction,{x:14,y:-14});
+  n.pull(80);const released={...n.position};n.releaseTether();
+  assert.equal(n.anchor,null);assert.equal(n.harpoonTarget,null);assert.equal(n.canOrbit,true);
+  assert.deepEqual(n.position,released);n.update(0,view);assert.deepEqual(n.position,released);
+  n.reset();assert.deepEqual(n.correction,{x:0,y:0});
+});

@@ -45,6 +45,7 @@ export class OrbitNavigation {
     this.speed = 0; this.safetyStop = false;
     this.angle = 0; this.elevation = 0; this.radius = ORBIT.radius;
     this.orbitNormal = null;
+    this.correction = { x: 0, y: 0 }; this.tetherDistance = 0;
     this.enemyYaw = 0; this.enemyPosition = { x: 0, y: 0, z: 0 };
     this.position = { x: 0, y: 0, z: 6 };
     this.discovered = false; this.observeTime = 0; this.anchor = null; this.harpoonTarget = null; this.harpoonLocalTarget = null; this.pullVector = null;
@@ -181,12 +182,36 @@ export class OrbitNavigation {
     // The ship can move during flight. Lock the cable from the impact-time position.
     const v = subtract(this.position, this.anchor); const distance = length(v);
     this.pullVector = { x: v.x / distance, y: v.y / distance, z: v.z / distance };
+    this.tetherDistance = distance - 14;
+    this.correction = {x:0,y:0};
+    const bearing=lookAt(this.position,this.anchor,view);
+    this.correctionRight={x:Math.cos(bearing.yaw),y:0,z:Math.sin(bearing.yaw)};
+    this.correctionUp={x:Math.sin(bearing.yaw)*Math.sin(bearing.pitch),y:Math.cos(bearing.pitch),z:-Math.cos(bearing.yaw)*Math.sin(bearing.pitch)};
     return { distance: distance - 14, bearing: lookAt(this.position, this.anchor, view) };
   }
   pull(distance) {
     if (!this.anchor) return;
     this.stopOrbit();
     this.position = { x: this.anchor.x + this.pullVector.x * (distance + 14), y: this.anchor.y + this.pullVector.y * (distance + 14), z: this.anchor.z + this.pullVector.z * (distance + 14) };
+    for(const axis of ['x','y','z']) this.position[axis] += this.correctionRight[axis]*this.correction.x + this.correctionUp[axis]*this.correction.y;
+  }
+  correct(x,y) {
+    if(!this.anchor) return;
+    this.correction={x:clamp(x,-14,14),y:clamp(y,-14,14)};
+  }
+  landingError(view) {
+    if(!this.anchor) return 0;
+    const local=rotate(subtract(this.position,this.enemyPosition),-this.enemyYaw);
+    const direction=rotate({x:Math.sin(view.yaw)*Math.cos(view.pitch),y:-Math.sin(view.pitch),z:-Math.cos(view.yaw)*Math.cos(view.pitch)},-this.enemyYaw);
+    const t=(ORBIT.sternZ-local.z)/direction.z;
+    if(!Number.isFinite(t) || t<0) return Infinity;
+    return Math.hypot(local.x+direction.x*t,local.y+direction.y*t);
+  }
+  releaseTether() {
+    this.anchor=this.harpoonTarget=this.harpoonLocalTarget=this.pullVector=null;
+    this.correction={x:0,y:0}; this.orbitNormal=null; this.stopOrbit();
+    const local=rotate(subtract(this.position,this.enemyPosition),-this.enemyYaw);
+    this.radius=length(local); this.angle=Math.atan2(local.x,local.z);this.elevation=Math.atan2(local.y,Math.hypot(local.x,local.z));
   }
   forceRear(viewOnly = false) {
     this.angle = Math.PI; this.elevation = 0; this.updatePosition();
@@ -202,6 +227,7 @@ export class OrbitNavigation {
       doorDiscovered: this.discovered, doorVisible: this.solution.visible, canHarpoon: this.solution.canFire,
       doorDistance: this.solution.distance, incidence: this.solution.incidence, anchor: this.anchor && { ...this.anchor },
       harpoonTarget: this.harpoonTarget && { ...this.harpoonTarget },
+      correction: {...this.correction},
       doorBearing: lookAt(this.position, this.door) };
   }
 }

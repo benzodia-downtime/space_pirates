@@ -10,18 +10,51 @@ try {
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     const read=()=>page.evaluate(()=>defenseQA.getState());
     const tap=s=>mobile?page.locator(s).tap():page.locator(s).click();
-    async function fresh() {
+    async function fresh(rear=false) {
       await page.goto(url);
       await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type==='webgl2');
-      await page.evaluate(async()=>{
+      await page.evaluate(async rear=>{
         SpacePiratesAmbient.destroy();
-        const {VoyageScene}=await import(new URL('./src/voyage.js?v=defender-1',location.href));
+        const {VoyageScene}=await import(new URL('./src/voyage.js?v=breachplay-1',location.href));
         window.defenseQA=new VoyageScene(document.querySelector('#starfield'));
         const s=defenseQA;s.stopLoop();s.forceContact();
-        const view=s.getActualBearing();s.pointer={x:view.x*.65/.442,y:view.y*.65/.312};s.pointerTarget={...s.pointer};s.renderStill();
-      });
+        const view=rear?s.navigation.forceRear(true):s.getView();
+        if(!rear) {const target=s.getActualBearing();view.yaw=target.x*.65;view.pitch=target.y*.65;}
+        s.pointer={x:view.yaw/.442,y:view.pitch/.312};s.pointerTarget={...s.pointer};s.renderStill();
+      },rear);
     }
     const step=frames=>page.evaluate(n=>{for(let i=0;i<n;i++)defenseQA.update(.02);defenseQA.renderStill();},frames);
+    async function drag(dx,dy) {
+      const box=await page.locator('#steering-pad').boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+      if(mobile) {
+        const touch=await page.context().newCDPSession(page);
+        await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
+        await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx,y:y+dy}]});
+        await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await touch.detach();
+      } else {await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:3});await page.mouse.up();}
+      await step(1);
+    }
+    async function latch() {
+      await fresh(true);assert.equal((await read()).navigation.canHarpoon,true);
+      await tap('#boarding-action');await step(40);assert.equal((await read()).mode,'tethered');
+    }
+    async function layout(stage) {
+      const original=page.viewportSize();
+      for(const [width,height] of [[1440,900],[390,844],[320,568],[568,320]]) {
+        await page.setViewportSize({width,height});await step(0);
+        const issues=await page.evaluate(()=>{
+          const issues=[],dock=document.querySelector('.hud-bottom').getBoundingClientRect();
+          if(dock.top<innerHeight*.65)issues.push('dock above bottom 35%');
+          for(const el of document.querySelectorAll('.voyage-ui button, #steering-pad')) {
+            if(!el.getClientRects().length)continue;const r=el.getBoundingClientRect();
+            if(r.width<44||r.height<44||r.left<0||r.right>innerWidth+.5||r.bottom>innerHeight+.5)issues.push(el.id);
+            if(!el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)))issues.push(el.id+' obscured');
+          }
+          return issues;
+        });assert.deepEqual(issues,[],stage+' '+width+'x'+height);
+      }
+      await page.setViewportSize(original);await step(0);
+    }
     const until=async(phase)=>{
       const reached=await page.evaluate(target=>{
         for(let i=0;i<2000;i++) {if(defenseQA.enemyDefense.gunPhase===target)return true;defenseQA.update(.02);}
@@ -57,6 +90,42 @@ try {
     await step(110);assert.equal((await read()).enemyDefense.hull,100,'Changing orbit after lock avoids damage');
     assert.ok((await read()).navigation.position.y>locked.navigation.position.y+30);
 
+    await fresh();await step(400);await until('aim');await step(40);
+    assert.equal((await read()).enemyDefense.pattern,'fan');assert.equal((await read()).rendering.enemyAimRays,9);
+    await page.screenshot({path:`qa-output/fan-${mobile?'mobile':'desktop'}.png`});
+    await until('locked');await step(63);assert.equal((await read()).rendering.enemyBoltsVisible,9);
+
+    await latch();await until('locked');
+    assert.equal((await read()).enemyDefense.mount,'aft');
+    await page.screenshot({path:`qa-output/rear-defense-${mobile?'mobile':'desktop'}.png`});
+    await drag(0,-45);await step(105);
+    assert.ok((await read()).enemyDefense.shots>0);assert.equal((await read()).enemyDefense.hull,100,'Tethered pad dodge avoids rear shot');
+    const held=(await read()).navigation.position;await step(10);assert.deepEqual((await read()).navigation.position,held);
+
+    await latch();await tap('#boarding-action');await step(80);
+    assert.equal((await read()).mode,'charge');assert.equal((await read()).steeringLocked,false);
+    await drag(18,0);await step(112);
+    let ram=await read();assert.equal(ram.mode,'jammed');assert.equal(ram.collision,'graze');assert.ok(ram.enemyDefense.hull<=90);
+    assert.equal(ram.breachProgress,0);await step(25);assert.equal((await read()).mode,'jammed');
+    await layout('jammed');await page.screenshot({path:`qa-output/ram-jammed-${mobile?'mobile':'desktop'}.png`});
+    await drag(-18,0);await step(30);
+    assert.equal((await read()).mode,'impact');assert.equal((await read()).enemyDefense.gunPhase,'idle');
+    await step(350);ram=await read();assert.equal(ram.mode,'ready');assert.equal(ram.rendering.armourBreached,true);
+    await page.screenshot({path:`qa-output/ram-recovered-${mobile?'mobile':'desktop'}.png`});
+
+    await latch();await tap('#boarding-action');await step(80);await drag(48,0);await step(112);
+    ram=await read();assert.equal(ram.mode,'rebound');assert.equal(ram.collision,'miss');assert.equal(ram.breachProgress,0);
+    await layout('rebound');await step(50);ram=await read();
+    assert.equal(ram.mode,'survey');assert.equal(ram.navigation.anchor,null);assert.equal(ram.navigation.canOrbit,true);
+    assert.equal(ram.rendering.bridgeVisible,false);assert.equal(ram.enemyDefense.hull,80);
+    const recovered=ram.navigation.position;await step(1);assert.deepEqual((await read()).navigation.position,recovered);
+
+    await latch();await tap('#boarding-action');await step(540);
+    assert.equal((await read()).mode,'ready','Centered ram completes without an artificial forced miss');
+    await latch();await page.evaluate(()=>{defenseQA.enemyDefense.hull=20;});
+    await tap('#boarding-action');await step(80);await drag(48,0);await step(112);
+    assert.equal((await read()).mode,'defeated','Ram collision damage can disable the ship');
+    assert.equal((await read()).enemyDefense.hull,0);
     await fresh();await step(1600);
     const failed=await read();assert.equal(failed.enemyDefense.hull,0);assert.equal(failed.mode,'defeated');
     assert.equal(await page.locator('#boarding-action-label').innerText(),'다시 도전');
@@ -70,7 +139,7 @@ try {
     assert.equal(reset.navigation.radius,220);assert.equal(reset.enemyDefense.shots,0);
     assert.equal(await page.locator('#boarding-panel, #assault-cue, #orbit-direction').count(),0);
     assert.deepEqual(errors,[]);
-    console.log(`Defense ${mobile?'mobile':'desktop'} PASS: telegraph, touch/key dodge, actual miss/hit, defeat/retry, pause, compact HUD`);
+    console.log(`Defense ${mobile?'mobile':'desktop'} PASS: focused/fan telegraphs, tether dodge, clean/graze/miss ram, pad recovery, defeat/retry, pause, compact HUD`);
     await page.close();
   }
 } finally {await browser.close();}
