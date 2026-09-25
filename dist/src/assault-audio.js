@@ -32,6 +32,8 @@ export class AssaultAudio {
   }
 
   play(stage) {
+    if (stage === "harpoon") this.tone(640, 90, 0.45, 0.09, "triangle");
+    if (stage === "tethered") this.tone(180, 55, 0.22, 0.08);
     if (stage === "ram-deploy") this.tone(210, 75, 0.8, 0.07, "triangle");
     if (stage === "charge") this.tone(48, 190, 2.4, 0.12, "triangle");
     if (stage === "impact") {

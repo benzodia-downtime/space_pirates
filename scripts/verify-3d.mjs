@@ -15,41 +15,120 @@ try {
   await page.waitForFunction(() => window.SpacePiratesAmbient);
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().rendering.type), 'webgl2');
   await page.screenshot({ path: 'qa-output/01-cruise.png' });
-  await page.evaluate(() => SpacePiratesAmbient.forceContact());
-  const seen = new Set();
-  let start = Date.now();
-  while (Date.now() - start < 65000) {
-    const state = await page.evaluate(() => SpacePiratesAmbient.getState());
+  const read = () => page.evaluate(() => SpacePiratesAmbient.getState());
+  const tap = async selector => mobile ? page.locator(selector).tap() : page.locator(selector).click();
+  const touch = mobile ? await page.context().newCDPSession(page) : null;
+  async function drag(dx, dy, offset = 0) {
     const box = await page.locator('#steering-pad').boundingBox();
-    const x = box.x + box.width / 2 + Math.max(-1, Math.min(1, state.guidanceBearing.x / .68)) * box.width * .36;
-    const y = box.y + box.height / 2 + Math.max(-1, Math.min(1, state.guidanceBearing.y / .48)) * box.height * .36;
-    if (mobile) await page.touchscreen.tap(x, y);
-    else { await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.up(); }
+    const x = box.x + box.width / 2 + offset, y = box.y + box.height / 2;
+    if (mobile) {
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      if (dx || dy) await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y: y + dy }] });
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    } else {
+      await page.mouse.move(x, y); await page.mouse.down();
+      if (dx || dy) await page.mouse.move(x + dx, y + dy, { steps: 3 });
+      await page.mouse.up();
+    }
+    await page.waitForTimeout(80);
+  }
+  async function aim(view) {
+    for (let i = 0; i < 30; i++) {
+      const state = await read();
+      const angle = view.yaw - state.steering.x * .442;
+      const dx = Math.atan2(Math.sin(angle), Math.cos(angle)) / .006;
+      const dy = (view.pitch - state.steering.y * .312) / .006;
+      if (Math.hypot(dx, dy) < 0.15) break;
+      await drag(Math.max(-35, Math.min(35, dx)), Math.max(-25, Math.min(25, dy)));
+    }
+  }
+  // A fresh press anywhere on the pad must preserve the current heading.
+  await drag(25, -8);
+  const firstDrag = await read();
+  await drag(0, 0, -17);
+  const regrip = await read();
+  assert.ok(Math.abs(regrip.steering.x - firstDrag.steering.x) < .001, 'Regripping never resets absolute yaw');
+  assert.ok(Math.abs(regrip.steering.y - firstDrag.steering.y) < .001, 'Regripping never resets pitch');
+  await drag(20, 0, 10);
+  assert.ok((await read()).steering.x > regrip.steering.x + .2, 'Second relative drag accumulates from current heading');
+  // A yaw-only keyboard input must not clamp a pitch set with the relative pad.
+  for (let i = 0; i < 4; i++) await drag(0, 20);
+  const highPitch = (await read()).steering.y;
+  assert.ok(highPitch > 1);
+  await page.keyboard.down('d'); await page.waitForTimeout(120); await page.keyboard.up('d');
+  assert.ok(Math.abs((await read()).steering.y - highPitch) < .001, 'Keyboard does not reset an existing pad pitch');
+  await page.evaluate(() => SpacePiratesAmbient.forceContact());
+  let state = await read();
+  await aim({ yaw: state.guidanceBearing.x * .65, pitch: state.guidanceBearing.y * .65 });
+  await page.waitForTimeout(600);
+  assert.equal((await read()).navigation.doorDiscovered, false);
+  assert.equal(await page.locator('#boarding-action').isEnabled(), false, 'Straight approach cannot succeed');
+  await page.keyboard.press('Space');
+  assert.equal((await read()).mode, 'survey', 'Blind attack is rejected');
+  await page.screenshot({ path: 'qa-output/orbit-front.png' });
+  const fixedEnemy = (await read()).rendering.enemyPosition;
+  const fixedRotation = (await read()).rendering.enemyRotation;
+  await tap('#orbit-button');
+  await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.angleDegrees > 75);
+  await page.screenshot({ path: 'qa-output/orbit-side.png' });
+  assert.deepEqual((await read()).rendering.enemyPosition, fixedEnemy, 'Enemy stays fixed as player orbits');
+  assert.deepEqual((await read()).rendering.enemyRotation, fixedRotation, 'Orbit is not a spinning enemy model');
+  assert.equal((await read()).navigation.doorVisible, false, 'Rear hatch is occluded from the side');
+  await tap('#orbit-direction');
+  const reverseAngle = (await read()).navigation.angleDegrees;
+  await page.waitForTimeout(350);
+  assert.ok((await read()).navigation.angleDegrees < reverseAngle, 'Reverse autopilot direction');
+  await tap('#orbit-direction');
+  await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.angleDegrees > 178, null, { timeout: 25000 });
+  await tap('#orbit-button');
+  const parked = (await read()).navigation.position;
+  await aim((await read()).navigation.doorBearing);
+  await page.waitForTimeout(500);
+  state = await read();
+  assert.deepEqual(state.navigation.position, parked, 'Stopping orbit holds world position');
+  assert.equal(state.navigation.doorDiscovered, true);
+  assert.equal(state.navigation.canHarpoon, true);
+  await page.screenshot({ path: 'qa-output/orbit-rear.png' });
+  for (const id of ['orbit-button', 'orbit-direction', 'boarding-action']) {
+    const b = await page.locator('#' + id).boundingBox();
+    assert.ok(b.x >= 0 && b.y >= 0 && b.x+b.width <= page.viewportSize().width+1 && b.y+b.height <= page.viewportSize().height+1, id+' fits');
+  }
+  const seen = new Set(['survey']);
+  await tap('#boarding-action');
+  await page.waitForFunction(() => SpacePiratesAmbient.getState().mode === 'harpoon');
+  seen.add('harpoon');
+  await page.waitForFunction(() => SpacePiratesAmbient.getState().mode === 'tethered');
+  seen.add('tethered');
+  const hooked = await read();
+  assert.equal(hooked.navigation.orbiting, false);
+  assert.equal(hooked.rendering.harpoonVisible, true);
+  await page.waitForTimeout(1100);
+  assert.equal((await read()).mode, 'tethered', 'Hooking alone never triggers the ram');
+  assert.deepEqual((await read()).navigation.position, hooked.navigation.position);
+  await page.screenshot({ path: 'qa-output/harpoon-locked.png' });
+  if (mobile) await tap('#boarding-action');
+  else await page.keyboard.press('Space'); // Works even when the previous button still has focus.
+  let start = Date.now();
+  while (Date.now() - start < 20000) {
+    state = await read();
     if (!seen.has(state.mode)) {
       seen.add(state.mode);
       console.log(state.mode, state.distanceMeters.toFixed(1), { drawCalls: state.rendering.drawCalls, breached: state.rendering.armourBreached });
-      if (state.mode !== 'ready') {
-        const action = await page.locator('#boarding-action').boundingBox();
-        assert.ok(action.x >= 0 && action.x + action.width <= page.viewportSize().width + 1, 'Assault action fits at ' + state.mode);
-      }
       await page.screenshot({ path: `qa-output/stage-${state.mode}.png` });
       if (state.mode === 'charge') {
         await page.evaluate(() => SpacePiratesAmbient.pause());
-        const charge = await page.evaluate(() => SpacePiratesAmbient.getState().chargeProgress);
+        const charge = (await read()).chargeProgress;
         await page.waitForTimeout(250);
-        assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().chargeProgress), charge);
+        assert.equal((await read()).chargeProgress, charge);
         await page.evaluate(() => SpacePiratesAmbient.resume());
       }
     }
     if (state.mode === 'charge' && state.chargeProgress > 0.72 && !page.chargeCaptured) {
-      await page.screenshot({ path: 'qa-output/charge-close.png' });
-      // Record once without changing the ordered stage assertion.
-      page.chargeCaptured = true;
+      await page.screenshot({ path: 'qa-output/charge-close.png' }); page.chargeCaptured = true;
     }
     if (state.mode === 'impact' && state.breachProgress > 0.4) await page.screenshot({ path: 'qa-output/impact-breach.png' });
     if (state.mode === 'ready') break;
-    if (state.mode === 'armed' && await page.locator('#boarding-action').isEnabled()) await page.locator('#boarding-action').click();
-    await page.waitForTimeout(160);
+    await page.waitForTimeout(100);
   }
   const ready = await page.evaluate(() => SpacePiratesAmbient.getState());
   assert.equal(ready.mode, 'ready', 'Full input-driven boarding sequence');
@@ -57,16 +136,17 @@ try {
   assert.equal(ready.breachProgress, 1);
   assert.equal(ready.clampProgress, 1);
   assert.equal(ready.rendering.armourBreached, true);
+  assert.equal(ready.rendering.harpoonVisible, false, 'Cable retracts when the anchored ramp tears away');
   assert.equal(ready.rendering.clawsVisible, true);
   if (mobile) assert.ok(ready.rendering.pixelRatio <= 1.5);
   const heading = ready.rendering.cameraRotation;
   await page.keyboard.down('a'); await page.waitForTimeout(180); await page.keyboard.up('a');
   const locked = await page.evaluate(() => SpacePiratesAmbient.getState());
   assert.ok(Math.abs(locked.rendering.cameraRotation[1] - heading[1]) < 0.001, 'Committed helm rejects steering');
-  assert.deepEqual([...seen], ['intercept','align','armed','ram-deploy','charge','impact','clamp','seal','pressurize','ready']);
+  assert.deepEqual([...seen], ['survey','harpoon','tethered','ram-deploy','charge','impact','clamp','seal','pressurize','ready']);
   assert.equal(ready.rendering.bridgeVisible, true);
   assert.ok(ready.rendering.bridgeUp[1] > 0.97, 'Bridge stays upright near antiparallel headings');
-  assert.deepEqual(ready.rendering.passageEnd, ready.rendering.bridgeEnd, 'Passage reaches inside the pierced bow');
+  assert.deepEqual(ready.rendering.passageEnd, ready.rendering.bridgeEnd, 'Passage reaches inside the torn stern ramp');
   assert.ok(ready.rendering.triangles < 18000);
   await page.evaluate(() => SpacePiratesAmbient.pause());
   for (const [name, width, height] of [['desktop', 1440, 900], ['portrait', 390, 844], ['landscape', 844, 390]]) {
@@ -96,6 +176,9 @@ try {
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().rendering.bridgeVisible), false);
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().steeringLocked), false);
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().rendering.ramVisible), false);
+  assert.equal((await read()).navigation.active, false);
+  assert.equal((await read()).navigation.anchor, null);
+  assert.equal((await read()).rendering.harpoonVisible, false);
   await page.locator('#sound-button').click();
   assert.equal(await page.locator('#sound-button').getAttribute('aria-pressed'), 'false');
 
@@ -135,7 +218,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=ram-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=orbit-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();
@@ -148,7 +231,7 @@ try {
     scene.destroy();
     return { state, flash };
   });
-  assert.ok(reduced.state.rendering.cameraPosition.every((value, index) => Math.abs(value - [0,0,6][index]) < 1e-10), 'Reduced motion removes recoil');
+  assert.ok(reduced.state.rendering.cameraPosition.every((value, index) => Math.abs(value - Object.values(reduced.state.navigation.position)[index]) < 1e-10), 'Reduced motion removes recoil');
   assert.equal(reduced.state.rendering.debrisVisible, false, 'Reduced motion removes flying debris');
   assert.equal(Number(reduced.flash), 0, 'Reduced motion removes contact flash');
 

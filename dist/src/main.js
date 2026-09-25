@@ -1,4 +1,4 @@
-import { VoyageScene } from "./voyage.js?v=ram-1";
+import { VoyageScene } from "./voyage.js?v=orbit-1";
 
 (() => {
   "use strict";
@@ -187,7 +187,7 @@ import { VoyageScene } from "./voyage.js?v=ram-1";
       this.startButton.disabled = true;
       this.ambientScene?.pause();
       this.resetBattle();
-      this.setPhase("격벽 돌파구로 진입");
+      this.setPhase("후방 하강문 돌파구로 진입");
       this.level.focus({ preventScroll: true });
       this.schedule(() => this.beginWalk(), BATTLE_CONFIG.introMilliseconds);
     }
@@ -202,7 +202,7 @@ import { VoyageScene } from "./voyage.js?v=ram-1";
       this.startButton.disabled = true;
       this.ambientScene?.pause();
       this.resetBattle();
-      this.setPhase("격벽 돌파구로 진입");
+      this.setPhase("후방 하강문 돌파구로 진입");
       this.level.focus({ preventScroll: true });
       this.schedule(() => this.beginWalk(), BATTLE_CONFIG.introMilliseconds);
     }
@@ -229,7 +229,7 @@ import { VoyageScene } from "./voyage.js?v=ram-1";
         this.schedule(() => this.exchangeFire(), 350);
       } else if (suspendedPhase === "idle") {
         this.phase = "idle";
-        this.setPhase("격벽 돌파구로 진입");
+        this.setPhase("후방 하강문 돌파구로 진입");
         this.schedule(() => this.beginWalk(), BATTLE_CONFIG.introMilliseconds);
       }
     }

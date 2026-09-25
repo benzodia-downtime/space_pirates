@@ -1278,3 +1278,28 @@
 @media (prefers-reduced-motion: reduce) {
   .impact-flash { display: none; }
 }
+
+/* Separate autopilot controls leave the reticle and relative steering pad unobstructed. */
+.orbit-controls {
+  position: absolute; z-index: 36; left: 1.2rem; bottom: 7.8rem;
+  width: min(18rem, calc(100vw - 2.4rem)); padding: 0.65rem;
+  border: 1px solid #3f626f; background: rgba(4, 15, 25, 0.88); color: #a6bfcd;
+  font-family: ui-monospace, monospace;
+}
+.orbit-controls output { display: block; margin-bottom: 0.5rem; font-size: 0.62rem; }
+.orbit-controls > div { display: flex; gap: 0.45rem; }
+.orbit-controls button {
+  flex: 1; min-height: 44px; padding: 0.4rem; border: 1px solid #456979;
+  color: #b9e8ee; background: #102936; font-size: 0.68rem; cursor: pointer;
+}
+.orbit-controls button[aria-pressed="true"] { background: #224b4c; border-color: #85e0c8; color: #caffeb; }
+.orbit-controls button:disabled { opacity: 0.4; cursor: default; }
+.orbit-controls button:focus-visible { outline: 2px solid #b8fbff; outline-offset: 2px; }
+@media (max-width: 720px) {
+  .orbit-controls { left: 0.8rem; bottom: max(7rem, calc(env(safe-area-inset-bottom) + 6rem)); }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  .orbit-controls { left: 0.8rem; bottom: 5.1rem; width: 15rem; padding: 0.4rem; }
+  .orbit-controls output { font-size: 0.55rem; margin-bottom: 0.25rem; }
+  .orbit-controls button { font-size: 0.58rem; }
+}

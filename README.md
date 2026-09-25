@@ -15,37 +15,41 @@ Then open [http://localhost:4173](http://localhost:4173) in a browser. To use a 
 
 ## Controls and game loop
 
-- Set a persistent course with the on-screen control pad, `WASD`, or the arrow keys.
-- Use **SCAN** or the space bar to accelerate long-range contact detection.
-- Approach the enemy bow and hold its forward bulkhead in the central reticle.
-- At 90 m, maintain alignment until **강습 돌입** is enabled, then click it (or press Space) to commit. Nothing rams automatically.
-- The helm locks for ram deployment → accelerating frontal charge → contact hit-stop and penetration → claw lock → sealing and pressure equalization. The entire sequence stays in the cockpit.
-- Select **적함 돌입** after the inner door opens. Use **SFX ON/OFF** to toggle the procedural ship-interior sounds.
-- Win the boarding action, collect the enemy ship's supplies, and return to begin a new search.
+- Drag the steering pad to turn **relative to the current view**. Releasing or touching it again never resets your heading. WASD / arrows also steer.
+- Use **SCAN** or Space to accelerate long-range detection.
+- After contact, **자동 선회 / O** starts or stops target-centred autopilot at a 155 m radius. **반대 방향 / Q** reverses the orbit. The enemy remains fixed; the cockpit actually travels around it.
+- Find the **rear drop-down cargo ramp**, between the two engines. No rear-entry marker is revealed through the bow or side armour; it is identified only after you see it.
+- Stop orbiting, aim at the ramp, then select **작살 발사 / Space / F**. A ray must hit the visible ramp from a near-rear angle. Looking at the ship's centre from the front cannot succeed.
+- The harpoon flies, anchors and holds position. A **separate** press of **견인 돌입 / Space** deploys the ram and rapidly reels the ship along the cable.
+- Contact hit-stop → torn ramp → claw lock → sealing and pressure equalization stay in the cockpit. The tether retracts when the outer ramp ruptures.
+- Select **적함 돌입** after the inner door opens. Use **SFX ON/OFF** for procedural effects.
+- Win the unchanged top-down crew fight, collect supplies, and return to begin a new search.
 
-The voyage is a real perspective 3D scene. The enemy presents its bow, not a side airlock. A hollow breaching ram tears apart the forward armour panels, seats inside the opening, and deploys mechanical claws. A short sealed passage connects our foredeck to a point inside the damaged hull. Only this local entry point is destroyed; the ship remains available to board and loot. Crew combat remains top-down 2D.
+One 3D world unit is one metre (100 Unreal units in crew combat). During exploration the HUD shows orbit radius, then the foredeck-to-anchor gap during tethered assault. The radius is currently a fixed prototype setting; enemy evasive movement and configurable orbit distance are not implemented.
 
-One 3D world unit is one metre (equivalent to 100 Unreal units in crew combat). The range readout describes the foredeck-to-bow gap and switches to penetration depth after contact. Mobile rendering caps pixel density and uses simple shared/instanced geometry. A WebGL 2 browser is required; unsupported/interrupted graphics show a recovery message.
+Reduced motion removes collision shake, flash, star streaks and debris, but not player-requested orbital navigation. Sound needs a user gesture. Pause, a hidden tab or GPU interruption freezes simulation time. Pointer cancellation/window blur release input without resetting the view. A new search clears the tether, discovery and damage state.
 
-Reduced motion removes collision shake, flash, star streaks and flying debris while preserving the readable stage sequence. Audio starts only after a user gesture and stops on pause, hidden tabs, GPU interruption or mute. Simulation-time cutscenes cannot advance while paused or hidden; steering stays latched before commitment and unlocks on the next search.
+Mobile rendering caps pixel density and uses shared/instanced geometry. A WebGL 2 browser is required; unsupported/interrupted graphics show a recovery message.
 
 Dependencies are pinned in `package-lock.json`. The build copies Three.js and its MIT license into `dist/vendor/`, so the deployed game has no third-party CDN dependency.
 
 ## Project structure
 
 - `src/main.js`: crew combat and scene integration
-- `src/voyage.js`: persistent steering, search, assault UI and lifecycle
-- `src/assault.js`: deterministic frontal-assault state machine
-- `src/voyage-renderer.js`: 3D bow, breakable armour, ram, claws and passage
+- `src/voyage.js`: relative steering, search, orbit/assault UI and lifecycle
+- `src/navigation.js`: fixed-world orbit, visibility/harpoon hit tests, relative helm math
+- `src/assault.js`: deterministic harpoon / tether-pull / breach state machine
+- `src/voyage-renderer.js`: 3D hull and rear ramp, cable, ram, claws and passage
 - `src/assault-audio.js`: gesture-unlocked procedural ship-interior effects
 - `scripts/build-static.mjs`: static deployment build
 - `scripts/verify-3d.mjs`: browser regression tests
 - `tests/assault.test.mjs`: deterministic sequence tests
+- `tests/navigation.test.mjs`: orbit, occlusion, aiming, relative-drag regression tests
 
 ## Validate
 
-`npm test` builds the deployment into `dist/`, checks syntax, and runs the assault-state tests.
+`npm test` builds the deployment into `dist/`, checks syntax, and runs the assault and navigation tests.
 
-With the local server running, use `npm run test:e2e` for the full approach, ram, boarding, combat and loot loop. Use `npm run test:e2e -- --mobile` for touch input and high-density mobile rendering. Both runs check desktop/portrait/landscape layouts, passage attachment, helm locking, paused charge, persistent steering, reduced motion and graphics recovery. Screenshots go to ignored `qa-output/`.
+With the local server running, use `npm run test:e2e` for the full orbit, discovery, harpoon, ram, boarding, combat and loot loop. Use `npm run test:e2e -- --mobile` for real touch-drag input and high-density mobile rendering. Both runs check pad re-gripping, occluded targets, direction reversal, separate shot/pull input, desktop/portrait/landscape layouts, passage attachment, helm locking, paused charge, persistent steering, reduced motion and graphics recovery. Screenshots go to ignored `qa-output/`.
 
 Browser tests require Node.js 20+ and use installed Microsoft Edge on Windows. On other platforms, run `npx playwright install chromium` first. Pass a URL or set `QA_URL` to test the build or deployed site, for example `node scripts/verify-3d.mjs http://localhost:4173/dist/ --mobile`.

@@ -3,8 +3,8 @@ import * as THREE from "../vendor/three.module.js";
 const smoothstep = THREE.MathUtils.smoothstep;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
-// One unit is one metre. The approach distance is from our foredeck collar to the enemy bow.
-// The ram, destructible forward bulkhead and sealed passage share one 3D world.
+// One unit is one metre. The fixed enemy hull, orbiting cockpit, harpoon and
+// destructible stern ramp all share the same world coordinates.
 export class VoyageRenderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -55,7 +55,11 @@ export class VoyageRenderer {
       red: this.keep(new THREE.MeshBasicMaterial({ color: 0xfa6653 })),
     };
     this.enemy = new THREE.Group();
-    this.enemy.name = "hostile-frontal-frigate";
+    this.enemy.name = "hostile-cargo-frigate";
+    this.stern = new THREE.Group();
+    this.stern.position.z = -20;
+    this.stern.rotation.y = Math.PI;
+    this.enemy.add(this.stern);
     this.enemy.rotation.order = "YXZ";
     this.scene.add(this.enemy);
     this.makeEnemy();
@@ -162,8 +166,10 @@ export class VoyageRenderer {
         plate(m.panel, [side * 16.5, 0, z], [0.7, 8, 13]);
         plate(m.trim, [side * 17, 2.8, z], [0.25, 0.3, 10]);
       }
-      const nozzle = this.mesh(this.enemy, this.cylinderGeometry, m.trim, [side * 19, -2, -40], [3.2, 1.4, 3.2]);
+      const nozzle = this.mesh(this.enemy, this.cylinderGeometry, m.trim, [side * 19, -2, -51], [3.2, 1.4, 3.2]);
       nozzle.rotation.x = Math.PI / 2;
+      plate(m.cyan, [side * 19, -2, -52], [3.8, 3.8, 0.3]);
+      for (const z of [-38, -32, -26]) plate(m.trim, [side * 17.1, -1, z], [0.2, 3, 0.7]);
     }
     plate(m.dark, [0, 11, -17], [15, 4.5, 25]);
     plate(m.panel, [0, 13.5, -17], [13, 0.8, 22]);
@@ -173,46 +179,57 @@ export class VoyageRenderer {
     plate(m.trim, [0, 7.2, 30.8], [15, 0.6, 0.55]);
     plate(m.dark, [0, -7, 30.8], [17, 1.5, 1]);
 
-    this.hatch = new THREE.Object3D(); // The destructible forward bulkhead, not an existing side airlock.
+    // Bow is sealed armour. The only boarding entry is the rear loading ramp.
+    plate(m.panel, [0, 0, 31.4], [7.5, 7.5, 1.5]);
+    plate(m.trim, [0, 0, 32.2], [0.45, 7, 0.1]);
+    const rearBoxes = [];
+    const rearPlate = (material, position, scale) => rearBoxes.push({ material, position, scale });
+    for (const x of [-4.2, 4.2]) rearPlate(m.trim, [x, 0, 31.6], [0.7, 9, 0.7]);
+    rearPlate(m.trim, [0, -4.1, 31.8], [9, 0.7, 0.8]);
+    for (const x of [-2.7, 0, 2.7]) rearPlate(m.dark, [x, -3.8, 32.1], [0.7, 0.9, 0.9]);
+    this.label(this.stern, "CARGO / RAMP 02", [0, 5.4, 31.7], 12, "#ffcf80");
+    this.hatch = new THREE.Object3D(); // Closed drop-down ramp: torn open by our ram, not politely opened.
     this.hatch.position.set(0, 0, 31);
-    this.enemy.add(this.hatch);
+    this.stern.add(this.hatch);
     this.passageEnd = new THREE.Object3D();
     this.passageEnd.position.set(0, 0, 25);
-    this.enemy.add(this.passageEnd);
+    this.stern.add(this.passageEnd);
     this.label(this.enemy, "FORWARD ARMOR / 07", [0, 5.4, 31.7], 12, "#b6c7cd");
 
     this.armour = [];
     for (const x of [-1, 1]) for (const y of [-1, 1]) {
       const panel = new THREE.Group();
       panel.userData = { sideX: x, sideY: y };
-      this.enemy.add(panel);
+      this.stern.add(panel);
       this.box(panel, m.door, [0, 0, 0], [3.66, 3.66, 0.65]);
       this.box(panel, m.dark, [0, -y * 0.7, 0.36], [2.7, 0.25, 0.08]);
       this.box(panel, m.trim, [x * 1.2, y * 1.2, 0.37], [0.18, 0.45, 0.08]);
+      for (const rib of [-1.1, 0, 1.1]) this.box(panel, m.panel, [0, rib, 0.37], [3.5, 0.16, 0.2]);
       this.armour.push(panel);
     }
     // Chamber behind the broken outer plate; the inner door stays shut until pressure is safe.
-    plate(m.dark, [0, 0, 4], [10, 10, 0.5]);
-    plate(m.panel, [0, -2.25, 18], [7.2, 0.4, 27]);
-    for (const x of [-3.5, 3.5]) plate(m.dark, [x, 0, 18], [0.3, 7.2, 27]);
-    plate(m.dark, [0, 3.5, 18], [7.2, 0.3, 27]);
+    rearPlate(m.dark, [0, 0, 4], [10, 10, 0.5]);
+    rearPlate(m.panel, [0, -2.25, 18], [7.2, 0.4, 27]);
+    for (const x of [-3.5, 3.5]) rearPlate(m.dark, [x, 0, 18], [0.3, 7.2, 27]);
+    rearPlate(m.dark, [0, 3.5, 18], [7.2, 0.3, 27]);
     for (const z of [9, 14, 19, 24, 29]) {
-      plate(m.cyan, [0, 3.3, z], [5.3, 0.15, 0.35]);
-      plate(m.trim, [-3.35, 0.5, z], [0.12, 5.5, 0.18]);
-      plate(m.trim, [3.35, 0.5, z], [0.12, 5.5, 0.18]);
+      rearPlate(m.cyan, [0, 3.3, z], [5.3, 0.15, 0.35]);
+      rearPlate(m.trim, [-3.35, 0.5, z], [0.12, 5.5, 0.18]);
+      rearPlate(m.trim, [3.35, 0.5, z], [0.12, 5.5, 0.18]);
     }
     this.doors = [-1, 1].map(side => {
-      const door = this.box(this.enemy, m.panel, [side * 1.72, 0.5, 19], [3.4, 5.8, 0.35]);
+      const door = this.box(this.stern, m.panel, [side * 1.72, 0.5, 19], [3.4, 5.8, 0.35]);
       this.box(door, m.trim, [0, 0, 0.6], [0.8, 0.07, 0.1]);
       return door;
     });
-    this.hatchLamp = this.box(this.enemy, m.red.clone(), [0, 3.4, 19.3], [3, 0.15, 0.15]);
+    this.hatchLamp = this.box(this.stern, m.red.clone(), [0, 3.4, 19.3], [3, 0.15, 0.15]);
     this.keep(this.hatchLamp.material);
-    this.label(this.enemy, "DECK 01", [0, 1.3, 4.4], 4, "#80c6d7");
+    this.label(this.stern, "DECK 01", [0, 1.3, 4.4], 4, "#80c6d7");
     this.batchBoxes(this.enemy, boxes);
+    this.batchBoxes(this.stern, rearBoxes);
 
     this.debris = new THREE.InstancedMesh(this.boxGeometry, m.door, 28);
-    this.enemy.add(this.debris);
+    this.stern.add(this.debris);
     this.debris.frustumCulled = false;
     this.debrisTransform = new THREE.Object3D();
     this.debrisVelocities = Array.from({ length: 28 }, (_, i) => {
@@ -221,7 +238,7 @@ export class VoyageRenderer {
     });
     this.impactLight = new THREE.PointLight(0xffb264, 0, 65, 2);
     this.impactLight.position.set(0, 0, 35);
-    this.enemy.add(this.impactLight);
+    this.stern.add(this.impactLight);
   }
 
   makePlayer() {
@@ -237,6 +254,9 @@ export class VoyageRenderer {
       this.box(this.player, m.panel, [x, -2.5, -9], [1.3, 1.4, 10]);
       this.box(this.player, m.cyan, [x, -1.76, -9], [0.14, 0.1, 8]);
     }
+    this.launcher = this.box(this.player, m.dark, [-4.5, -1.5, -12], [0.6, 0.6, 4]);
+    this.harpoonCable = this.mesh(this.scene, this.cylinderGeometry, m.trim);
+    this.harpoonBolt = this.mesh(this.scene, this.keep(new THREE.ConeGeometry(0.3, 1.5, 5)), m.amber);
     this.playerHatch = new THREE.Object3D();
     this.playerHatch.position.set(0, 0, -14);
     this.player.add(this.playerHatch);
@@ -294,7 +314,7 @@ export class VoyageRenderer {
       const claw = new THREE.Group();
       claw.position.set(side*2.45,height*2.6,32.5);
       claw.userData = {side, height};
-      this.enemy.add(claw);
+      this.stern.add(claw);
       this.box(claw,m.trim,[side*0.9,0,0],[2.1,0.45,0.65]);
       this.box(claw,m.door,[side*1.9,0,0.55],[0.6,0.7,1.7]);
       this.claws.push(claw);
@@ -307,7 +327,7 @@ export class VoyageRenderer {
     for (let i = 0; i < positions.length; i += 3) {
       positions[i] = (Math.random() - 0.5) * 18000;
       positions[i + 1] = (Math.random() - 0.5) * 12000;
-      positions[i + 2] = -Math.random() * 14000;
+      positions[i + 2] = (Math.random() - 0.5) * 18000;
       const light = 0.45 + Math.random() * 0.5;
       colors.set([light * 0.84, light * 0.93, light], i);
     }
@@ -375,14 +395,20 @@ export class VoyageRenderer {
     const { bearing, guidance, steering, distance, reveal, time, motion, assault: a } = frame;
     const shock = motion && a.impactAge >= 0 ? Math.exp(-a.impactAge * 4.5) : 0;
     const chargeMotion = motion && a.stage === "charge" ? a.charge : 0;
-    this.camera.position.set(Math.sin(a.impactAge*71)*shock*0.06, Math.sin(a.impactAge*53)*shock*0.1, 6 + shock*0.48 - chargeMotion*0.2);
-    this.camera.rotation.set(-steering.y*0.48*0.65 + Math.sin(a.impactAge*49)*shock*0.016, -steering.x*0.68*0.65, Math.sin(a.impactAge*63)*shock*0.012);
-    const heading = new THREE.Euler(-bearing.y*0.65, -bearing.x*0.65, 0, "YXZ");
-    const range = distance + 14;
-    this.target.set(0,0,-1).applyEuler(heading).multiplyScalar(range).add(new THREE.Vector3(0,0,6));
-    this.enemy.rotation.copy(heading);
-    if (!a.committed) this.enemy.rotateY(Math.sin(time*0.3)*0.09*smoothstep(distance,170,1000));
-    this.enemy.position.copy(this.target).sub(this.hatch.position.clone().applyEuler(this.enemy.rotation));
+    const nav = frame.navigation;
+    const origin = nav?.active ? nav.position : { x: 0, y: 0, z: 6 };
+    this.camera.position.set(origin.x + Math.sin(a.impactAge*71)*shock*0.06, origin.y + Math.sin(a.impactAge*53)*shock*0.1, origin.z + shock*0.48 - chargeMotion*0.2);
+    this.camera.rotation.set(-steering.y*0.312 + Math.sin(a.impactAge*49)*shock*0.016, -steering.x*0.442, Math.sin(a.impactAge*63)*shock*0.012);
+    const range = distance;
+    if (nav?.active) {
+      this.enemy.position.set(nav.enemyPosition.x, nav.enemyPosition.y, nav.enemyPosition.z);
+      this.enemy.rotation.set(0, nav.enemyYaw, 0);
+    } else {
+      const heading = new THREE.Euler(-bearing.y*0.65, -bearing.x*0.65, 0, "YXZ");
+      this.target.set(0,0,-1).applyEuler(heading).multiplyScalar(range).add(new THREE.Vector3(0,0,6));
+      this.enemy.rotation.set(0, -bearing.x*0.65, 0);
+      this.enemy.position.copy(this.target);
+    }
     this.enemy.visible = reveal > 0;
     const opening = smoothstep(a.pressure, 0.7, 1);
     this.doors.forEach((door,i) => { door.position.x = (i === 0 ? -1 : 1) * (1.72 + opening*3.5); });
@@ -416,6 +442,15 @@ export class VoyageRenderer {
     }
     this.impactLight.intensity = shock*150;
     this.scene.updateMatrixWorld(true);
+    this.harpoonCable.visible = this.harpoonBolt.visible = a.harpoon > 0 && a.breach < 0.1 && Boolean(nav?.anchor);
+    if (this.harpoonCable.visible) {
+      const launch = this.launcher.getWorldPosition(new THREE.Vector3());
+      const anchor = new THREE.Vector3(nav.anchor.x, nav.anchor.y, nav.anchor.z);
+      const bolt = launch.clone().lerp(anchor, a.harpoon);
+      this.barBetween(this.harpoonCable, launch, bolt, 0.08, true);
+      this.harpoonBolt.position.copy(bolt);
+      this.harpoonBolt.quaternion.setFromUnitVectors(Y_AXIS, anchor.clone().sub(launch).normalize());
+    }
     const bridgeProgress = a.seal;
     const start = this.playerHatch.getWorldPosition(new THREE.Vector3());
     const end = this.passageEnd.getWorldPosition(new THREE.Vector3());
@@ -434,11 +469,11 @@ export class VoyageRenderer {
     }
     this.bridgeRibs.forEach((rib, i) => { rib.position.z = length * i / (this.bridgeRibs.length - 1); });
     this.collar.position.copy(start).addScaledVector(direction, bridgeProgress);
-    this.collar.quaternion.copy(this.enemy.quaternion);
+    this.stern.getWorldQuaternion(this.collar.quaternion);
 
     const positions = this.stars.geometry.attributes.position;
     for (let i = 2; i < positions.array.length; i += 3) {
-      positions.array[i] = -(((-this.starOrigins[i] - frame.travel) % 14000 + 14000) % 14000);
+      positions.array[i] = ((this.starOrigins[i] + 9000 - frame.travel) % 18000 + 18000) % 18000 - 9000;
     }
     positions.needsUpdate = true;
     this.streaks.visible = chargeMotion > 0.1;
@@ -452,7 +487,7 @@ export class VoyageRenderer {
     }
     this.renderer.render(this.scene, this.camera);
     const lead = new THREE.Vector3(Math.tan(guidance.x * 0.65), -Math.tan(guidance.y * 0.65), -1).normalize().multiplyScalar(range).add(this.camera.position);
-    return { contact: this.project(this.hatch.getWorldPosition(new THREE.Vector3())), intercept: this.project(lead) };
+    return { contact: this.project(nav?.active && nav.discovered && nav.solution.visible ? this.hatch.getWorldPosition(new THREE.Vector3()) : this.enemy.position), intercept: this.project(lead) };
   }
 
   showError(message) {
@@ -469,6 +504,8 @@ export class VoyageRenderer {
       pixelRatio: this.renderer.getPixelRatio(), cameraPosition: this.camera.position.toArray(),
       cameraRotation: this.camera.rotation.toArray().slice(0, 3),
       hatch: this.hatch.getWorldPosition(new THREE.Vector3()).toArray(),
+      enemyPosition: this.enemy.position.toArray(), enemyRotation: this.enemy.rotation.toArray().slice(0,3),
+      harpoonVisible: this.harpoonCable.visible, harpoonTip: this.harpoonBolt.position.toArray(),
       bowFacing: new THREE.Vector3(0,0,1).applyQuaternion(this.enemy.quaternion).toArray(),
       passageEnd: this.passageEnd.getWorldPosition(new THREE.Vector3()).toArray(),
       armourBreached: this.lastFrame.assault.breach >= 1, ramVisible: this.ramHead.visible,
