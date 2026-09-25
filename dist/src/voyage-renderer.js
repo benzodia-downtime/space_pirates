@@ -393,7 +393,7 @@ export class VoyageRenderer {
   draw(frame) {
     if (!this.available) return null;
     this.lastFrame = frame;
-    const { bearing, guidance, steering, distance, reveal, time, motion, assault: a } = frame;
+    const { bearing, guidance, steering, distance, time, motion, assault: a } = frame;
     const shock = motion && a.impactAge >= 0 ? Math.exp(-a.impactAge * 4.5) : 0;
     const chargeMotion = motion && a.stage === "charge" ? a.charge : 0;
     const nav = frame.navigation;
@@ -410,7 +410,9 @@ export class VoyageRenderer {
       this.enemy.rotation.set(0, -bearing.x*0.65, 0);
       this.enemy.position.copy(this.target);
     }
-    this.enemy.visible = reveal > 0;
+    // A placed hull exists in the world regardless of sensor identification.
+    // Camera frustum/distance determine what can be seen, never a progress threshold.
+    this.enemy.visible = Boolean(nav?.placed);
     const opening = smoothstep(a.pressure, 0.7, 1);
     this.doors.forEach((door,i) => { door.position.x = (i === 0 ? -1 : 1) * (1.72 + opening*3.5); });
     this.hatchLamp.material.color.setHex(a.pressure >= 1 ? 0x71f2c3 : 0xff9260);
@@ -503,6 +505,7 @@ export class VoyageRenderer {
       type: "webgl2", available: this.available, units: "metres", shipVisible: this.enemy.visible,
       triangles: this.renderer.info.render.triangles, drawCalls: this.renderer.info.render.calls,
       pixelRatio: this.renderer.getPixelRatio(), cameraPosition: this.camera.position.toArray(),
+      farClipMetres: this.camera.far,
       cameraRotation: this.camera.rotation.toArray().slice(0, 3),
       hatch: this.hatch.getWorldPosition(new THREE.Vector3()).toArray(),
       enemyPosition: this.enemy.position.toArray(), enemyRotation: this.enemy.rotation.toArray().slice(0,3),

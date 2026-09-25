@@ -1,8 +1,8 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=radar-1";
-import { AssaultSequence, ASSAULT_CONFIG, ASSAULT_COPY } from "./assault.js?v=radar-1";
-import { AssaultAudio } from "./assault-audio.js?v=radar-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=visibility-1";
+import { AssaultSequence, ASSAULT_CONFIG, ASSAULT_COPY } from "./assault.js?v=visibility-1";
+import { AssaultAudio } from "./assault-audio.js?v=visibility-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=radar-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=visibility-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -693,20 +693,11 @@ export class VoyageScene {
     const guidance = this.getTrackingMetrics();
     const actualRelativeX = guidance.relativeX;
     const actualRelativeY = guidance.relativeY;
-    const enemyReveal = this.isBoardingActive
-      ? 1
-      : clamp(
-        (this.searchProgress - VOYAGE_CONFIG.approachProgress) /
-          (1 - VOYAGE_CONFIG.approachProgress),
-        0,
-        1,
-      );
-
     this.visuals.draw({
       bearing: actual, guidance: guidance.guidance, steering: this.pointer,
       distance: this.isBoardingActive ? this.assault.distance : this.navigation.radius,
       navigation: this.navigation,
-      reveal: enemyReveal, time: this.sceneTime, motion: !this.reducedMotion,
+      time: this.sceneTime, motion: !this.reducedMotion,
       travel: this.starTravel, assault: this.assault,
     });
     if (this.radar) {

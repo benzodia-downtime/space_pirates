@@ -42,6 +42,52 @@ try {
       await drag(Math.max(-35, Math.min(35, dx)), Math.max(-25, Math.min(25, dy)));
     }
   }
+  async function checkDistantVisibility() {
+    assert.equal((await read()).searchProgress, 0);
+    assert.equal((await read()).rendering.shipVisible, true, 'Hull exists before sensor identification');
+    assert.ok((await read()).rendering.farClipMetres >= 18000);
+    await page.evaluate(async () => {
+      SpacePiratesAmbient.destroy();
+      const { VoyageScene } = await import(new URL('./src/voyage.js?v=visibility-1', location.href));
+      window.qaVisibilityScene = new VoyageScene(document.getElementById('starfield'));
+      qaVisibilityScene.pause();
+    });
+    const samples = [];
+    for (const distance of [1100,2200,6000,17000]) {
+      const sample = await page.evaluate(distance => {
+        const s=qaVisibilityScene;
+        s.navigation.begin({x:0,y:0},{position:{x:0,y:0,z:6},radius:distance,active:false});
+        s.pointer={x:0,y:0}; s.pointerTarget={x:0,y:0}; s.searchProgress=0;
+        s.updateMode(); s.renderStill();
+        const v=s.visuals, withHull=v.renderer.info.render.triangles;
+        const point=v.enemy.position.clone(); point.x+=10;
+        const projectedHalfWidth=v.project(point).x-v.project(v.enemy.position).x;
+        v.enemy.visible=false; v.renderer.render(v.scene,v.camera);
+        const withoutHull=v.renderer.info.render.triangles;
+        s.renderStill();
+        return {visible:v.enemy.visible,withHull,withoutHull,projectedHalfWidth,scale:v.enemy.scale.toArray()};
+      }, distance);
+      assert.equal(sample.visible,true);
+      assert.ok(sample.withHull>sample.withoutHull, distance+'m hull actually participates in rendering');
+      assert.deepEqual(sample.scale,[1,1,1], 'No artificial model growth');
+      samples.push(sample);
+      await page.screenshot({path:`qa-output/distant-${distance}-${mobile?'mobile':'desktop'}.png`});
+    }
+    assert.ok(Math.abs(samples[0].projectedHalfWidth/samples[1].projectedHalfWidth-2)<.001,'Distance alone controls apparent size');
+    const progressSamples=await page.evaluate(() => {
+      const s=qaVisibilityScene;
+      s.navigation.begin({x:0,y:0},{position:{x:0,y:0,z:6},radius:1100,active:false});
+      return [0,.27,.639,.64,.641,.99,1].map(progress => {
+        s.searchProgress=progress; s.updateMode(); s.renderStill();
+        return {visible:s.visuals.enemy.visible,position:s.visuals.enemy.position.toArray(),triangles:s.visuals.renderer.info.render.triangles};
+      });
+    });
+    for(const sample of progressSamples) assert.deepEqual(sample,progressSamples[0],'Identification never toggles or moves the hull');
+    await page.evaluate(() => { qaVisibilityScene.destroy(); delete window.qaVisibilityScene; });
+    await page.reload(); await page.waitForFunction(() => window.SpacePiratesAmbient);
+  }
+  await checkDistantVisibility();
+
   async function checkSettings() {
     assert.equal(await page.locator('#scan-button, #scan-button-state').count(), 0);
     assert.equal(await page.locator('#sound-button').isVisible(), false);
@@ -456,7 +502,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=radar-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=visibility-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();
