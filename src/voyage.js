@@ -1,8 +1,8 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=controls-1";
-import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=controls-1";
-import { AssaultAudio } from "./assault-audio.js?v=controls-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=orbit3d-1";
+import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=orbit3d-1";
+import { AssaultAudio } from "./assault-audio.js?v=orbit3d-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=controls-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=orbit3d-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -226,9 +226,13 @@ export class VoyageScene {
   updateTargetFromPad(clientX, clientY) {
     if (!this.padOrigin) return;
     const dx = clientX - this.padOrigin.clientX, dy = clientY - this.padOrigin.clientY;
+    this.padDrag = { x: clamp(dx / 35, -1, 1), y: clamp(dy / 35, -1, 1) };
+    if (this.navigation.orbiting) {
+      this.navigation.steerOrbit(this.padDrag, this.getView());
+      return;
+    }
     this.pointerTarget = relativeHelm(this.padOrigin.heading, dx, dy);
     this.pointer = { ...this.pointerTarget };
-    this.padDrag = { x: clamp(dx / 35, -1, 1), y: clamp(dy / 35, -1, 1) };
   }
 
   releasePad() {
@@ -287,7 +291,8 @@ export class VoyageScene {
   toggleOrbit() {
     if (this.manuallyPaused || this.destroyed || this.spaceScene?.hidden) return;
     if (this.navigation.toggleOrbit()) {
-      if (this.announcement) this.announcement.textContent = this.navigation.orbiting ? "자동 선회 시작. 거리를 유지하며 적함 주위를 돕니다. 다시 누르면 정지합니다." : "선회 정지. 현재 위치와 시선을 유지합니다.";
+      this.releasePad();
+      if (this.announcement) this.announcement.textContent = this.navigation.orbiting ? "자동 선회 시작. 패드나 방향키로 상하좌우 선회 방향을 바꾸고, 놓으면 그 궤도를 유지합니다." : "선회 정지. 현재 위치와 시선을 유지합니다.";
     } else if (this.navigation.active && this.navigation.orbitTooClose && !this.navigation.anchor) {
       if (this.announcement) this.announcement.textContent = this.orbitTooCloseMessage;
     }
@@ -470,7 +475,7 @@ export class VoyageScene {
 
   getActualBearing() {
     if (!this.navigation.placed) return { ...this.contactBearing };
-    const view = lookAt(this.navigation.position, this.navigation.target);
+    const view = lookAt(this.navigation.position, this.navigation.target, this.getView());
     return { x: view.yaw / 0.65, y: view.pitch / 0.65 };
   }
 
@@ -568,13 +573,14 @@ export class VoyageScene {
 
     const keyboardTarget = this.getKeyboardTarget();
     if (keyboardTarget && !this.assault.committed) {
-      const nudgeRate = this.isBoardingActive ? 0.62 : 1.05;
-      this.pointerTarget.x += keyboardTarget.x * nudgeRate * deltaSeconds;
-      this.pointerTarget.y = clamp(
-        this.pointerTarget.y + keyboardTarget.y * nudgeRate * deltaSeconds,
-        -3.8,
-        3.8,
-      );
+      if (this.navigation.orbiting && !this.getThrust()) {
+        this.navigation.steerOrbit(keyboardTarget, this.getView());
+      } else {
+        const nudgeRate = this.isBoardingActive ? 0.62 : 1.05;
+        this.pointerTarget = relativeHelm(this.pointerTarget,
+          keyboardTarget.x * nudgeRate * deltaSeconds * HELM.yawScale / HELM.dragRadians,
+          keyboardTarget.y * nudgeRate * deltaSeconds * HELM.pitchScale / HELM.dragRadians);
+      }
     }
     const target = this.pointerTarget;
     const pointerEase = 1 - Math.exp(-deltaSeconds * 3.8);

@@ -26,6 +26,85 @@ test('Orbit translates the cockpit at fixed radius without turning or moving the
   const position = { ...n.position }; n.toggleOrbit(); n.update(0.05, view); assert.deepEqual(n.position, position);
   n.reverse(); n.toggleOrbit(); const angle = n.angle; n.update(0.05, view); assert.ok(n.angle < angle);
 });
+test('Pad up, down, left, right and diagonals steer actual 3D orbital travel without teleporting', () => {
+  for (const input of [{x:0,y:-1}, {x:0,y:1}, {x:1,y:0}, {x:-1,y:0}, {x:1,y:-1}, {x:-1,y:1}]) {
+    const n = new OrbitNavigation(); n.begin({x:0,y:0}); n.toggleOrbit();
+    const start = {...n.position}, center = {...n.enemyPosition};
+    const view = lookAt(n.position, n.enemyPosition);
+    assert.equal(n.steerOrbit(input, view), true);
+    assert.deepEqual(n.position, start, 'Input changes trajectory, not position');
+    n.update(.05, view);
+    if (input.x) assert.equal(Math.sign(n.position.x - start.x), Math.sign(input.x));
+    if (input.y) assert.equal(Math.sign(n.position.y - start.y), -Math.sign(input.y));
+    near(lengthFrom(n.position, center), ORBIT.radius);
+    near(n.speed, ORBIT.radius * ORBIT.speed);
+  }
+});
+const lengthFrom = (a,b) => Math.hypot(a.x-b.x, a.y-b.y, a.z-b.z);
+test('A released diagonal input retains its plane, radius and target view over complete orbits', () => {
+  const n = setup(); n.toggleOrbit();
+  let view = lookAt(n.position, n.enemyPosition);
+  n.steerOrbit({x:1,y:-1}, view);
+  const normal = {...n.orbitNormal}, center = {...n.enemyPosition}, yaw = n.enemyYaw;
+  n.steerOrbit({x:0,y:0}, view); // Center/dead zone is not a reset to horizontal.
+  for (let i=0; i<3600; i++) {
+    const shift = n.update(.02, view); view.yaw += shift.yaw; view.pitch += shift.pitch;
+    const p = n.position;
+    near(lengthFrom(p, center), ORBIT.radius);
+    near((p.x-center.x)*normal.x+(p.y-center.y)*normal.y+(p.z-center.z)*normal.z, 0);
+    assert.deepEqual(n.orbitNormal, normal);
+    assert.ok(Math.abs(shift.yaw)<.03 && Math.abs(shift.pitch)<.03);
+    const forward = {x:Math.sin(view.yaw)*Math.cos(view.pitch), y:-Math.sin(view.pitch), z:-Math.cos(view.yaw)*Math.cos(view.pitch)};
+    near((center.x-p.x)*forward.x+(center.y-p.y)*forward.y+(center.z-p.z)*forward.z, ORBIT.radius);
+  }
+  assert.deepEqual(n.enemyPosition, center); assert.equal(n.enemyYaw, yaw);
+});
+test('A vertical orbit crosses both poles smoothly, reverses and resumes the selected plane', () => {
+  const n = new OrbitNavigation(); n.begin({x:0,y:0}); n.toggleOrbit();
+  let view = lookAt(n.position, n.enemyPosition);
+  n.steerOrbit({x:0,y:-1}, view);
+  const start = {...n.position}, normal = {...n.orbitNormal};
+  let maxHeight = 0, minHeight = 0;
+  for (let i=0; i<1800; i++) {
+    const shift = n.update(.02, view); view.yaw += shift.yaw; view.pitch += shift.pitch;
+    assert.ok(Math.abs(shift.yaw)<.01 && Math.abs(shift.pitch)<.01, 'No polar camera flip');
+    maxHeight = Math.max(maxHeight, n.position.y-n.enemyPosition.y);
+    minHeight = Math.min(minHeight, n.position.y-n.enemyPosition.y);
+  }
+  assert.ok(maxHeight > ORBIT.radius*.99 && minHeight < -ORBIT.radius*.99);
+  n.toggleOrbit(); const parked = {...n.position}; n.update(.05, view);
+  assert.deepEqual(n.position, parked);
+  assert.equal(n.steerOrbit({x:1,y:0}, view), false);
+  n.toggleOrbit(); assert.deepEqual(n.orbitNormal, normal);
+  n.reverse();
+  for (let i=0; i<1800; i++) {
+    const shift = n.update(.02, view); view.yaw += shift.yaw; view.pitch += shift.pitch;
+  }
+  near(lengthFrom(n.position, start), 0, 1e-6);
+  const overPole = {x:3,y:Math.PI/HELM.pitchScale};
+  assert.deepEqual(relativeHelm(overPole,0,0), overPole);
+  near(relativeHelm(overPole,10,0).y, overPole.y);
+});
+test('Orbital steering cannot move an inactive, paused or tethered ship', () => {
+  const n = setup(), before = {...n.position};
+  const view = lookAt(n.position, n.enemyPosition);
+  assert.equal(n.steerOrbit({x:1,y:-1}, view), false);
+  n.toggleOrbit(); n.steerOrbit({x:0,y:-1}, view); n.update(0,view);
+  assert.deepEqual(n.position, before);
+  n.forceRear(); const anchored = {...n.position};
+  assert.equal(n.steerOrbit({x:0,y:-1}, view), false); n.update(.05,view);
+  assert.deepEqual(n.position, anchored);
+  n.reset(); assert.equal(n.orbitNormal,null);
+});
+test('Harpooning after an over-the-top orbit preserves the current camera orientation', () => {
+  const n = new OrbitNavigation(); n.begin({x:0,y:0});
+  n.angle=Math.PI; n.updatePosition();
+  const view={yaw:0,pitch:Math.PI};
+  n.inspect(view,.5);
+  const attachment=n.attach(view);
+  assert.ok(attachment);
+  near(attachment.bearing.yaw,view.yaw); near(attachment.bearing.pitch,view.pitch);
+});
 test('Discovery requires actually looking at the rear, and firing requires a ray hitting its door', () => {
   const n = setup(); n.angle = Math.PI; n.elevation = 0; n.updatePosition();
   const rear = lookAt(n.position, n.door);
