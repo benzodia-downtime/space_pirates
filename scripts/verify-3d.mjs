@@ -42,6 +42,65 @@ try {
       await drag(Math.max(-35, Math.min(35, dx)), Math.max(-25, Math.min(25, dy)));
     }
   }
+  async function checkLayout(label, matrix = true) {
+    const original = page.viewportSize();
+    const viewports = matrix ? [['desktop',1440,900], ['tablet',1024,768], ['portrait',390,844], ['small',320,568], ['landscape',844,390], ['short',667,375], ['compact-landscape',568,320]] : [[label,original.width,original.height]];
+    for (const [name,width,height] of viewports) {
+      await page.setViewportSize({width,height});
+      await page.evaluate(() => SpacePiratesAmbient.redraw());
+      const problems = await page.evaluate(() => {
+        const issues = [];
+        const visible = e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+        const selectors = ['.hud-brand','.voyage-hud','#boarding-panel','#orbit-controls','#assault-cue','.assault-actions','.flight-controls','#help-overlay','.thrust-controls'];
+        const panels = selectors.map(s=>document.querySelector(s)).filter(visible);
+        const overlap = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left) > 1 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top) > 1;
+        const aim = document.querySelector('.cockpit-reticle').getBoundingClientRect();
+        const centre = {left:aim.x+aim.width/2-8,right:aim.x+aim.width/2+8,top:aim.y+aim.height/2-8,bottom:aim.y+aim.height/2+8};
+        for (let i=0;i<panels.length;i++) {
+          const a=panels[i], r=a.getBoundingClientRect(), name=a.id||a.className;
+          if (r.left < -.5 || r.top < -.5 || r.right > innerWidth+.5 || r.bottom > innerHeight+.5) issues.push(name+' outside viewport');
+          if (overlap(r,centre)) issues.push(name+' covers aim centre');
+          for (let j=i+1;j<panels.length;j++) if(overlap(r,panels[j].getBoundingClientRect())) issues.push(name+' overlaps '+(panels[j].id||panels[j].className));
+        }
+        for (const button of [...document.querySelectorAll('.voyage-ui button, #steering-pad')].filter(visible)) {
+          const r=button.getBoundingClientRect();
+          if(r.height<44 || r.width<44) issues.push(button.id+' touch target too small');
+          if(r.left<0 || r.top<0 || r.right>innerWidth+.5 || r.bottom>innerHeight+.5) issues.push(button.id+' outside viewport');
+          const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+          if(!button.contains(hit)) issues.push(button.id+' is obscured');
+        }
+        for (const cell of [...document.querySelectorAll('.boarding-panel__metrics p')].filter(visible)) {
+          for (const text of cell.children) {
+            const range = document.createRange(); range.selectNodeContents(text);
+            if(range.getBoundingClientRect().width > cell.getBoundingClientRect().width + .5) issues.push(text.id+' metric overflows its cell');
+          }
+        }
+        if(document.documentElement.scrollWidth>innerWidth) issues.push('horizontal overflow');
+        if(document.querySelector('#contact-marker, #intercept-marker')) issues.push('world target overlay still exists');
+        return issues;
+      });
+      assert.deepEqual(problems, [], label+' / '+name);
+      await page.screenshot({path:`qa-output/hud-${label}-${name}.png`});
+    }
+    await page.setViewportSize(original);
+    await page.evaluate(() => SpacePiratesAmbient.redraw());
+  }
+  await checkLayout('cruise');
+  if (process.argv.includes('--layout-only')) {
+    await page.evaluate(() => SpacePiratesAmbient.forceContact());
+    await checkLayout('survey');
+    const contact = await read();
+    await aim({yaw:contact.guidanceBearing.x*.65,pitch:contact.guidanceBearing.y*.65});
+    await page.keyboard.down('w');
+    await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.radius < 115);
+    await page.keyboard.up('w'); await page.waitForTimeout(100);
+    assert.equal(await page.locator('#orbit-button').isEnabled(), false);
+    await checkLayout('blocked');
+    await page.evaluate(() => SpacePiratesAmbient.forceEncounter());
+    await checkLayout('docked');
+    assert.equal(errors.length, 0, errors.join('\\n'));
+    console.log('LAYOUT QA PASSED: cruise, survey, blocked, docked across seven viewports');
+  } else {
   // Stationary startup: neither simulation position nor cosmetic star travel advances.
   const idle = await read(); await page.waitForTimeout(700);
   assert.deepEqual((await read()).navigation.position, idle.navigation.position);
@@ -128,6 +187,23 @@ try {
   await page.keyboard.press('Space');
   assert.equal((await read()).mode, 'survey', 'Blind attack is rejected');
   await page.screenshot({ path: 'qa-output/orbit-front.png' });
+  await checkLayout('survey');
+  // Too-close clearance rejects both touch/button and keyboard orbit; backing off restores it.
+  await page.keyboard.down('w');
+  await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.radius < 115);
+  await page.keyboard.up('w'); await page.waitForTimeout(100);
+  assert.equal(await page.locator('#orbit-button').isEnabled(), false);
+  assert.match(await page.locator('#orbit-readout').innerText(), /너무 가까워 선회 불가/);
+  const closePosition = (await read()).navigation.position;
+  await page.keyboard.press('o'); await page.waitForTimeout(100);
+  assert.equal((await read()).navigation.orbiting, false);
+  assert.deepEqual((await read()).navigation.position, closePosition);
+  await checkLayout('blocked');
+  await page.keyboard.down('s');
+  await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.radius > 155);
+  await page.keyboard.up('s'); await page.waitForTimeout(100);
+  assert.equal(await page.locator('#orbit-button').isEnabled(), true);
+  assert.doesNotMatch(await page.locator('#orbit-readout').innerText(), /선회 불가/);
   // Manual reverse overrides autopilot; releasing holds the new position.
   await tap('#orbit-button');
   await page.waitForTimeout(120);
@@ -219,20 +295,7 @@ try {
   assert.deepEqual(ready.rendering.passageEnd, ready.rendering.bridgeEnd, 'Passage reaches inside the torn stern ramp');
   assert.ok(ready.rendering.triangles < 18000);
   await page.evaluate(() => SpacePiratesAmbient.pause());
-  for (const [name, width, height] of [['desktop', 1440, 900], ['portrait', 390, 844], ['landscape', 844, 390]]) {
-    await page.setViewportSize({ width, height });
-    await page.evaluate(() => SpacePiratesAmbient.redraw());
-    await page.screenshot({ path: `qa-output/docked-${name}.png` });
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, name + ' no horizontal overflow');
-    assert.ok(await page.locator('#battle-start').isVisible());
-    const target = await page.locator('#contact-marker').boundingBox();
-    const cue = await page.locator('#assault-cue').boundingBox();
-    assert.ok(cue.y + cue.height < target.y + target.height / 2, name + ': cue leaves breach centre clear');
-    for (const id of ['steering-pad', 'scan-button', 'sound-button', 'battle-start', 'thrust-forward', 'thrust-reverse']) {
-      const bounds = await page.locator('#' + id).boundingBox();
-      assert.ok(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= width + 1 && bounds.y + bounds.height <= height + 1, name + ': ' + id + ' fits');
-    }
-  }
+  await checkLayout('docked');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => SpacePiratesAmbient.resume());
   await page.locator('#battle-start').click();
@@ -289,7 +352,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=flight-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=hud-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();
@@ -320,4 +383,5 @@ try {
   await unsupported.close();
   assert.equal(errors.length, 0, errors.join('\\n'));
   console.log('QA PASSED', [...seen].join(' -> '));
+  }
 } finally { await browser.close(); }

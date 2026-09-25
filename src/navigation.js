@@ -6,7 +6,7 @@ const rotate = (v, yaw) => ({ x: Math.cos(yaw) * v.x + Math.sin(yaw) * v.z, y: v
 
 export const HELM = Object.freeze({ yawScale: 0.442, pitchScale: 0.312, dragRadians: 0.006 });
 export const FLIGHT = Object.freeze({ contactDistance: 1100, surveyDistance: 220, forwardSpeed: 80, reverseSpeed: 45, closeSpeed: 22, safetyRadius: 85 });
-export const ORBIT = Object.freeze({ radius: 155, speed: 0.19, sternZ: -51, doorHalfSize: 3.65 });
+export const ORBIT = Object.freeze({ radius: 155, minRadius: 120, speed: 0.19, sternZ: -51, doorHalfSize: 3.65 });
 
 export function relativeHelm(origin, dragX, dragY) {
   return { x: origin.x + dragX * HELM.dragRadians / HELM.yawScale, y: clamp(origin.y + dragY * HELM.dragRadians / HELM.pitchScale, -3.8, 3.8) };
@@ -66,11 +66,14 @@ export class OrbitNavigation {
     this.angle = Math.atan2(local.x, local.z);
     this.elevation = Math.atan2(local.y, Math.hypot(local.x, local.z));
   }
+  get orbitTooClose() { return this.radius < ORBIT.minRadius; }
+  get canOrbit() { return this.active && !this.anchor && !this.orbitTooClose; }
   toggleOrbit() {
-    if (!this.active || this.anchor) return false;
+    // Stopping is always allowed; starting is validated here for every input path.
+    if (!this.orbiting && !this.canOrbit) return false;
     this.orbiting = !this.orbiting; return true;
   }
-  reverse() { if (this.active && !this.anchor) this.direction *= -1; }
+  reverse() { if (this.canOrbit) this.direction *= -1; }
   update(delta, view) {
     const dt = clamp(delta, 0, 0.05);
     const previous = lookAt(this.position, this.enemyPosition);
@@ -123,7 +126,7 @@ export class OrbitNavigation {
     return view;
   }
   getState() {
-    return { active: this.active, placed: this.placed, speed: this.speed, safetyStop: this.safetyStop, orbiting: this.orbiting, direction: this.direction, radius: this.radius, angleDegrees: ((this.angle * 180 / Math.PI) % 360 + 360) % 360,
+    return { active: this.active, placed: this.placed, speed: this.speed, safetyStop: this.safetyStop, orbiting: this.orbiting, canOrbit: this.canOrbit, orbitTooClose: this.orbitTooClose, minOrbitRadius: ORBIT.minRadius, direction: this.direction, radius: this.radius, angleDegrees: ((this.angle * 180 / Math.PI) % 360 + 360) % 360,
       position: { ...this.position }, enemyPosition: { ...this.enemyPosition }, enemyYaw: this.enemyYaw,
       doorDiscovered: this.discovered, doorVisible: this.solution.visible, canHarpoon: this.solution.canFire,
       doorDistance: this.solution.distance, incidence: this.solution.incidence, anchor: this.anchor && { ...this.anchor },

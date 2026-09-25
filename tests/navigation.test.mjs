@@ -103,3 +103,34 @@ test('Far contacts have a fixed world pose before activation, even while reversi
   assert.equal(n.active, false); assert.ok(n.radius > 1100);
   assert.deepEqual(n.enemyPosition, enemy);
 });
+
+test('Orbit minimum distance is enforced in navigation, including boundary and retreat', () => {
+  const n = setup();
+  n.radius = ORBIT.minRadius - .001; n.updatePosition();
+  const position = { ...n.position }, angle = n.angle, direction = n.direction;
+  assert.equal(n.getState().orbitTooClose, true);
+  assert.equal(n.getState().canOrbit, false);
+  assert.equal(n.toggleOrbit(), false);
+  n.reverse(); n.update(.05, lookAt(n.position, n.enemyPosition));
+  assert.deepEqual(n.position, position);
+  assert.equal(n.angle, angle); assert.equal(n.direction, direction);
+  n.move(.05, lookAt(n.position, n.enemyPosition), -1);
+  assert.ok(n.radius > ORBIT.minRadius);
+  assert.equal(n.canOrbit, true); assert.equal(n.toggleOrbit(), true);
+  n.toggleOrbit();
+  n.radius = ORBIT.minRadius; n.updatePosition();
+  assert.equal(n.orbitTooClose, false); assert.equal(n.toggleOrbit(), true);
+  // A stop command must never be rejected, even if clearance changed.
+  n.radius = ORBIT.minRadius - 1;
+  assert.equal(n.toggleOrbit(), true); assert.equal(n.orbiting, false);
+  assert.equal(n.toggleOrbit(), false);
+});
+
+test('Clearance alone cannot enable orbit before contact or after harpoon attachment', () => {
+  const n = new OrbitNavigation();
+  n.begin({ x: 0, y: 0 }, { radius: 220, active: false });
+  assert.equal(n.canOrbit, false); assert.equal(n.toggleOrbit(), false);
+  n.active = true; n.forceRear();
+  assert.ok(n.anchor); assert.equal(n.canOrbit, false);
+  assert.equal(n.toggleOrbit(), false);
+});

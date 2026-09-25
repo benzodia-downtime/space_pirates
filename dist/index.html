@@ -2,7 +2,7 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#030713" />
     <link rel="icon" href="data:," />
     <meta
@@ -11,7 +11,7 @@
     />
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./voyage.css?v=flight-1" />
+    <link rel="stylesheet" href="./voyage.css?v=hud-1" />
     <link rel="stylesheet" href="./battle.css?v=loot-1" />
   </head>
   <body>
@@ -41,74 +41,6 @@
       <div id="stars-mid" class="stars stars--mid" aria-hidden="true"></div>
       <div id="stars-near" class="stars stars--near" aria-hidden="true"></div>
 
-      <header id="title-overlay" class="title-overlay">
-        <p class="title-overlay__eyebrow">Nautilus // Navigation</p>
-        <h1>Space <span>Pirates</span></h1>
-        <p class="title-overlay__subtitle">미탐사 구역 · 항로 07</p>
-      </header>
-
-      <section class="voyage-hud" aria-label="장거리 항해 정보">
-        <div class="voyage-readout">
-          <span class="voyage-readout__label"><i aria-hidden="true"></i> LONG RANGE SENSOR</span>
-          <strong id="voyage-state">정지 · 입력 대기</strong>
-          <output id="voyage-distance">확인된 신호 없음</output>
-          <div class="voyage-progress" aria-hidden="true">
-            <span id="voyage-progress-bar"></span>
-          </div>
-          <p>
-            <span>SPEED <output id="voyage-speed">0.0 m/s</output></span>
-            <span id="voyage-coordinate">X 000 · Y 000</span>
-          </p>
-        </div>
-
-        <div id="voyage-radar" class="voyage-radar" aria-hidden="true">
-          <span class="voyage-radar__ring voyage-radar__ring--inner"></span>
-          <span class="voyage-radar__ring voyage-radar__ring--outer"></span>
-          <span class="voyage-radar__cross"></span>
-          <span class="voyage-radar__sweep"></span>
-          <span id="radar-blip" class="voyage-radar__blip"></span>
-          <span class="voyage-radar__ship"></span>
-        </div>
-      </section>
-
-      <div id="contact-marker" class="contact-marker" aria-hidden="true" hidden>
-        <span class="contact-marker__frame" aria-hidden="true"></span>
-        <output id="contact-bearing">희미한 신호</output>
-      </div>
-
-      <div id="intercept-marker" class="intercept-marker" aria-hidden="true" hidden>
-        <span class="intercept-marker__ring"></span>
-        <span class="intercept-marker__vector"></span>
-        <output>INTERCEPT</output>
-      </div>
-
-      <div class="impact-flash" aria-hidden="true"></div>
-      <div id="assault-cue" class="assault-cue" aria-hidden="true" hidden><span></span><strong></strong></div>
-
-      <p id="voyage-announcement" class="sr-only" aria-live="polite"></p>
-
-      <section id="boarding-panel" class="boarding-panel" aria-label="적함 승선 정보" hidden>
-        <header>
-          <span>ORBIT / HARPOON</span>
-          <output id="boarding-phase" aria-live="polite">요격 대기</output>
-        </header>
-        <p id="boarding-objective" class="boarding-panel__objective">적함 주위를 선회하며 후방 하강문을 찾으십시오.</p>
-        <div class="boarding-panel__metrics">
-          <p><span>DISTANCE</span><strong id="boarding-distance">1,200 m</strong></p>
-          <p><span>REL SPEED</span><strong id="relative-speed">85.0 m/s</strong></p>
-          <p><span>ALIGNMENT</span><strong id="alignment-value">0%</strong></p>
-          <p><span>BREACH</span><strong id="breach-value">대기</strong></p>
-        </div>
-        <div class="boarding-panel__progress" aria-hidden="true">
-          <span id="boarding-progress-bar"></span>
-        </div>
-        <footer>
-          <span id="ram-state" data-state="standby">RAM · STOWED</span>
-          <span id="clamp-state" data-state="standby">CLAWS · STOWED</span>
-          <span id="boarding-seal-state" data-state="standby">SEAL · STOWED</span>
-        </footer>
-      </section>
-
       <div id="cockpit-shell" class="cockpit-shell" aria-hidden="true">
         <div class="cockpit-shell__glass">
           <span class="cockpit-shell__reflection cockpit-shell__reflection--left"></span>
@@ -126,76 +58,130 @@
           <i></i>
         </div>
 
-        <div class="cockpit-console">
-          <div class="cockpit-console__panel cockpit-console__panel--left">
-            <span>NAV BUS</span>
-            <i></i><i></i><i></i>
+        <div class="cockpit-console"></div>
+      </div>
+      <div class="impact-flash" aria-hidden="true"></div>
+      <p id="voyage-announcement" class="sr-only" aria-live="polite"></p>
+
+      <!-- Normal-flow horizontal/vertical panels; only the world and reticle are overlaid. -->
+      <div class="voyage-ui v-panel">
+        <div class="hud-top h-panel">
+          <div class="hud-brand v-panel">
+            <header id="title-overlay" class="title-overlay">
+              <p class="title-overlay__eyebrow">Nautilus // Navigation</p>
+              <h1>Space <span>Pirates</span></h1>
+              <p class="title-overlay__subtitle">미탐사 구역 · 항로 07</p>
+            </header>
+            <p class="status-whisper" aria-live="polite">
+              <span aria-hidden="true"></span>
+              <output id="space-status-text">Ship link stable</output>
+            </p>
           </div>
-          <div class="cockpit-console__core">
-            <span>NAUTILUS</span>
-            <strong>HELM ONLINE</strong>
+          <div class="hud-instruments h-panel">
+            <section class="voyage-hud" aria-label="장거리 항해 정보">
+              <div class="voyage-readout">
+                <span class="voyage-readout__label"><i aria-hidden="true"></i> LONG RANGE SENSOR</span>
+                <strong id="voyage-state">정지 · 입력 대기</strong>
+                <output id="voyage-distance">확인된 신호 없음</output>
+                <div class="voyage-progress" aria-hidden="true">
+                  <span id="voyage-progress-bar"></span>
+                </div>
+                <p>
+                  <span>SPEED <output id="voyage-speed">0.0 m/s</output></span>
+                  <span id="voyage-coordinate">X 000 · Y 000</span>
+                </p>
+              </div>
+
+              <div id="voyage-radar" class="voyage-radar" aria-hidden="true">
+                <span class="voyage-radar__ring voyage-radar__ring--inner"></span>
+                <span class="voyage-radar__ring voyage-radar__ring--outer"></span>
+                <span class="voyage-radar__cross"></span>
+                <span class="voyage-radar__sweep"></span>
+                <span id="radar-blip" class="voyage-radar__blip"></span>
+                <span class="voyage-radar__ship"></span>
+              </div>
+            </section>
+            <section id="boarding-panel" class="boarding-panel" aria-label="적함 승선 정보" hidden>
+              <header>
+                <span>ORBIT / HARPOON</span>
+                <output id="boarding-phase" aria-live="polite">요격 대기</output>
+              </header>
+              <p id="boarding-objective" class="boarding-panel__objective">적함 주위를 선회하며 후방 하강문을 찾으십시오.</p>
+              <div class="boarding-panel__metrics">
+                <p><span id="boarding-distance-type">CENTRE</span><strong id="boarding-distance">1,200 m</strong></p>
+                <p><span>REL SPEED</span><strong id="relative-speed">85.0 m/s</strong></p>
+                <p><span>ALIGNMENT</span><strong id="alignment-value">0%</strong></p>
+                <p><span>BREACH</span><strong id="breach-value">대기</strong></p>
+              </div>
+              <div class="boarding-panel__progress" aria-hidden="true">
+                <span id="boarding-progress-bar"></span>
+              </div>
+              <footer>
+                <span id="ram-state" data-state="standby">RAM · STOWED</span>
+                <span id="clamp-state" data-state="standby">CLAWS · STOWED</span>
+                <span id="boarding-seal-state" data-state="standby">SEAL · STOWED</span>
+              </footer>
+            </section>
           </div>
-          <div class="cockpit-console__panel cockpit-console__panel--right">
-            <span>HULL 100</span>
-            <i></i><i></i><i></i>
+        </div>
+        <div class="hud-view" aria-hidden="true"></div>
+        <div class="hud-bottom v-panel">
+          <div class="hud-action-row h-panel">
+            <section id="orbit-controls" class="orbit-controls" aria-label="표적 중심 자동항법" hidden>
+              <output id="orbit-readout">선회 대기 · 후방 하강문 탐색</output>
+              <div>
+                <button id="orbit-button" type="button" aria-describedby="orbit-readout" aria-pressed="false">자동 선회 [O]</button>
+                <button id="orbit-direction" type="button">반대 방향 ↶ [Q]</button>
+              </div>
+            </section>
+            <div id="assault-cue" class="assault-cue v-panel" aria-hidden="true" hidden><span></span><strong></strong></div>
+            <div class="assault-actions v-panel">
+              <button id="boarding-action" class="battle-start boarding-action" type="button" disabled hidden>
+                <span id="boarding-action-status">요격 해법 계산 중</span>
+                <strong id="boarding-action-label">항로 추적</strong>
+              </button>
+
+              <button id="battle-start" class="battle-start" type="button" disabled hidden>
+                <span>후방 하강문 파열 · 진입 가능</span>
+                <strong>적함 돌입</strong>
+              </button>
+            </div>
+          </div>
+          <div class="hud-control-row h-panel">
+            <section class="flight-controls" aria-label="항해 조종 장치">
+              <div
+                id="steering-pad"
+                class="steering-pad"
+                role="group"
+                aria-label="현재 시선을 기준으로 드래그하거나 방향키와 AD로 조향합니다. WS는 전진과 후진입니다. 놓거나 다시 눌러도 시선이 초기화되지 않습니다"
+                tabindex="0"
+              >
+                <span class="steering-pad__axis" aria-hidden="true"></span>
+                <span id="steering-knob" class="steering-pad__knob" aria-hidden="true"></span>
+              </div>
+              <div class="utility-controls v-panel">
+                <button id="scan-button" class="scan-button" type="button" aria-label="장거리 센서 펄스 방출">
+                  <span>센서 펄스</span>
+                  <strong id="scan-button-state">SCAN</strong>
+                </button>
+                <button id="sound-button" class="sound-button" type="button" aria-label="효과음 사용" aria-pressed="true">SFX ON</button>
+              </div>
+            </section>
+            <aside id="help-overlay" class="help-overlay" aria-label="조작 도움말">
+              <span class="help-overlay__signal" aria-hidden="true"></span>
+              <span><kbd>드래그</kbd>해 항로 고정 · <kbd>방향키 / AD</kbd> 조향 · <kbd>W/S</kbd> 전진·후진</span>
+              <span class="help-overlay__separator" aria-hidden="true">/</span>
+              <span><kbd>O</kbd> 선회 · <kbd>Q</kbd> 역방향 · <kbd>Space</kbd> 작살 / 돌입</span>
+            </aside>
+            <section class="thrust-controls v-panel" aria-label="전진 후진 · 누르는 동안 이동">
+              <output id="thrust-state">정지</output>
+              <small>누를 때만 이동</small>
+              <button id="thrust-forward" data-thrust="1" type="button" aria-label="누르는 동안 전진, W 키" aria-keyshortcuts="w">전진 <kbd>W</kbd></button>
+              <button id="thrust-reverse" data-thrust="-1" type="button" aria-label="누르는 동안 후진, S 키" aria-keyshortcuts="s">후진 <kbd>S</kbd></button>
+            </section>
           </div>
         </div>
       </div>
-
-      <button id="boarding-action" class="battle-start boarding-action" type="button" disabled hidden>
-        <span id="boarding-action-status">요격 해법 계산 중</span>
-        <strong id="boarding-action-label">항로 추적</strong>
-      </button>
-
-      <button id="battle-start" class="battle-start" type="button" disabled hidden>
-        <span>후방 하강문 파열 · 진입 가능</span>
-        <strong>적함 돌입</strong>
-      </button>
-
-      <section id="orbit-controls" class="orbit-controls" aria-label="표적 중심 자동항법" hidden>
-        <output id="orbit-readout">선회 대기 · 후방 하강문 탐색</output>
-        <div>
-          <button id="orbit-button" type="button" aria-pressed="false">자동 선회 [O]</button>
-          <button id="orbit-direction" type="button">반대 방향 ↶ [Q]</button>
-        </div>
-      </section>
-
-      <section class="flight-controls" aria-label="항해 조종 장치">
-        <div
-          id="steering-pad"
-          class="steering-pad"
-          role="group"
-          aria-label="현재 시선을 기준으로 드래그하거나 방향키와 AD로 조향합니다. WS는 전진과 후진입니다. 놓거나 다시 눌러도 시선이 초기화되지 않습니다"
-          tabindex="0"
-        >
-          <span class="steering-pad__axis" aria-hidden="true"></span>
-          <span id="steering-knob" class="steering-pad__knob" aria-hidden="true"></span>
-        </div>
-        <button id="scan-button" class="scan-button" type="button" aria-label="장거리 센서 펄스 방출">
-          <span>센서 펄스</span>
-          <strong id="scan-button-state">SCAN</strong>
-        </button>
-        <button id="sound-button" class="sound-button" type="button" aria-label="효과음 사용" aria-pressed="true">SFX ON</button>
-      </section>
-
-      <section class="thrust-controls" aria-label="전진 후진 · 누르는 동안 이동">
-        <output id="thrust-state">정지</output>
-        <small>누를 때만 이동</small>
-        <button id="thrust-forward" data-thrust="1" type="button" aria-label="누르는 동안 전진, W 키" aria-keyshortcuts="w">전진 <kbd>W</kbd></button>
-        <button id="thrust-reverse" data-thrust="-1" type="button" aria-label="누르는 동안 후진, S 키" aria-keyshortcuts="s">후진 <kbd>S</kbd></button>
-      </section>
-
-      <aside id="help-overlay" class="help-overlay" aria-label="조작 도움말">
-        <span class="help-overlay__signal" aria-hidden="true"></span>
-        <span><kbd>드래그</kbd>해 항로 고정 · <kbd>방향키 / AD</kbd> 조향 · <kbd>W/S</kbd> 전진·후진</span>
-        <span class="help-overlay__separator" aria-hidden="true">/</span>
-        <span><kbd>O</kbd> 선회 · <kbd>Q</kbd> 역방향 · <kbd>Space</kbd> 작살 / 돌입</span>
-      </aside>
-
-      <p class="status-whisper" aria-live="polite">
-        <span aria-hidden="true"></span>
-        <output id="space-status-text">Ship link stable</output>
-      </p>
     </main>
 
     <section
@@ -344,6 +330,6 @@
       </footer>
     </section>
 
-    <script type="module" src="./src/main.js?v=flight-1"></script>
+    <script type="module" src="./src/main.js?v=hud-1"></script>
   </body>
 </html>
