@@ -39,8 +39,12 @@ const server = createServer(async (request, response) => {
   try {
     const requestUrl = new URL(request.url ?? "/", "http://localhost");
     const decodedPath = decodeURIComponent(requestUrl.pathname);
-    const relativePath =
+    let relativePath =
       decodedPath === "/" ? "index.html" : decodedPath.replace(/^\/+/, "");
+    // Match the production vendor URLs without copying dependencies into the source tree.
+    if (["vendor/three.module.js", "vendor/three.core.js"].includes(relativePath)) {
+      relativePath = `node_modules/three/build/${relativePath.slice(7)}`;
+    }
     let filePath = resolve(rootDirectory, relativePath);
 
     if (
@@ -77,4 +81,3 @@ const server = createServer(async (request, response) => {
 server.listen(port, "127.0.0.1", () => {
   console.log(`Space Pirates is drifting at http://localhost:${port}`);
 });
-

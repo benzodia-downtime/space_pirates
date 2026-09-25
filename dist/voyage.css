@@ -11,6 +11,7 @@
 }
 
 .space-scene {
+  min-height: 0;
   --flight-bank: 0deg;
   --flight-pitch: 0deg;
   --flight-x: 0px;
@@ -480,87 +481,10 @@
   text-shadow: 0 0 7px rgba(97, 234, 244, 0.38);
 }
 
-.boarding-rig {
-  position: absolute;
-  z-index: 25;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  clip-path: polygon(3% 2%, 97% 2%, 96% 73%, 4% 73%);
-  pointer-events: none;
-}
-
-.boarding-rig__cable,
-.boarding-rig__bridge,
-.boarding-rig__bridge-shadow,
-.boarding-rig__collar {
-  vector-effect: non-scaling-stroke;
-}
-
-.boarding-rig__cable {
-  opacity: 0;
-  stroke: #9af6ff;
-  stroke-width: 2.4;
-  stroke-dasharray: 8 4;
-  filter: drop-shadow(0 0 4px rgba(97, 234, 244, 0.98));
-  animation: tether-flow 520ms linear infinite;
-  transition: opacity 180ms ease;
-}
-
-.boarding-rig[data-anchors="1"] .boarding-rig__cable--port,
-.boarding-rig[data-anchors="2"] .boarding-rig__cable {
-  opacity: 1;
-}
-
-.boarding-rig__bridge-shadow,
-.boarding-rig__bridge {
-  fill: none;
-  opacity: 0;
-  stroke-linecap: square;
-  stroke-dasharray: 1;
-  stroke-dashoffset: calc(1 - var(--bridge-progress));
-}
-
-.boarding-rig__bridge-shadow {
-  stroke: rgba(2, 7, 15, 0.88);
-  stroke-width: 12;
-}
-
-.boarding-rig__bridge {
-  stroke: #b8fbff;
-  stroke-width: 7;
-  filter: drop-shadow(0 0 7px rgba(97, 234, 244, 0.9));
-}
-
-.boarding-rig__collar {
-  opacity: 0;
-  fill: rgba(3, 13, 25, 0.92);
-  stroke: #d5a85e;
-  stroke-width: 2;
-  filter: drop-shadow(0 0 5px rgba(213, 168, 94, 0.58));
-}
-
-.boarding-rig[data-mode="bridge"] .boarding-rig__bridge-shadow,
-.boarding-rig[data-mode="bridge"] .boarding-rig__bridge,
-.boarding-rig[data-mode="pressurize"] .boarding-rig__bridge-shadow,
-.boarding-rig[data-mode="pressurize"] .boarding-rig__bridge,
-.boarding-rig[data-mode="ready"] .boarding-rig__bridge-shadow,
-.boarding-rig[data-mode="ready"] .boarding-rig__bridge {
-  opacity: 1;
-}
-
-.boarding-rig[data-mode="bridge"] .boarding-rig__collar,
-.boarding-rig[data-mode="pressurize"] .boarding-rig__collar,
-.boarding-rig[data-mode="ready"] .boarding-rig__collar {
-  opacity: 1;
-  animation: collar-lock 1.1s ease-in-out infinite alternate;
-}
-
 .cockpit-shell {
   position: absolute;
   z-index: 24;
-  inset: -3% -3% 0;
+  inset: 0;
   overflow: hidden;
   pointer-events: none;
   transform:
@@ -661,7 +585,7 @@
 .cockpit-reticle {
   position: absolute;
   z-index: 2;
-  top: 45%;
+  top: 40%;
   left: 50%;
   width: clamp(4.5rem, 8vw, 7rem);
   aspect-ratio: 1;
@@ -809,90 +733,6 @@
   color: #83d9df;
   font-size: 0.56rem;
   letter-spacing: 0.12em;
-}
-
-.ship-stage--player {
-  z-index: 0;
-  top: 77%;
-  width: min(68vmin, 40rem);
-  opacity: 0;
-  pointer-events: none;
-  transform:
-    translate(-50%, -50%)
-    translate3d(var(--flight-x), var(--flight-y), 0)
-    rotateZ(var(--flight-bank))
-    rotateX(calc(49deg + var(--flight-pitch)));
-  transform-style: preserve-3d;
-  will-change: transform;
-}
-
-.ship-stage--player .ship-stage__halo {
-  inset: 23% 16%;
-  background: radial-gradient(ellipse, rgba(67, 211, 235, 0.18), transparent 67%);
-  filter: blur(15px);
-  transform: translateZ(-8px);
-}
-
-.ship-stage__orbit {
-  display: none;
-}
-
-.ship-stage__wake {
-  position: absolute;
-  z-index: 1;
-  top: 66%;
-  left: 50%;
-  display: flex;
-  gap: 3.4%;
-  justify-content: center;
-  width: 28%;
-  height: 34%;
-  opacity: 0.78;
-  transform: translateX(-50%) translateZ(-2px);
-  pointer-events: none;
-}
-
-.ship-stage__wake i {
-  display: block;
-  width: 5px;
-  height: 100%;
-  background: linear-gradient(180deg, rgba(214, 255, 255, 0.9), rgba(69, 225, 248, 0.58) 18%, rgba(42, 101, 255, 0) 88%);
-  filter: blur(2px) drop-shadow(0 0 7px rgba(64, 220, 255, 0.75));
-  transform: scaleY(var(--wake-length, 0.8));
-  transform-origin: top;
-}
-
-.ship-stage__wake i:first-child,
-.ship-stage__wake i:last-child {
-  width: 2px;
-  opacity: 0.42;
-}
-
-.ship-stage--player .spaceship {
-  scale: 0.3;
-  filter:
-    drop-shadow(0 18px 22px rgba(0, 0, 0, 0.75))
-    drop-shadow(0 0 20px rgba(57, 172, 207, 0.13));
-}
-
-.ship-stage--enemy {
-  z-index: 11;
-  top: var(--enemy-y, 35%);
-  left: var(--enemy-x, 50%);
-  width: min(46vmin, 28rem);
-  opacity: var(--enemy-opacity, 0);
-  transform: translate(-50%, -50%) rotate(var(--enemy-roll, 0deg)) scale(var(--enemy-scale, 0.08));
-  transform-origin: center;
-  transition: opacity 320ms ease;
-  will-change: transform, opacity;
-}
-
-.ship-stage--enemy[data-contact-state="hidden"] {
-  visibility: hidden;
-}
-
-.ship-stage--enemy .spaceship {
-  scale: 0.3;
 }
 
 .battle-start {
@@ -1047,15 +887,6 @@
   to { transform: rotate(360deg); }
 }
 
-@keyframes tether-flow {
-  to { stroke-dashoffset: -8; }
-}
-
-@keyframes collar-lock {
-  from { stroke-width: 1.5; opacity: 0.7; }
-  to { stroke-width: 2.5; opacity: 1; }
-}
-
 @keyframes encounter-button {
   from { box-shadow: 0 0 18px rgba(52, 211, 235, 0.12), inset 0 0 18px rgba(67, 218, 239, 0.05); }
   to { box-shadow: 0 0 34px rgba(52, 211, 235, 0.3), inset 0 0 18px rgba(67, 218, 239, 0.1); }
@@ -1128,14 +959,7 @@
     bottom: 7%;
   }
 
-  .ship-stage--player {
-    top: 76%;
-    width: min(92vw, 34rem);
-  }
 
-  .ship-stage--enemy {
-    width: min(68vw, 25rem);
-  }
 
   .flight-controls {
     bottom: max(0.8rem, env(safe-area-inset-bottom));
@@ -1230,10 +1054,6 @@
     transform: none;
   }
 
-  .ship-stage--player {
-    top: 74%;
-    width: 100vw;
-  }
 
   .boarding-panel {
     top: 0.65rem;
@@ -1278,6 +1098,7 @@
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
+  .status-whisper { display: none; }
   .title-overlay__eyebrow,
   .title-overlay__subtitle,
   .voyage-readout p {
@@ -1313,10 +1134,6 @@
     transform: none;
   }
 
-  .ship-stage--player {
-    top: 75%;
-    width: min(84vh, 31rem);
-  }
 
   .flight-controls {
     bottom: 0.55rem;
@@ -1356,17 +1173,11 @@
   .voyage-radar__sweep,
   .contact-marker__frame,
   .intercept-marker__ring,
-  .boarding-rig__cable,
-  .boarding-rig__collar,
   .battle-start,
   .space-scene.is-scanning .voyage-radar__ring--outer {
     animation: none !important;
   }
 
-  .ship-stage--player {
-    --flight-bank: 0deg !important;
-    --flight-pitch: 0deg !important;
-  }
 }
 
 @media (prefers-contrast: more) {
@@ -1386,15 +1197,22 @@
   }
 }
 
-/* Keep the SVG definitions available to the enemy ship without drawing the player exterior. */
-#ship-stage.ship-stage--player {
-  position: absolute;
-  top: -10000px;
-  left: -10000px;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transform: none;
+
+/* World geometry is behind glass/HUD, never painted over the cockpit. */
+.space-scene[data-renderer="webgl"] .cockpit-shell__canopy,
+.space-scene[data-renderer="webgl"] .stars {
+  display: none;
 }
+
+.renderer-error {
+  position: absolute;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  color: #e3f6ff;
+  background: rgba(2, 7, 16, 0.96);
+}
+.renderer-error > div { max-width: 25rem; line-height: 1.7; }
+.renderer-error a { display: inline-block; margin-top: 1rem; padding: 0.6rem 1rem; color: #8febff; border: 1px solid currentColor; }

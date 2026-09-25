@@ -11,6 +11,10 @@ const staticFiles = [
   ["battle.css", "battle.css"],
   [join("src", "main.js"), join("src", "main.js")],
   [join("src", "voyage.js"), join("src", "voyage.js")],
+  [join("src", "voyage-renderer.js"), join("src", "voyage-renderer.js")],
+  [join("node_modules", "three", "build", "three.module.js"), join("vendor", "three.module.js")],
+  [join("node_modules", "three", "build", "three.core.js"), join("vendor", "three.core.js")],
+  [join("node_modules", "three", "LICENSE"), join("vendor", "three-LICENSE.txt")],
   [join("assets", "crew-player.png"), join("assets", "crew-player.png")],
   [join("assets", "crew-enemy.png"), join("assets", "crew-enemy.png")],
 ];

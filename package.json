@@ -7,10 +7,17 @@
   "scripts": {
     "start": "node server.mjs",
     "build": "node scripts/build-static.mjs",
-    "check": "node --check server.mjs && node --check scripts/build-static.mjs && node --check src/voyage.js && node --check src/main.js",
-    "test": "npm run build && npm run check"
+    "check": "node --check server.mjs && node --check scripts/build-static.mjs && node --check src/voyage.js && node --check src/voyage-renderer.js && node --check src/main.js",
+    "test": "npm run build && npm run check",
+    "test:e2e": "node scripts/verify-3d.mjs"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
   }
 }

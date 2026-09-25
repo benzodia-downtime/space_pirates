@@ -1,13 +1,8 @@
+import { VoyageRenderer } from "./voyage-renderer.js?v=3d-1";
+
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-const wrap = (value, size) => ((value % size) + size) % size;
 
 const VOYAGE_CONFIG = Object.freeze({
-  nearPlane: 42,
-  farPlane: 3600,
-  desktopStarDensity: 1 / 3000,
-  mobileStarDensity: 1 / 4300,
-  minimumStars: 150,
-  maximumStars: 420,
   cruiseSpeed: 0.058,
   searchBaseRate: 0.026,
   searchAlignedRate: 0.044,
@@ -30,156 +25,9 @@ const VOYAGE_CONFIG = Object.freeze({
   pressurizeSeconds: 4,
 });
 
-class PerspectiveStarfield {
-  constructor(canvas) {
-    this.canvas = canvas;
-    this.context = canvas && typeof canvas.getContext === "function"
-      ? canvas.getContext("2d", { alpha: true })
-      : null;
-    this.width = 0;
-    this.height = 0;
-    this.pixelRatio = 1;
-    this.focalLength = 720;
-    this.worldWidth = 2600;
-    this.worldHeight = 1600;
-    this.stars = [];
-  }
-
-  resize() {
-    if (!this.canvas || !this.context) return;
-
-    const bounds = this.canvas.getBoundingClientRect();
-    const width = Math.max(1, bounds.width || this.canvas.clientWidth || window.innerWidth || 1);
-    const height = Math.max(1, bounds.height || this.canvas.clientHeight || window.innerHeight || 1);
-    const isMobile = width <= 720;
-    const pixelRatio = clamp(window.devicePixelRatio || 1, 1, isMobile ? 1.5 : 2);
-    const bufferWidth = Math.round(width * pixelRatio);
-    const bufferHeight = Math.round(height * pixelRatio);
-
-    if (
-      bufferWidth === this.canvas.width &&
-      bufferHeight === this.canvas.height &&
-      width === this.width &&
-      height === this.height
-    ) {
-      return;
-    }
-
-    this.canvas.width = bufferWidth;
-    this.canvas.height = bufferHeight;
-    this.width = width;
-    this.height = height;
-    this.pixelRatio = pixelRatio;
-    this.focalLength = Math.max(420, Math.min(width, height) * 0.92);
-    this.worldWidth = Math.max(2200, width * 3.4);
-    this.worldHeight = Math.max(1500, height * 3.2);
-    this.context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    this.createStars(isMobile);
-  }
-
-  createStars(isMobile) {
-    const density = isMobile
-      ? VOYAGE_CONFIG.mobileStarDensity
-      : VOYAGE_CONFIG.desktopStarDensity;
-    const count = Math.round(clamp(
-      this.width * this.height * density,
-      VOYAGE_CONFIG.minimumStars,
-      VOYAGE_CONFIG.maximumStars,
-    ));
-    const depthSpan = VOYAGE_CONFIG.farPlane - VOYAGE_CONFIG.nearPlane;
-
-    this.stars = Array.from({ length: count }, () => ({
-      x: (Math.random() - 0.5) * this.worldWidth,
-      y: (Math.random() - 0.5) * this.worldHeight,
-      z: VOYAGE_CONFIG.nearPlane + Math.random() * depthSpan,
-      size: 0.45 + Math.random() * 1.25,
-      alpha: 0.42 + Math.random() * 0.56,
-      phase: Math.random() * Math.PI * 2,
-      tint: Math.random(),
-    }));
-  }
-
-  draw(sceneTime, travelDistance, steering, allowMotion, speedFactor = 1) {
-    const context = this.context;
-    if (!context || !this.width || !this.height) return;
-
-    const near = VOYAGE_CONFIG.nearPlane;
-    const far = VOYAGE_CONFIG.farPlane;
-    const depthSpan = far - near;
-    const travel = travelDistance;
-    const centerX = this.width / 2 - steering.x * this.width * 0.065;
-    const centerY = this.height * 0.42 - steering.y * this.height * 0.05;
-    const cameraX = steering.x * 0.2;
-    const cameraY = steering.y * 0.14;
-    const streakDepth = allowMotion ? 72 * speedFactor : 0;
-
-    context.clearRect(0, 0, this.width, this.height);
-    context.save();
-    context.globalCompositeOperation = "lighter";
-
-    for (const star of this.stars) {
-      const z = near + wrap(star.z - travel - near, depthSpan);
-      const shiftedX = star.x - cameraX * z;
-      const shiftedY = star.y - cameraY * z;
-      const scale = this.focalLength / z;
-      const screenX = centerX + shiftedX * scale;
-      const screenY = centerY + shiftedY * scale;
-      const margin = 50;
-
-      if (
-        screenX < -margin ||
-        screenX > this.width + margin ||
-        screenY < -margin ||
-        screenY > this.height + margin
-      ) {
-        continue;
-      }
-
-      const proximity = 1 - (z - near) / depthSpan;
-      const twinkle = allowMotion
-        ? 0.84 + Math.sin(sceneTime * (0.6 + star.size * 0.34) + star.phase) * 0.16
-        : 0.92;
-      const alpha = clamp(star.alpha * (0.2 + proximity * 0.95) * twinkle, 0.06, 1);
-      const radius = star.size * (0.42 + proximity * proximity * 2.2);
-      const color = star.tint > 0.92
-        ? "190, 229, 255"
-        : star.tint < 0.07
-          ? "255, 222, 187"
-          : "238, 248, 255";
-
-      if (streakDepth > 0 && proximity > 0.18 && z + streakDepth < far) {
-        const previousZ = z + streakDepth;
-        const previousScale = this.focalLength / previousZ;
-        const previousX = centerX + (star.x - cameraX * previousZ) * previousScale;
-        const previousY = centerY + (star.y - cameraY * previousZ) * previousScale;
-        context.beginPath();
-        context.moveTo(previousX, previousY);
-        context.lineTo(screenX, screenY);
-        context.strokeStyle = `rgba(${color}, ${alpha * 0.62})`;
-        context.lineWidth = Math.max(0.5, radius * 0.68);
-        context.stroke();
-      } else {
-        context.beginPath();
-        context.arc(screenX, screenY, Math.max(0.35, radius), 0, Math.PI * 2);
-        context.fillStyle = `rgba(${color}, ${alpha})`;
-        context.fill();
-      }
-    }
-
-    context.restore();
-  }
-
-  clear() {
-    this.context?.clearRect(0, 0, this.width, this.height);
-  }
-}
-
 export class VoyageScene {
-  constructor(ship, canvas) {
-    this.ship = ship;
+  constructor(canvas) {
     this.spaceScene = document.getElementById("space-scene");
-    this.playerStage = document.getElementById("ship-stage");
-    this.enemyStage = document.getElementById("enemy-ship-stage");
     this.battleButton = document.getElementById("battle-start");
     this.battleButtonStatus = this.battleButton?.querySelector("span");
     this.stateLabel = document.getElementById("voyage-state");
@@ -207,20 +55,12 @@ export class VoyageScene {
     this.boardingAction = document.getElementById("boarding-action");
     this.boardingActionStatus = document.getElementById("boarding-action-status");
     this.boardingActionLabel = document.getElementById("boarding-action-label");
-    this.boardingRig = document.getElementById("boarding-rig");
-    this.harpoonPortLine = document.getElementById("harpoon-port-line");
-    this.harpoonStarboardLine = document.getElementById("harpoon-starboard-line");
-    this.boardingBridge = document.getElementById("boarding-bridge");
-    this.boardingBridgeShadow = document.getElementById("boarding-bridge-shadow");
-    this.boardingCollar = document.getElementById("boarding-collar");
     this.steeringPad = document.getElementById("steering-pad");
     this.steeringKnob = document.getElementById("steering-knob");
     this.scanButton = document.getElementById("scan-button");
     this.scanButtonState = document.getElementById("scan-button-state");
-    this.starfield = new PerspectiveStarfield(canvas);
-    this.engineGlows = ship
-      ? Array.from(ship.querySelectorAll("[data-engine-glow], .engine-glow, .engine"))
-      : [];
+    this.visuals = new VoyageRenderer(canvas);
+    this.visuals.onRestore = () => { this.renderStill(); this.startLoop(); };
 
     this.pointer = { x: 0, y: 0 };
     this.pointerTarget = { x: 0, y: 0 };
@@ -269,7 +109,6 @@ export class VoyageScene {
       ? window.matchMedia("(prefers-reduced-motion: reduce)")
       : null;
     this.reducedMotion = Boolean(this.motionPreference?.matches);
-    this.originalEngineOpacity = this.engineGlows.map((engine) => engine.style.opacity);
 
     this.onFrame = this.onFrame.bind(this);
     this.onResize = this.onResize.bind(this);
@@ -284,14 +123,14 @@ export class VoyageScene {
     this.onMotionPreferenceChange = this.onMotionPreferenceChange.bind(this);
 
     this.addListeners();
-    this.starfield.resize();
+    this.visuals.resize();
     this.startNewSearch({ announce: false });
     this.renderStill();
     this.startLoop();
   }
 
   get hasVisuals() {
-    return Boolean(this.ship || this.starfield.context);
+    return this.visuals.available;
   }
 
   get encounterReady() {
@@ -437,7 +276,7 @@ export class VoyageScene {
   }
 
   onResize() {
-    this.starfield.resize();
+    this.visuals.resize();
     this.renderStill();
   }
 
@@ -445,7 +284,7 @@ export class VoyageScene {
     if (document.hidden) {
       this.stopLoop();
     } else if (!this.manuallyPaused) {
-      this.starfield.resize();
+      this.visuals.resize();
       this.startLoop();
     }
   }
@@ -484,11 +323,6 @@ export class VoyageScene {
       this.boardingAction.hidden = true;
       this.boardingAction.disabled = true;
     }
-    if (this.boardingRig) {
-      this.boardingRig.setAttribute("hidden", "");
-      this.boardingRig.dataset.anchors = "0";
-      this.boardingRig.dataset.mode = "stowed";
-    }
     this.spaceScene?.style.setProperty("--bridge-progress", "0");
     this.spaceScene?.style.setProperty("--tether-alert", "0");
     this.spaceScene?.removeAttribute("data-boarding-state");
@@ -510,12 +344,6 @@ export class VoyageScene {
       y: -0.14 + Math.random() * 0.26,
     };
 
-    if (this.enemyStage) {
-      this.enemyStage.dataset.contactState = "hidden";
-      this.enemyStage.setAttribute("aria-hidden", "true");
-      this.enemyStage.style.setProperty("--enemy-opacity", "0");
-      this.enemyStage.style.setProperty("--enemy-scale", "0.08");
-    }
     if (this.battleButton) {
       this.battleButton.hidden = true;
       this.battleButton.disabled = true;
@@ -560,10 +388,6 @@ export class VoyageScene {
     this.bridgeProgress = 0;
     this.pressureProgress = 0;
 
-    if (this.enemyStage) {
-      this.enemyStage.dataset.contactState = "intercept";
-      this.enemyStage.removeAttribute("aria-hidden");
-    }
     if (this.boardingPanel) this.boardingPanel.hidden = false;
     if (this.boardingAction) this.boardingAction.hidden = false;
     if (this.battleButton) {
@@ -946,7 +770,7 @@ export class VoyageScene {
       }
       if (this.pressureProgress >= 1) {
         this.setVoyageMode("ready", "적함 에어록이 열렸습니다. 승무원이 돌입할 수 있습니다.");
-        if (this.enemyStage) this.enemyStage.dataset.contactState = "docked";
+
       }
     }
   }
@@ -1183,11 +1007,7 @@ export class VoyageScene {
     const actual = this.getActualBearing();
     const actualRelativeX = actual.x - this.pointer.x * 0.68;
     const actualRelativeY = actual.y - this.pointer.y * 0.48;
-    const markerX = clamp(50 + actualRelativeX * 54, 12, 88);
-    const markerY = clamp(37 + actualRelativeY * 38, 16, this.isBoardingActive ? 60 : 67);
     const guidance = this.getTrackingMetrics();
-    const interceptX = clamp(50 + guidance.relativeX * 54, 12, 88);
-    const interceptY = clamp(37 + guidance.relativeY * 38, 16, 64);
     const contactStrength = this.isBoardingActive
       ? 1
       : clamp(
@@ -1204,6 +1024,19 @@ export class VoyageScene {
         0,
         1,
       );
+
+    const projected = this.visuals.draw({
+      bearing: actual, guidance: guidance.guidance, steering: this.pointer,
+      distance: this.isBoardingActive ? this.boardingDistance : 1200 + (1 - enemyReveal) * 3800,
+      reveal: enemyReveal, time: this.sceneTime, motion: !this.reducedMotion,
+      travel: this.starTravel, rotationError: this.rotationError,
+      anchors: this.harpoonCount, bridgeProgress: this.bridgeProgress,
+      pressureProgress: this.pressureProgress,
+    });
+    const markerX = clamp(projected?.contact.x ?? 50 + actualRelativeX * 54, 6, 94);
+    const markerY = clamp(projected?.contact.y ?? 40 + actualRelativeY * 38, 8, 78);
+    const interceptX = clamp(projected?.intercept.x ?? 50 + guidance.relativeX * 54, 6, 94);
+    const interceptY = clamp(projected?.intercept.y ?? 40 + guidance.relativeY * 38, 8, 78);
 
     this.spaceScene?.style.setProperty("--contact-x", `${markerX.toFixed(2)}%`);
     this.spaceScene?.style.setProperty("--contact-y", `${markerY.toFixed(2)}%`);
@@ -1240,104 +1073,35 @@ export class VoyageScene {
       this.radar.style.setProperty("--radar-opacity", clamp(this.searchProgress * 1.7, 0, 1).toFixed(3));
     }
 
-    if (this.enemyStage) {
-      const distanceProgress = this.isBoardingActive
-        ? clamp(
-          (VOYAGE_CONFIG.interceptStartDistance - this.boardingDistance) /
-            (VOYAGE_CONFIG.interceptStartDistance - VOYAGE_CONFIG.dockingDistance),
-          0,
-          1,
-        )
-        : 0;
-      const boardingScale = 1 + Math.pow(distanceProgress, 1.35) * 1.5;
-      this.enemyStage.style.setProperty("--enemy-x", `${markerX.toFixed(2)}%`);
-      this.enemyStage.style.setProperty("--enemy-y", `${markerY.toFixed(2)}%`);
-      this.enemyStage.style.setProperty("--enemy-opacity", enemyReveal.toFixed(3));
-      this.enemyStage.style.setProperty(
-        "--enemy-scale",
-        (this.isBoardingActive ? boardingScale : 0.1 + enemyReveal * 0.9).toFixed(3),
-      );
-      const enemyRoll = this.isBoardingActive
-        ? Math.sin(this.sceneTime * 0.7) * this.rotationError * 0.34
-        : 0;
-      this.enemyStage.style.setProperty("--enemy-roll", `${enemyRoll.toFixed(2)}deg`);
-      if (enemyReveal > 0 && this.enemyStage.dataset.contactState === "hidden") {
-        this.enemyStage.dataset.contactState = "approach";
-      }
-    }
-
-    if (this.boardingRig) {
-      this.boardingRig.toggleAttribute(
-        "hidden",
-        this.harpoonCount === 0 && this.bridgeProgress === 0,
-      );
-      this.boardingRig.dataset.anchors = String(this.harpoonCount);
-      this.boardingRig.dataset.mode = this.mode;
-    }
-    const portTargetX = markerX - 1.8;
-    const starboardTargetX = markerX + 1.8;
-    const targetY = markerY + 3.2;
-    this.harpoonPortLine?.setAttribute("x2", portTargetX.toFixed(2));
-    this.harpoonPortLine?.setAttribute("y2", targetY.toFixed(2));
-    this.harpoonStarboardLine?.setAttribute("x2", starboardTargetX.toFixed(2));
-    this.harpoonStarboardLine?.setAttribute("y2", targetY.toFixed(2));
-    const bridgePath = `M 50 89 L ${markerX.toFixed(2)} ${(markerY + 5).toFixed(2)}`;
-    this.boardingBridge?.setAttribute("d", bridgePath);
-    this.boardingBridgeShadow?.setAttribute("d", bridgePath);
-    this.boardingCollar?.setAttribute("cx", markerX.toFixed(2));
-    this.boardingCollar?.setAttribute("cy", (markerY + 5).toFixed(2));
   }
 
   render(allowMotion) {
-    const time = allowMotion ? this.sceneTime : 0;
     const steering = this.pointer;
-    this.starfield.draw(time, this.starTravel, steering, allowMotion, this.starSpeedFactor);
 
-    const floatX = allowMotion ? Math.sin(this.sceneTime * 0.42) * 3.5 : 0;
-    const floatY = allowMotion ? Math.sin(this.sceneTime * 0.58 + 0.7) * 4.5 : 0;
-    const x = floatX + this.course.x + steering.x * 34;
-    const y = floatY + this.course.y + Math.abs(steering.x) * 3 + steering.y * 12;
-    const bank = this.course.roll + steering.x * 8.5;
-    const pitch = steering.y * -3.2;
-    const wakeLength = allowMotion
-      ? clamp(0.78 + Math.sin(this.sceneTime * 31) * 0.08 + Math.sin(this.sceneTime * 53) * 0.04, 0.65, 0.96)
-      : 0.78;
-    const engineFlicker = allowMotion
-      ? clamp(0.76 + Math.sin(this.sceneTime * 27) * 0.12 + Math.sin(this.sceneTime * 61) * 0.055, 0.54, 0.98)
-      : 0.76;
     const cockpitVibration = allowMotion
       ? Math.sin(this.sceneTime * 19) * 0.22 + Math.sin(this.sceneTime * 31) * 0.12
       : 0;
 
     if (this.spaceScene) {
-      this.spaceScene.style.setProperty("--flight-x", `${x.toFixed(2)}px`);
-      this.spaceScene.style.setProperty("--flight-y", `${y.toFixed(2)}px`);
-      this.spaceScene.style.setProperty("--flight-bank", `${bank.toFixed(2)}deg`);
-      this.spaceScene.style.setProperty("--flight-pitch", `${pitch.toFixed(2)}deg`);
-      this.spaceScene.style.setProperty("--wake-length", wakeLength.toFixed(3));
       this.spaceScene.style.setProperty("--cockpit-vibration", `${cockpitVibration.toFixed(2)}px`);
     }
     if (this.steeringKnob) {
       this.steeringKnob.style.setProperty("--knob-x", `${(steering.x * 22).toFixed(1)}px`);
       this.steeringKnob.style.setProperty("--knob-y", `${(steering.y * 22).toFixed(1)}px`);
     }
-    for (const engine of this.engineGlows) {
-      engine.style.setProperty("--engine-flicker", engineFlicker.toFixed(3));
-      engine.style.opacity = engineFlicker.toFixed(3);
-    }
 
     this.updateContactVisuals();
   }
 
   renderStill() {
-    this.starfield.resize();
+    this.visuals.resize();
     this.render(false);
     this.updateHud(true);
   }
 
   onFrame(timestamp) {
     this.frameId = 0;
-    if (this.destroyed || this.manuallyPaused || document.hidden) return;
+    if (this.destroyed || this.manuallyPaused || document.hidden || !this.visuals.available) return;
 
     const deltaSeconds = this.lastFrameTime
       ? clamp((timestamp - this.lastFrameTime) / 1000, 0, 0.05)
@@ -1377,7 +1141,7 @@ export class VoyageScene {
 
   resume() {
     this.manuallyPaused = false;
-    this.starfield.resize();
+    this.visuals.resize();
     this.renderStill();
     this.startLoop();
   }
@@ -1417,8 +1181,7 @@ export class VoyageScene {
     this.bridgeProgress = 1;
     this.pressureProgress = 1;
     this.setVoyageMode("ready", "승선 절차를 완료했습니다. 적함으로 돌입할 수 있습니다.");
-    if (this.enemyStage) this.enemyStage.dataset.contactState = "docked";
-    this.boardingRig?.removeAttribute("hidden");
+
     this.updateHud(true);
     this.renderStill();
   }
@@ -1426,6 +1189,7 @@ export class VoyageScene {
   getState() {
     const tracking = this.getTrackingMetrics();
     return {
+      rendering: this.visuals.getState(),
       mode: this.mode,
       boardingStage: this.isBoardingActive ? this.mode : null,
       searchProgress: this.searchProgress,
@@ -1454,14 +1218,9 @@ export class VoyageScene {
     this.destroyed = true;
     this.stopLoop();
     this.removeListeners();
-    this.starfield.clear();
+    this.visuals.dispose();
     this.spaceScene?.classList.remove("is-scanning");
     this.keys.clear();
 
-    for (const engine of this.engineGlows) {
-      const index = this.engineGlows.indexOf(engine);
-      engine.style.opacity = this.originalEngineOpacity[index];
-      engine.style.removeProperty("--engine-flicker");
-    }
   }
 }
