@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { OrbitNavigation, ORBIT, HELM, lookAt, relativeHelm } from '../src/navigation.js';
+import { OrbitNavigation, ORBIT, HELM, lookAt, relativeHelm, pitchOffsetDegrees } from '../src/navigation.js';
 const near = (a, b, eps = 1e-8) => assert.ok(Math.abs(a - b) < eps, a + ' ~= ' + b);
 function setup() { const nav = new OrbitNavigation(); nav.begin({ x: 0.31, y: -0.04 }); return nav; }
 
@@ -133,4 +133,19 @@ test('Clearance alone cannot enable orbit before contact or after harpoon attach
   n.active = true; n.forceRear();
   assert.ok(n.anchor); assert.equal(n.canOrbit, false);
   assert.equal(n.toggleOrbit(), false);
+});
+
+test('Radar pitch is relative to the current view: positive up, negative down, zero aligned', () => {
+  const r = degrees => degrees * Math.PI / 180;
+  near(pitchOffsetDegrees(0, r(-12)), 12);
+  near(pitchOffsetDegrees(0, r(12)), -12);
+  near(pitchOffsetDegrees(r(25), r(10)), 15);
+  near(pitchOffsetDegrees(r(-35), r(10)), -45);
+  near(pitchOffsetDegrees(r(60), r(60)), 0);
+  near(pitchOffsetDegrees(r(-68), r(80)), -148);
+  near(pitchOffsetDegrees(r(68), r(-80)), 148);
+  const above = lookAt({x:0,y:0,z:0}, {x:0,y:10,z:-10});
+  const below = lookAt({x:0,y:0,z:0}, {x:0,y:-10,z:-10});
+  near(pitchOffsetDegrees(0, above.pitch), 45);
+  near(pitchOffsetDegrees(0, below.pitch), -45);
 });

@@ -95,6 +95,42 @@ try {
     await page.evaluate(() => SpacePiratesAmbient.resume());
   }
   await checkSettings();
+  async function checkRadar() {
+    assert.equal(await page.locator('#radar-blip').isVisible(), false, 'No contact: no pitch callout');
+    await page.keyboard.down('w');
+    await page.waitForFunction(() => SpacePiratesAmbient.getState().searchProgress > .3, null, {timeout:15000});
+    await page.keyboard.up('w'); await page.waitForTimeout(100);
+    const contact = await read();
+    const target = {yaw:contact.guidanceBearing.x*.65,pitch:contact.guidanceBearing.y*.65};
+    const original = page.viewportSize();
+    for (const [offset,yawOffset] of [[15,0],[-15,0],[0,0],[50,1.5],[-50,-1.5]]) {
+      await aim({yaw:target.yaw+yawOffset,pitch:target.pitch+offset*Math.PI/180});
+      const expected = offset>0 ? `↑ ${offset}°` : offset<0 ? `↓ ${-offset}°` : '0°';
+      assert.equal(await page.locator('#radar-pitch').innerText(), expected);
+      assert.ok(Math.abs((await read()).radarPitchDegrees-offset)<.15);
+      const heldLabel=await page.locator('#radar-pitch').innerText();
+      await page.waitForTimeout(150);
+      assert.equal(await page.locator('#radar-pitch').innerText(),heldLabel,'Released steering preserves relative pitch');
+      for (const [width,height] of [[1440,900],[390,844],[320,568],[568,320]]) {
+        await page.setViewportSize({width,height}); await page.evaluate(() => SpacePiratesAmbient.redraw());
+        const radar=await page.locator('#voyage-radar').boundingBox();
+        const label=await page.locator('#radar-pitch').boundingBox();
+        const blip=await page.locator('#radar-blip').boundingBox();
+        assert.ok(Math.hypot(blip.x+blip.width/2-radar.x-radar.width/2,blip.y+blip.height/2-radar.y-radar.height/2)<radar.width*.43,'Contact stays inside circular radar');
+        assert.ok(label && label.x>=radar.x && label.y>=radar.y && label.x+label.width<=radar.x+radar.width && label.y+label.height<=radar.y+radar.height,'Pitch callout fits radar at '+width+'x'+height);
+        if(width===390) await page.screenshot({path:`qa-output/radar-pitch-${offset}.png`});
+      }
+      await page.setViewportSize(original);
+    }
+    await aim(target);
+    await page.keyboard.down('w'); await page.waitForTimeout(300); await page.keyboard.up('w');
+    const moved = await read(), p=moved.navigation.position, t=moved.navigation.enemyPosition;
+    const expected = (moved.steering.y*.312 - Math.atan2(-(t.y-p.y), Math.hypot(t.x-p.x,t.z-p.z)))*180/Math.PI;
+    assert.ok(Math.abs(moved.radarPitchDegrees-expected)<.01,'Pitch uses the current world position and heading');
+    await page.reload(); await page.waitForFunction(() => window.SpacePiratesAmbient);
+    assert.equal(await page.locator('#radar-blip').isVisible(),false,'New search clears the old radar callout');
+  }
+  await checkRadar();
 
   async function checkLayout(label, matrix = true) {
     const original = page.viewportSize();
@@ -420,7 +456,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=hud-2', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=radar-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();

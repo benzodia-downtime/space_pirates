@@ -1,8 +1,8 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=hud-2";
-import { AssaultSequence, ASSAULT_CONFIG, ASSAULT_COPY } from "./assault.js?v=hud-2";
-import { AssaultAudio } from "./assault-audio.js?v=hud-2";
+import { VoyageRenderer } from "./voyage-renderer.js?v=radar-1";
+import { AssaultSequence, ASSAULT_CONFIG, ASSAULT_COPY } from "./assault.js?v=radar-1";
+import { AssaultAudio } from "./assault-audio.js?v=radar-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt } from "./navigation.js?v=hud-2";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=radar-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -21,6 +21,7 @@ export class VoyageScene {
     this.announcement = document.getElementById("voyage-announcement");
     this.radar = document.getElementById("voyage-radar");
     this.radarBlip = document.getElementById("radar-blip");
+    this.radarPitch = document.getElementById("radar-pitch");
     this.boardingPanel = document.getElementById("boarding-panel");
     this.boardingPhaseLabel = document.getElementById("boarding-phase");
     this.boardingObjective = document.getElementById("boarding-objective");
@@ -501,7 +502,8 @@ export class VoyageScene {
     const relativeX = Math.atan2(Math.sin(angle), Math.cos(angle)) / 0.65;
     const relativeY = guidance.y - this.pointer.y * 0.48;
     const error = Math.hypot(relativeX, relativeY);
-    return { guidance, relativeX, relativeY, error, quality: clamp(1 - error / 0.58, 0, 1) };
+    const pitchDegrees = pitchOffsetDegrees(this.getView().pitch, guidance.y * 0.65);
+    return { guidance, relativeX, relativeY, pitchDegrees, error, quality: clamp(1 - error / 0.58, 0, 1) };
   }
 
   handleBoardingAction() {
@@ -708,9 +710,23 @@ export class VoyageScene {
       travel: this.starTravel, assault: this.assault,
     });
     if (this.radar) {
-      this.radar.style.setProperty("--radar-x", `${clamp(50 + actualRelativeX * 64, 12, 88).toFixed(1)}%`);
-      this.radar.style.setProperty("--radar-y", `${clamp(46 + actualRelativeY * 58, 12, 88).toFixed(1)}%`);
-      this.radar.style.setProperty("--radar-opacity", clamp(this.searchProgress * 1.7, 0, 1).toFixed(3));
+      const dx = actualRelativeX * 64, dy = -4 + actualRelativeY * 58;
+      const edgeScale = Math.min(1, 40 / (Math.hypot(dx, dy) || 1));
+      const markerX = 50 + dx * edgeScale, markerY = 50 + dy * edgeScale;
+      this.radar.style.setProperty("--radar-x", `${markerX.toFixed(1)}%`);
+      this.radar.style.setProperty("--radar-y", `${markerY.toFixed(1)}%`);
+      this.radar.style.setProperty("--radar-opacity", Math.max(0.85, clamp(this.searchProgress * 1.7, 0, 1)).toFixed(3));
+      const pitch = Math.round(guidance.pitchDegrees) || 0;
+      const label = pitch > 0 ? `↑ ${pitch}°` : pitch < 0 ? `↓ ${-pitch}°` : "0°";
+      const hasContact = this.searchProgress > 0;
+      if (this.radarBlip) {
+        this.radarBlip.hidden = !hasContact;
+        // Flip the callout inward so even an off-screen contact stays readable at the rim.
+        this.radarBlip.dataset.labelLeft = String(markerX > 50);
+        this.radarBlip.dataset.labelAbove = String(markerY > 60);
+      }
+      if (this.radarPitch && this.radarPitch.textContent !== label) this.radarPitch.textContent = label;
+      this.radar.setAttribute("aria-label", hasContact ? `적함 피치 차이: ${pitch > 0 ? "위로" : pitch < 0 ? "아래로" : "일치"} ${Math.abs(pitch)}도` : "레이더: 감지된 적함 없음");
     }
 
   }
@@ -837,6 +853,7 @@ export class VoyageScene {
       distanceMeters: this.isBoardingActive ? this.assault.distance : null,
       relativeSpeed: this.assault.committed ? this.assault.speed : this.navigation.speed,
       alignment: tracking.quality,
+      radarPitchDegrees: tracking.pitchDegrees,
       steeringLocked: this.assault.committed,
       ramProgress: this.assault.ram,
       chargeProgress: this.assault.charge,

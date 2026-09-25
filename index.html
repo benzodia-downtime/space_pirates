@@ -11,7 +11,7 @@
     />
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./voyage.css?v=hud-2" />
+    <link rel="stylesheet" href="./voyage.css?v=radar-1" />
     <link rel="stylesheet" href="./battle.css?v=loot-1" />
   </head>
   <body>
@@ -78,13 +78,15 @@
             </p>
           </div>
           <div class="hud-instruments h-panel">
-            <div id="voyage-radar" class="voyage-radar" aria-hidden="true">
-              <span class="voyage-radar__ring voyage-radar__ring--inner"></span>
-              <span class="voyage-radar__ring voyage-radar__ring--outer"></span>
-              <span class="voyage-radar__cross"></span>
-              <span class="voyage-radar__sweep"></span>
-              <span id="radar-blip" class="voyage-radar__blip"></span>
-              <span class="voyage-radar__ship"></span>
+            <div id="voyage-radar" class="voyage-radar" role="img" aria-label="레이더: 감지된 적함 없음">
+              <div class="voyage-radar__scope" aria-hidden="true">
+                <span class="voyage-radar__ring voyage-radar__ring--inner"></span>
+                <span class="voyage-radar__ring voyage-radar__ring--outer"></span>
+                <span class="voyage-radar__cross"></span>
+                <span class="voyage-radar__sweep"></span>
+                <span class="voyage-radar__ship"></span>
+              </div>
+              <span id="radar-blip" class="voyage-radar__blip" aria-hidden="true" hidden><span id="radar-pitch" class="voyage-radar__pitch">0°</span></span>
             </div>
             <section id="boarding-panel" class="boarding-panel" aria-label="적함 승선 정보" hidden>
               <header>
@@ -326,6 +328,6 @@
       </footer>
     </section>
 
-    <script type="module" src="./src/main.js?v=hud-2"></script>
+    <script type="module" src="./src/main.js?v=radar-1"></script>
   </body>
 </html>

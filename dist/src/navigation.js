@@ -17,6 +17,11 @@ export function lookAt(from, to) {
   return { yaw: Math.atan2(d.x, -d.z), pitch: Math.atan2(-d.y, Math.hypot(d.x, d.z)) };
 }
 
+// Camera pitch is positive downward. Radar guidance is positive upward.
+export function pitchOffsetDegrees(viewPitch, targetPitch) {
+  return (viewPitch - targetPitch) * 180 / Math.PI;
+}
+
 // Enemy pose never changes while orbiting. Only our cockpit travels around it.
 // No renderer dependency: discovery, occlusion and harpoon hit tests are deterministic.
 export class OrbitNavigation {

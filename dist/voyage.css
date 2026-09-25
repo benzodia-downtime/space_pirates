@@ -55,8 +55,13 @@
 .boarding-panel__progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #386979, #83e6e1); transition: width 180ms linear; }
 .voyage-radar {
   position: relative;
-  width: 72px;
-  height: 72px;
+  width: 96px;
+  height: 96px;
+}
+
+.voyage-radar__scope {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   background: radial-gradient(circle, rgba(24, 88, 100, 0.11), rgba(2, 11, 22, 0.74) 68%);
   border: 1px solid rgba(97, 234, 244, 0.24);
@@ -110,6 +115,15 @@
   transition: opacity 320ms ease;
 }
 
+.voyage-radar__pitch {
+  position: absolute; top: 10px; left: -2px; z-index: 1;
+  padding: 2px 3px; border: 1px solid #874654; border-radius: 3px;
+  background: #160e1b; color: #ffe3e9; font: 600 10px/1.4 ui-monospace, monospace;
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.voyage-radar__blip[data-label-left="true"] .voyage-radar__pitch { left: auto; right: -2px; }
+.voyage-radar__blip[data-label-above="true"] .voyage-radar__pitch { top: auto; bottom: 10px; }
+
 .voyage-radar__ship {
   bottom: 14%;
   left: 50%;
@@ -124,7 +138,7 @@
 
 
 
-.voyage-radar { flex: 0 0 72px; }
+.voyage-radar { flex: 0 0 96px; }
 .boarding-panel {
   width: 360px; min-width: 0; padding: 12px;
   background: rgba(4, 14, 25, .94); border: 1px solid #3d626e; border-radius: 6px;
@@ -460,7 +474,7 @@
   .voyage-ui { --panel-gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
   .hud-brand, .voyage-ui .help-overlay { display: none; }
   .hud-instruments { width: 100%; }
-  .voyage-radar { width: 52px; height: 52px; flex-basis: 52px; }
+  .voyage-radar { width: 96px; height: 96px; flex-basis: 96px; }
   .boarding-panel { width: 100%; padding: 8px; }
   .boarding-panel__objective, .boarding-panel footer, .boarding-panel__progress { display: none; }
   .boarding-panel__metrics { margin-top: 6px; }
@@ -483,7 +497,7 @@
   .cockpit-console { height: 26vh; }
 }
 @media (max-width: 360px) and (orientation: portrait) {
-  .voyage-radar { width: 52px; height: 52px; flex-basis: 52px; }
+  .voyage-radar { width: 96px; height: 96px; flex-basis: 96px; }
   .steering-pad { width: 76px; height: 76px; }
   .thrust-controls { width: 80px; }
 }
