@@ -1,8 +1,8 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=settings-1";
-import { AssaultSequence, ASSAULT_CONFIG, ASSAULT_COPY } from "./assault.js?v=settings-1";
-import { AssaultAudio } from "./assault-audio.js?v=settings-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=hud-2";
+import { AssaultSequence, ASSAULT_CONFIG, ASSAULT_COPY } from "./assault.js?v=hud-2";
+import { AssaultAudio } from "./assault-audio.js?v=hud-2";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt } from "./navigation.js?v=settings-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt } from "./navigation.js?v=hud-2";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -18,11 +18,6 @@ export class VoyageScene {
     this.spaceScene = document.getElementById("space-scene");
     this.battleButton = document.getElementById("battle-start");
     this.battleButtonStatus = this.battleButton?.querySelector("span");
-    this.stateLabel = document.getElementById("voyage-state");
-    this.distanceLabel = document.getElementById("voyage-distance");
-    this.progressBar = document.getElementById("voyage-progress-bar");
-    this.speedLabel = document.getElementById("voyage-speed");
-    this.coordinateLabel = document.getElementById("voyage-coordinate");
     this.announcement = document.getElementById("voyage-announcement");
     this.radar = document.getElementById("voyage-radar");
     this.radarBlip = document.getElementById("radar-blip");
@@ -668,41 +663,10 @@ export class VoyageScene {
   }
 
   updateHud(force = false) {
-    const progressPercent = Math.round((this.isSearching ? this.searchProgress : this.getBoardingProgress()) * 100);
-    const distanceKm = this.navigation.radius / 1000;
-    const bearingDegrees = Math.round(this.getTrackingMetrics().relativeX * 0.65 * 180 / Math.PI);
     this.updateThrustUi();
-    const bearingText = bearingDegrees === 0
-      ? "정면"
-      : bearingDegrees > 0
-        ? `우현 ${bearingDegrees}°`
-        : `좌현 ${Math.abs(bearingDegrees)}°`;
-
-    if (this.mode === "cruise") {
-      if (this.stateLabel) this.stateLabel.textContent = this.navigation.speed ? "수동 항해 중" : "정지 · 입력 대기";
-      if (this.distanceLabel) this.distanceLabel.textContent = "확인된 신호 없음";
-    } else if (this.mode === "signal") {
-      if (this.stateLabel) this.stateLabel.textContent = "희미한 열원 감지";
-      if (this.distanceLabel) this.distanceLabel.textContent = `미확인 신호 · ${bearingText}`;
-    } else if (this.mode === "approach") {
-      if (this.stateLabel) this.stateLabel.textContent = this.navigation.speed ? "미확인 함선 접근" : "미확인 함선 · 정지 중";
-      if (this.distanceLabel) this.distanceLabel.textContent = `${distanceKm.toFixed(1)} km · ${bearingText}`;
-    } else if (this.isBoardingActive) {
-      if (this.stateLabel) this.stateLabel.textContent = ASSAULT_COPY[this.mode][0];
-      if (this.distanceLabel) this.distanceLabel.textContent = this.assault.committed ? ASSAULT_COPY[this.mode][2] : Math.round(this.navigation.radius) + " m 선회 반경 · " + (this.navigation.discovered ? "후방 하강문 식별" : "진입점 미발견");
-    }
-
-    if (this.progressBar) this.progressBar.style.width = `${progressPercent}%`;
-    if (this.speedLabel) {
-      this.speedLabel.textContent = `${(this.assault.committed ? this.assault.speed : this.navigation.speed).toFixed(1)} m/s`;
-    }
-    if (this.coordinateLabel) {
-      const x = Math.round(this.navigation.position.x).toString().padStart(3, "0");
-      const y = Math.round(this.navigation.position.z).toString().padStart(3, "0");
-      this.coordinateLabel.textContent = `X ${x} · Y ${y}`;
-    }
     if (this.isBoardingActive) {
       const a = this.assault;
+      const progressPercent = Math.round(this.getBoardingProgress() * 100);
       if (this.boardingDistanceType) this.boardingDistanceType.textContent = a.breach > 0 ? "BREACH DEPTH" : this.mode === "survey" ? "CENTRE" : "GAP";
       if (this.boardingDistanceLabel) this.boardingDistanceLabel.textContent = a.breach > 0 ? (a.breach * (ASSAULT_CONFIG.contactDistance - ASSAULT_CONFIG.seatedDistance)).toFixed(1) + " m" : this.mode === "survey" ? this.navigation.radius.toFixed(1) + " m" : a.distance.toFixed(a.distance < 100 ? 1 : 0) + " m";
       if (this.relativeSpeedLabel) this.relativeSpeedLabel.textContent = (a.committed ? a.speed : this.navigation.speed).toFixed(1) + " m/s";

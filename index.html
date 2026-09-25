@@ -11,7 +11,7 @@
     />
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./voyage.css?v=settings-1" />
+    <link rel="stylesheet" href="./voyage.css?v=hud-2" />
     <link rel="stylesheet" href="./battle.css?v=loot-1" />
   </head>
   <body>
@@ -78,29 +78,14 @@
             </p>
           </div>
           <div class="hud-instruments h-panel">
-            <section class="voyage-hud" aria-label="장거리 항해 정보">
-              <div class="voyage-readout">
-                <span class="voyage-readout__label"><i aria-hidden="true"></i> LONG RANGE SENSOR</span>
-                <strong id="voyage-state">정지 · 입력 대기</strong>
-                <output id="voyage-distance">확인된 신호 없음</output>
-                <div class="voyage-progress" aria-hidden="true">
-                  <span id="voyage-progress-bar"></span>
-                </div>
-                <p>
-                  <span>SPEED <output id="voyage-speed">0.0 m/s</output></span>
-                  <span id="voyage-coordinate">X 000 · Y 000</span>
-                </p>
-              </div>
-
-              <div id="voyage-radar" class="voyage-radar" aria-hidden="true">
-                <span class="voyage-radar__ring voyage-radar__ring--inner"></span>
-                <span class="voyage-radar__ring voyage-radar__ring--outer"></span>
-                <span class="voyage-radar__cross"></span>
-                <span class="voyage-radar__sweep"></span>
-                <span id="radar-blip" class="voyage-radar__blip"></span>
-                <span class="voyage-radar__ship"></span>
-              </div>
-            </section>
+            <div id="voyage-radar" class="voyage-radar" aria-hidden="true">
+              <span class="voyage-radar__ring voyage-radar__ring--inner"></span>
+              <span class="voyage-radar__ring voyage-radar__ring--outer"></span>
+              <span class="voyage-radar__cross"></span>
+              <span class="voyage-radar__sweep"></span>
+              <span id="radar-blip" class="voyage-radar__blip"></span>
+              <span class="voyage-radar__ship"></span>
+            </div>
             <section id="boarding-panel" class="boarding-panel" aria-label="적함 승선 정보" hidden>
               <header>
                 <span>ORBIT / HARPOON</span>
@@ -341,6 +326,6 @@
       </footer>
     </section>
 
-    <script type="module" src="./src/main.js?v=settings-1"></script>
+    <script type="module" src="./src/main.js?v=hud-2"></script>
   </body>
 </html>

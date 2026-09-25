@@ -104,8 +104,9 @@ try {
       await page.evaluate(() => SpacePiratesAmbient.redraw());
       const problems = await page.evaluate(() => {
         const issues = [];
+        if (document.querySelector('.voyage-readout, #voyage-state, #voyage-distance, #voyage-speed, #voyage-coordinate, #voyage-progress-bar')) issues.push('Removed navigation readout still exists');
         const visible = e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
-        const selectors = ['.hud-brand','.voyage-hud','#boarding-panel','#orbit-controls','#assault-cue','.assault-actions','.flight-controls','#help-overlay','.thrust-controls'];
+        const selectors = ['.hud-brand','#voyage-radar','#boarding-panel','#orbit-controls','#assault-cue','.assault-actions','.flight-controls','#help-overlay','.thrust-controls'];
         const panels = selectors.map(s=>document.querySelector(s)).filter(visible);
         const overlap = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left) > 1 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top) > 1;
         const aim = document.querySelector('.cockpit-reticle').getBoundingClientRect();
@@ -419,7 +420,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=settings-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=hud-2', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();

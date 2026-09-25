@@ -31,7 +31,7 @@ One 3D world unit is one metre (100 Unreal units in crew combat). During explora
 
 Reduced motion removes collision shake, flash, star streaks and debris, but not player-requested orbital navigation. Sound needs a user gesture. Pause, a hidden tab or GPU interruption freezes simulation time. Pointer cancellation/window blur release input without resetting the view. A new search clears the tether, discovery and damage state.
 
-The HUD uses horizontal/vertical flex panels: instruments at the top, actions above the bottom controls, and a clear central view. Short landscape screens place controls side by side; portrait screens stack action panels. Safe-area insets protect controls around notches, and touch targets remain at least 44 px.\n\nMobile rendering caps pixel density and uses shared/instanced geometry. A WebGL 2 browser is required; unsupported/interrupted graphics show a recovery message.
+The cruise status, speed and coordinate readout is omitted; the radar and contextual boarding information remain. The HUD uses horizontal/vertical flex panels: instruments at the top, actions above the bottom controls, and a clear central view. Short landscape screens place controls side by side; portrait screens stack action panels. Safe-area insets protect controls around notches, and touch targets remain at least 44 px.\n\nMobile rendering caps pixel density and uses shared/instanced geometry. A WebGL 2 browser is required; unsupported/interrupted graphics show a recovery message.
 
 Dependencies are pinned in `package-lock.json`. The build copies Three.js and its MIT license into `dist/vendor/`, so the deployed game has no third-party CDN dependency.
 

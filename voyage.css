@@ -51,18 +51,8 @@
 .title-overlay__eyebrow { margin-bottom: 8px; font-size: 9px; letter-spacing: .14em; }
 .title-overlay__subtitle { margin: 8px 0 0; font-size: 9px; }
 .voyage-ui .status-whisper { display: flex; gap: 7px; justify-content: flex-start; font-size: 9px; letter-spacing: .04em; }
-.voyage-hud { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.voyage-readout {
-  min-width: 200px; padding: 12px;
-  background: rgba(4, 14, 25, .9); border: 1px solid #294551; border-radius: 6px;
-}
-.voyage-readout__label { display: flex; gap: 7px; align-items: center; color: #89aab9; font-size: 9px; letter-spacing: .08em; }
-.voyage-readout__label i { width: 5px; height: 5px; background: #79dedf; border-radius: 50%; }
-.voyage-readout > strong { display: block; margin-top: 7px; font-size: 14px; color: #ecf9ff; }
-.voyage-readout > output { display: block; margin-top: 6px; font-size: 11px; color: #a6becb; }
-.voyage-readout p { display: flex; justify-content: space-between; gap: 12px; margin: 8px 0 0; font-size: 9px; color: #90afbe; }
-.voyage-progress, .boarding-panel__progress { height: 3px; margin: 10px 0 0; background: #1e3742; overflow: hidden; }
-.voyage-progress span, .boarding-panel__progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #386979, #83e6e1); transition: width 180ms linear; }
+.boarding-panel__progress { height: 3px; margin: 10px 0 0; background: #1e3742; overflow: hidden; }
+.boarding-panel__progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #386979, #83e6e1); transition: width 180ms linear; }
 .voyage-radar {
   position: relative;
   width: 72px;
@@ -439,17 +429,13 @@
 .impact-flash { position: absolute; z-index: 27; inset: 0; pointer-events: none; opacity: var(--impact-flash, 0); background: radial-gradient(ellipse at 50% 40%, #ffe6b0, #d7772b 48%, transparent 78%); }
 @keyframes radar-sweep { to { transform: rotate(360deg); } }
 @media (max-width: 1100px) {
-  .space-scene[data-boarding-state] .voyage-hud { display: none; }
+  .space-scene[data-boarding-state] .voyage-radar { display: none; }
   .voyage-ui .help-overlay { display: none; }
 }
 @media (max-width: 720px) {
   .voyage-ui { --panel-gap: 8px; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
   .hud-brand { display: none; }
-  .hud-instruments, .voyage-hud { width: 100%; }
-  .voyage-readout { flex: 1; min-width: 0; padding: 10px; }
-  .voyage-readout > strong { font-size: 12px; }
-  .voyage-readout__label { font-size: 8px; }
-  .voyage-readout p { font-size: 8px; }
+  .hud-instruments { width: 100%; }
   .boarding-panel { width: 100%; padding: 10px; }
   .boarding-panel header output { font-size: 11px; }
   .boarding-panel__metrics strong { font-size: 10px; }
@@ -473,11 +459,7 @@
 @media (max-height: 560px) and (orientation: landscape) {
   .voyage-ui { --panel-gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
   .hud-brand, .voyage-ui .help-overlay { display: none; }
-  .hud-instruments, .voyage-hud { width: 100%; }
-  .voyage-readout { flex: 1; min-width: 0; padding: 8px; }
-  .voyage-readout p, .voyage-progress, .voyage-readout__label { display: none; }
-  .voyage-readout > strong { margin-top: 0; font-size: 12px; }
-  .voyage-readout > output { font-size: 10px; }
+  .hud-instruments { width: 100%; }
   .voyage-radar { width: 52px; height: 52px; flex-basis: 52px; }
   .boarding-panel { width: 100%; padding: 8px; }
   .boarding-panel__objective, .boarding-panel footer, .boarding-panel__progress { display: none; }
@@ -510,7 +492,7 @@
   .impact-flash { display: none; }
 }
 @media (prefers-contrast: more) {
-  .voyage-readout, .boarding-panel, .orbit-controls, :is(.voyage-ui, .settings-dialog) button { background-color: #020711; border-color: #dffcff; }
+  .boarding-panel, .orbit-controls, :is(.voyage-ui, .settings-dialog) button { background-color: #020711; border-color: #dffcff; }
 }
 
 /* Native modal supplies focus trapping, an inert background and Escape dismissal. */
