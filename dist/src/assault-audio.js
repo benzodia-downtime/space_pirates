@@ -32,6 +32,11 @@ export class AssaultAudio {
   }
 
   play(stage) {
+    if (stage === "enemy-charge") this.tone(160, 470, 1.4, 0.035, "triangle");
+    if (stage === "enemy-lock") this.tone(920, 600, 0.25, 0.06, "square");
+    if (stage === "enemy-fire") this.tone(180, 38, 0.45, 0.11, "sawtooth");
+    if (stage === "enemy-hit") { this.tone(95, 22, .55, .15); this.tone(620, 90, .15, .04, "triangle"); }
+    if (stage === "defeated") this.tone(180, 35, 1, .08, "triangle");
     if (stage === "harpoon") this.tone(640, 90, 0.45, 0.09, "triangle");
     if (stage === "tethered") this.tone(180, 55, 0.22, 0.08);
     if (stage === "ram-deploy") this.tone(210, 75, 0.8, 0.07, "triangle");

@@ -36,7 +36,7 @@ export function pitchOffsetDegrees(viewPitch, targetPitch) {
   return (viewPitch - targetPitch) * 180 / Math.PI;
 }
 
-// Enemy pose never changes while orbiting. Only our cockpit travels around it.
+// Orbit moves the cockpit, independently of the enemy's deliberate defensive yaw.
 // No renderer dependency: discovery, occlusion and harpoon hit tests are deterministic.
 export class OrbitNavigation {
   constructor() { this.reset(); }
@@ -47,7 +47,7 @@ export class OrbitNavigation {
     this.orbitNormal = null;
     this.enemyYaw = 0; this.enemyPosition = { x: 0, y: 0, z: 0 };
     this.position = { x: 0, y: 0, z: 6 };
-    this.discovered = false; this.observeTime = 0; this.anchor = null; this.harpoonTarget = null; this.pullVector = null;
+    this.discovered = false; this.observeTime = 0; this.anchor = null; this.harpoonTarget = null; this.harpoonLocalTarget = null; this.pullVector = null;
     this.solution = { visible: false, canFire: false, distance: 0, incidence: 0, aimError: Math.PI };
   }
   begin(bearing, { position = this.position, radius = ORBIT.radius, active = true } = {}) {
@@ -63,6 +63,14 @@ export class OrbitNavigation {
     return { x: r.x + this.enemyPosition.x, y: r.y + this.enemyPosition.y, z: r.z + this.enemyPosition.z };
   }
   get door() { return this.world({ x: 0, y: 0, z: ORBIT.sternZ }); }
+  setEnemyYaw(yaw) {
+    if(this.anchor) return; // A seated tether arrests the defender's manoeuvre.
+    this.enemyYaw=yaw;
+    const local=rotate(subtract(this.position,this.enemyPosition),-yaw);
+    this.angle=Math.atan2(local.x,local.z);
+    this.elevation=Math.atan2(local.y,Math.hypot(local.x,local.z));
+    if(this.harpoonLocalTarget) this.harpoonTarget=this.world(this.harpoonLocalTarget);
+  }
   get target() { return this.anchor || this.harpoonTarget || (this.discovered && this.solution.visible ? this.door : this.enemyPosition); }
   updatePosition() {
     const flat = Math.cos(this.elevation) * this.radius;
@@ -162,12 +170,13 @@ export class OrbitNavigation {
     if (!s.canFire) return null;
     // Reserve the ray-hit point, but continue the current orbit during projectile flight.
     this.harpoonTarget = { ...s.hit };
+    this.harpoonLocalTarget = rotate(subtract(s.hit,this.enemyPosition),-this.enemyYaw);
     this.solution.canFire = false;
     return { distance: length(subtract(this.position, this.harpoonTarget)) - 14, bearing: lookAt(this.position, this.harpoonTarget, view) };
   }
   attach(view) {
     if (this.anchor || (!this.harpoonTarget && !this.launch(view))) return null;
-    this.anchor = this.harpoonTarget; this.harpoonTarget = null;
+    this.anchor = this.harpoonTarget; this.harpoonTarget = null; this.harpoonLocalTarget = null;
     this.stopOrbit();
     // The ship can move during flight. Lock the cable from the impact-time position.
     const v = subtract(this.position, this.anchor); const distance = length(v);

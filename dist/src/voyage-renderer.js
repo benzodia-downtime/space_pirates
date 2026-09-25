@@ -3,7 +3,7 @@ import * as THREE from "../vendor/three.module.js";
 const smoothstep = THREE.MathUtils.smoothstep;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
-// One unit is one metre. The fixed enemy hull, orbiting cockpit, harpoon and
+// One unit is one metre. The defending hull, orbiting cockpit, harpoon and
 // destructible stern ramp all share the same world coordinates.
 export class VoyageRenderer {
   constructor(canvas) {
@@ -64,6 +64,7 @@ export class VoyageRenderer {
     this.scene.add(this.enemy);
     this.makeEnemy();
     this.makePlayer();
+    this.makeDefense();
     this.makeRig();
     this.makeRam();
     this.makeStars();
@@ -241,6 +242,69 @@ export class VoyageRenderer {
     this.stern.add(this.impactLight);
   }
 
+  makeDefense() {
+    const m=this.materials;
+    this.cannon=new THREE.Group(); this.cannon.position.set(0,2,33); this.enemy.add(this.cannon);
+    this.box(this.cannon,m.dark,[0,0,0],[5,3,2]);
+    this.chargeMaterial=this.keep(new THREE.MeshBasicMaterial({color:0xffae48}));
+    for(const x of [-1.4,1.4]) {
+      this.box(this.cannon,m.hull,[x,0,2.4],[1.3,1.3,4.8]);
+      this.box(this.cannon,m.trim,[x,0,4.9],[1.55,1.55,.35]);
+      this.box(this.cannon,this.chargeMaterial,[x,0,5.15],[.95,.95,.2]);
+    }
+    this.cannonLight=new THREE.PointLight(0xff953d,0,55,2);
+    this.cannonLight.position.set(0,0,6); this.cannon.add(this.cannonLight);
+    const glowCanvas=document.createElement('canvas');glowCanvas.width=glowCanvas.height=64;
+    const glowContext=glowCanvas.getContext('2d'),gradient=glowContext.createRadialGradient(32,32,1,32,32,32);
+    gradient.addColorStop(0,'rgba(255,255,255,1)');gradient.addColorStop(.2,'rgba(255,255,255,.85)');gradient.addColorStop(1,'rgba(255,255,255,0)');
+    glowContext.fillStyle=gradient;glowContext.fillRect(0,0,64,64);
+    const glowTexture=this.keep(new THREE.CanvasTexture(glowCanvas));
+    this.gunGlowMaterial=this.keep(new THREE.SpriteMaterial({map:glowTexture,color:0xffa33a,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+    this.gunGlow=new THREE.Sprite(this.gunGlowMaterial);this.gunGlow.position.set(0,0,5.5);this.cannon.add(this.gunGlow);
+    this.aimMaterial=this.keep(new THREE.MeshBasicMaterial({color:0xff9c3b,transparent:true,opacity:.65,depthWrite:false}));
+    this.aimBeam=this.mesh(this.scene,this.cylinderGeometry,this.aimMaterial);
+    const boltMaterial=this.keep(new THREE.MeshBasicMaterial({color:0xffdb98}));
+    this.enemyBolts=Array.from({length:4},()=>this.mesh(this.scene,this.cylinderGeometry,boltMaterial));
+    this.turnJets=[];
+    const jetGeometry=this.keep(new THREE.ConeGeometry(.8,4,6));
+    for(const side of [-1,1]) for(const z of [-23,23]) {
+      const jet=this.mesh(this.enemy,jetGeometry,m.cyan,[side*17.8,1,z]);
+      jet.rotation.z=-side*Math.PI/2; jet.userData.torque=Math.sign(side*z); this.turnJets.push(jet);
+    }
+    // Four physical lamps on the foredeck show hull condition without another HUD panel.
+    this.box(this.player,m.dark,[0,-2.02,-13.3],[3.4,.2,.7]);
+    this.hullLamps=Array.from({length:4},(_,i)=>this.box(this.player,m.cyan,[(i-1.5)*.75,-1.87,-13.2],[.5,.1,.45]));
+  }
+
+  drawDefense(defense, nav, motion) {
+    this.enemy.updateWorldMatrix(true,false);
+    if(defense?.aimPoint) this.cannon.lookAt(new THREE.Vector3(defense.aimPoint.x,defense.aimPoint.y,defense.aimPoint.z));
+    else this.cannon.rotation.set(0,0,0);
+    const charge=defense?.charge || 0, locked=defense?.gunPhase==='locked';
+    this.chargeMaterial.color.setHex(locked?0xff4830:charge>0?0xffae48:0x50331e);
+    this.cannonLight.color.setHex(locked?0xff4830:0xffae48);
+    const muzzle=defense?.muzzleAge>=0 && motion ? Math.exp(-defense.muzzleAge*14)*80 : 0;
+    this.cannonLight.intensity=charge*35+muzzle;
+    this.gunGlow.visible=charge>0 || muzzle>.2;
+    this.gunGlowMaterial.color.setHex(locked?0xff4e25:0xffb545);
+    this.gunGlow.scale.setScalar((locked?10:4+charge*5)+muzzle*.08);
+    this.aimBeam.visible=Boolean(defense?.aimPoint && ['aim','locked'].includes(defense.gunPhase));
+    if(this.aimBeam.visible) {
+      const origin=defense.muzzle(nav), target=defense.aimPoint;
+      this.aimMaterial.color.setHex(locked?0xff4932:0xffbb54);
+      this.barBetween(this.aimBeam,new THREE.Vector3(origin.x,origin.y,origin.z),new THREE.Vector3(target.x,target.y,target.z),locked?.12:.055,true);
+    }
+    this.enemyBolts.forEach((mesh,i)=>{
+      const bolt=defense?.bolts[i]; mesh.visible=Boolean(bolt);
+      if(!bolt) return;
+      const head=new THREE.Vector3(bolt.position.x,bolt.position.y,bolt.position.z);
+      const tail=head.clone().addScaledVector(new THREE.Vector3(bolt.direction.x,bolt.direction.y,bolt.direction.z),-11);
+      this.barBetween(mesh,tail,head,.45,true);
+    });
+    this.turnJets.forEach(jet=>{jet.visible=Boolean(defense && Math.abs(defense.turning)>.001 && jet.userData.torque===Math.sign(defense.turning));});
+    this.hullLamps.forEach((lamp,i)=>{lamp.material=(defense?.hull??100)>i*25?this.materials.cyan:this.materials.red;});
+  }
+
   makePlayer() {
     const m = this.materials;
     this.player = new THREE.Group();
@@ -413,6 +477,7 @@ export class VoyageRenderer {
     // A placed hull exists in the world regardless of sensor identification.
     // Camera frustum/distance determine what can be seen, never a progress threshold.
     this.enemy.visible = Boolean(nav?.placed);
+    this.drawDefense(frame.defense, nav, motion);
     const opening = smoothstep(a.pressure, 0.7, 1);
     this.doors.forEach((door,i) => { door.position.x = (i === 0 ? -1 : 1) * (1.72 + opening*3.5); });
     this.hatchLamp.material.color.setHex(a.pressure >= 1 ? 0x71f2c3 : 0xff9260);
@@ -511,6 +576,8 @@ export class VoyageRenderer {
       hatch: this.hatch.getWorldPosition(new THREE.Vector3()).toArray(),
       enemyPosition: this.enemy.position.toArray(), enemyRotation: this.enemy.rotation.toArray().slice(0,3),
       harpoonVisible: this.harpoonCable.visible, harpoonTip: this.harpoonBolt.position.toArray(),
+      enemyAimVisible: this.aimBeam.visible, enemyBoltsVisible: this.enemyBolts.filter(b=>b.visible).length,
+      turretChargeColor: this.chargeMaterial.color.getHex(),
       bowFacing: new THREE.Vector3(0,0,1).applyQuaternion(this.enemy.quaternion).toArray(),
       passageEnd: this.passageEnd.getWorldPosition(new THREE.Vector3()).toArray(),
       armourBreached: this.lastFrame.assault.breach >= 1, ramVisible: this.ramHead.visible,

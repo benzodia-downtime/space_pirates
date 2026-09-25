@@ -395,6 +395,7 @@
 .renderer-error > div { max-width: 400px; line-height: 1.7; }
 .renderer-error a { display: inline-block; margin-top: 16px; padding: 10px 16px; color: #8febff; border: 1px solid currentColor; }
 .impact-flash { position: absolute; z-index: 27; inset: 0; pointer-events: none; opacity: var(--impact-flash, 0); background: radial-gradient(ellipse at 50% 40%, #ffe6b0, #d7772b 48%, transparent 78%); }
+.damage-vignette { position: absolute; z-index: 26; inset: 0; pointer-events: none; opacity: var(--damage-opacity, 0); background: radial-gradient(ellipse at center, transparent 35%, #a02315 100%); }
 @keyframes radar-sweep { to { transform: rotate(360deg); } }
 @media (max-width: 720px) and (orientation: portrait) {
   .voyage-ui { --panel-gap: 8px; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }

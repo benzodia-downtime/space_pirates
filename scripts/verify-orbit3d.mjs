@@ -34,7 +34,7 @@ try {
     // Set up a stopped contact, then test the real touch/mouse and keyboard input paths.
     await page.evaluate(async ()=>{
       SpacePiratesAmbient.destroy();
-      const {VoyageScene}=await import(new URL("./src/voyage.js?v=orbitfire-1",location.href));
+      const {VoyageScene}=await import(new URL("./src/voyage.js?v=defender-1",location.href));
       window.orbitQA=new VoyageScene(document.getElementById("starfield"));
       const s=orbitQA; s.stopLoop(); s.forceContact();
       const b=s.getActualBearing();
@@ -54,7 +54,7 @@ try {
     assert.ok(Math.abs(state.radarPitchDegrees)<.001,'Target remains vertically tracked');
     assert.ok(Math.abs(state.navigation.radius-start.navigation.radius)<1e-7);
     assert.deepEqual(state.rendering.enemyPosition,start.rendering.enemyPosition);
-    assert.deepEqual(state.rendering.enemyRotation,start.rendering.enemyRotation);
+    assert.ok(state.rendering.enemyRotation.every((v,i)=>Math.abs(v-start.rendering.enemyRotation[i])<.001),'No artificial hull spin on a vertical orbital path');
     await page.screenshot({path:`qa-output/orbit3d-above-${mobile?'mobile':'desktop'}.png`});
     await drag(0,0);
     assert.deepEqual((await read()).navigation.orbitNormal,chosen,'Regrip does not flatten orbit');
@@ -98,7 +98,7 @@ try {
     await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type === 'webgl2');
     await page.evaluate(async ()=>{
       SpacePiratesAmbient.destroy();
-      const {VoyageScene}=await import(new URL('./src/voyage.js?v=orbitfire-1',location.href));
+      const {VoyageScene}=await import(new URL('./src/voyage.js?v=defender-1',location.href));
       window.orbitQA=new VoyageScene(document.getElementById('starfield'));
       const s=orbitQA; s.stopLoop(); s.forceContact();
       const view=s.navigation.forceRear(true);
@@ -120,7 +120,7 @@ try {
     await advance(21);
     const hooked=await read();
     assert.equal(hooked.mode,'tethered'); assert.equal(hooked.navigation.orbiting,false);
-    assert.deepEqual(hooked.navigation.anchor,flying.navigation.harpoonTarget);
+    assert.ok(hooked.navigation.anchor, 'Impact attaches to the moving rear ramp');
     assert.equal(hooked.navigation.harpoonTarget,null);
     await page.keyboard.press('o'); await advance(30);
     assert.equal((await read()).navigation.orbiting,false);

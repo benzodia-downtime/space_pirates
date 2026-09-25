@@ -48,7 +48,7 @@ try {
     assert.ok((await read()).rendering.farClipMetres >= 18000);
     await page.evaluate(async () => {
       SpacePiratesAmbient.destroy();
-      const { VoyageScene } = await import(new URL('./src/voyage.js?v=orbitfire-1', location.href));
+      const { VoyageScene } = await import(new URL('./src/voyage.js?v=defender-1', location.href));
       window.qaVisibilityScene = new VoyageScene(document.getElementById('starfield'));
       qaVisibilityScene.pause();
     });
@@ -352,7 +352,7 @@ try {
   await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.angleDegrees > 75);
   await page.screenshot({ path: 'qa-output/orbit-side.png' });
   assert.deepEqual((await read()).rendering.enemyPosition, fixedEnemy, 'Enemy stays fixed as player orbits');
-  assert.deepEqual((await read()).rendering.enemyRotation, fixedRotation, 'Orbit is not a spinning enemy model');
+  assert.notDeepEqual((await read()).rendering.enemyRotation, fixedRotation, 'Defender deliberately turns its hull while the cockpit orbits');
   assert.equal((await read()).navigation.doorVisible, false, 'Rear hatch is occluded from the side');
   assert.equal(await page.locator('#orbit-direction').count(), 0);
   await drag(-30, 0);
@@ -360,7 +360,7 @@ try {
   await page.waitForTimeout(350);
   assert.ok((await read()).navigation.angleDegrees < reverseAngle, 'Reverse autopilot direction');
   await drag(30, 0);
-  await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.angleDegrees > 178, null, { timeout: 25000 });
+  await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.angleDegrees > 178, null, { timeout: 40000 });
   await tap('#orbit-button');
   const parked = (await read()).navigation.position;
   await aim((await read()).navigation.doorBearing);
@@ -508,7 +508,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=orbitfire-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=defender-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();

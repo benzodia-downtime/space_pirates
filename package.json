@@ -7,8 +7,8 @@
   "scripts": {
     "start": "node server.mjs",
     "build": "node scripts/build-static.mjs",
-    "check": "node --check server.mjs && node --check scripts/build-static.mjs && node --check src/voyage.js && node --check src/voyage-renderer.js && node --check src/main.js && node --check src/assault.js && node --check src/assault-audio.js && node --check src/navigation.js",
-    "test": "npm run build && npm run check && node --test tests/assault.test.mjs tests/navigation.test.mjs",
+    "check": "node --check server.mjs && node --check scripts/build-static.mjs && node --check src/voyage.js && node --check src/voyage-renderer.js && node --check src/main.js && node --check src/assault.js && node --check src/assault-audio.js && node --check src/navigation.js && node --check src/enemy-defense.js",
+    "test": "npm run build && npm run check && node --test tests/assault.test.mjs tests/navigation.test.mjs tests/enemy-defense.test.mjs",
     "test:e2e": "node scripts/verify-3d.mjs"
   },
   "engines": {

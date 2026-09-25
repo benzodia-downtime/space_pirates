@@ -12,6 +12,7 @@ const staticFiles = [
   [join("src", "main.js"), join("src", "main.js")],
   [join("src", "voyage.js"), join("src", "voyage.js")],
   [join("src", "navigation.js"), join("src", "navigation.js")],
+  [join("src", "enemy-defense.js"), join("src", "enemy-defense.js")],
   [join("src", "assault.js"), join("src", "assault.js")],
   [join("src", "assault-audio.js"), join("src", "assault-audio.js")],
   [join("src", "voyage-renderer.js"), join("src", "voyage-renderer.js")],
