@@ -77,7 +77,7 @@ try {
     assert.ok((await read()).rendering.farClipMetres >= 18000);
     await page.evaluate(async () => {
       SpacePiratesAmbient.destroy();
-      const { VoyageScene } = await import(new URL('./src/voyage.js?v=aftgun-1', location.href));
+      const { VoyageScene } = await import(new URL('./src/voyage.js?v=enemyorbit-1', location.href));
       window.qaVisibilityScene = new VoyageScene(document.getElementById('starfield'));
       qaVisibilityScene.pause();
     });
@@ -385,7 +385,7 @@ try {
   await tap('#orbit-button');
   await orbitTo(75,110);
   await page.screenshot({ path: 'qa-output/orbit-side.png' });
-  assert.deepEqual((await read()).rendering.enemyPosition, fixedEnemy, 'Enemy stays fixed as player orbits');
+  assert.notDeepEqual((await read()).rendering.enemyPosition, fixedEnemy, 'Enemy also orbits the player');
   assert.ok((await read()).enemyDefense.shots > initialShots, 'Defender remains active while the cockpit orbits');
   // Hull yaw can legitimately stay fixed during the initial committed turn/hold and reload windows.
   // Deterministic turning and 360-degree firing are covered in the defence suite.
@@ -450,6 +450,7 @@ try {
   assert.deepEqual((await read()).navigation.position, hooked.navigation.position);
   await page.screenshot({ path: 'qa-output/harpoon-locked.png' });
   await checkLayout('tethered');
+  await aim((await read()).navigation.doorBearing); // Correct for the hull's movement during harpoon flight.
   if (mobile) await tap('#boarding-action');
   else await page.keyboard.press('f'); // Contextual action, independent of prior button focus.
   let start = Date.now();
@@ -554,7 +555,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=aftgun-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=enemyorbit-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();

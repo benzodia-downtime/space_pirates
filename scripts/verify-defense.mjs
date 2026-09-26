@@ -18,7 +18,7 @@ try {
       await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type==='webgl2');
       await page.evaluate(async rear=>{
         SpacePiratesAmbient.destroy();
-        const {VoyageScene}=await import(new URL('./src/voyage.js?v=aftgun-1',location.href));
+        const {VoyageScene}=await import(new URL('./src/voyage.js?v=enemyorbit-1',location.href));
         window.defenseQA=new VoyageScene(document.querySelector('#starfield'));
         const s=defenseQA;s.stopLoop();s.forceContact();
         const view=rear?s.navigation.forceRear(true):s.getView();
@@ -27,6 +27,11 @@ try {
       },rear);
     }
     const step=frames=>page.evaluate(n=>{for(let i=0;i<n;i++)defenseQA.update(.02);defenseQA.renderStill();},frames);
+    const aimDoor=()=>page.evaluate(()=>{
+      const s=defenseQA,p=s.navigation.position,t=s.navigation.door,dx=t.x-p.x,dy=t.y-p.y,dz=t.z-p.z;
+      s.pointer={x:Math.atan2(dx,-dz)/.442,y:Math.atan2(-dy,Math.hypot(dx,dz))/.312};s.pointerTarget={...s.pointer};
+      s.navigation.inspect(s.getView(),.5);s.renderStill();
+    });
     async function drag(dx,dy,frames=Math.round(Math.hypot(dx,dy)*.18/8/.02),selector='#steering-pad') {
       const box=await page.locator(selector).boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
       if(mobile) {
@@ -41,6 +46,7 @@ try {
     async function latch() {
       await fresh(true);assert.equal((await read()).navigation.canHarpoon,true);
       await tap('#boarding-action');await step(40);assert.equal((await read()).mode,'tethered');
+      await aimDoor();
     }
     async function layout(stage) {
       const original=page.viewportSize();
@@ -77,6 +83,18 @@ try {
     assert.ok((await read()).navigation.radius>430,'Detects at 440m rather than the old 220m');
     await until('locked');await step(0);await page.screenshot({path:`qa-output/range-lock-${mobile?'mobile':'desktop'}.png`});
     await step(180);assert.equal((await read()).enemyDefense.hull,75,'Distant fire actually reaches the player');
+    await fresh();await page.evaluate(()=>{
+      const s=defenseQA;s.navigation.radius=1200;s.navigation.updatePosition();s.enemyDefense.reset();
+    });
+    await until('locked');await step(340);
+    assert.equal((await read()).enemyDefense.hull,75,'Rounds still reach the player at the doubled 1200m range');
+    await fresh();
+    const orbitStart=await read();await step(80);let moving=await read();
+    assert.notDeepEqual(moving.navigation.enemyPosition,orbitStart.navigation.enemyPosition);
+    assert.deepEqual(moving.navigation.position,orbitStart.navigation.position);
+    assert.deepEqual(moving.steering,orbitStart.steering,'Enemy movement cannot drag the manual camera');
+    assert.ok(Math.abs(moving.navigation.radius-orbitStart.navigation.radius)<1e-8);
+    assert.deepEqual(moving.rendering.enemyPosition,Object.values(moving.navigation.enemyPosition));
     await fresh();
     await until('aim');await step(45);
     assert.equal((await read()).rendering.enemyAimVisible,true);
@@ -136,6 +154,19 @@ try {
     assert.equal((await read()).navigation.correction.y,0,'No vertical alignment movement');
     const held=(await read()).navigation.position;await step(10);assert.deepEqual((await read()).navigation.position,held);
 
+    for(const phase of ['aim','locked']) {
+      await fresh(true);await until(phase);await aimDoor();
+      assert.equal((await read()).navigation.canHarpoon,true);
+      await tap('#boarding-action');await step(36);
+      const attached=await read();assert.equal(attached.mode,'tethered');
+      assert.equal(attached.enemyDefense.finishingAttack,true);
+      assert.equal(attached.rendering.enemyAimVisible,true);
+      await step(180);const finished=await read();
+      assert.equal(finished.enemyDefense.shots,1);assert.equal(finished.enemyDefense.hull,75);
+      assert.deepEqual(finished.navigation.enemyPosition,attached.navigation.enemyPosition);
+      await step(600);assert.equal((await read()).enemyDefense.shots,1,'No second attack after the queued volley');
+    }
+
     await latch();await tap('#boarding-action');await step(80);
     assert.equal((await read()).mode,'charge');assert.equal((await read()).steeringLocked,false);
     await drag(18,0);await step(92);
@@ -182,7 +213,7 @@ try {
     assert.equal(reset.navigation.radius,440);assert.equal(reset.enemyDefense.shots,0);
     assert.equal(await page.locator('#boarding-panel, #assault-cue, #orbit-direction').count(),0);
     assert.deepEqual(errors,[]);
-    console.log(`Defense ${mobile?'mobile':'desktop'} PASS: visible 360-degree roof turret, side/rear/above hits, focused/fan telegraphs, immediate tether ceasefire, ram recovery/retry, pause, compact HUD`);
+    console.log(`Defense ${mobile?'mobile':'desktop'} PASS: moving enemy orbit, three turrets, focused/fan telegraphs, queued tether counterfire, ram recovery/retry, pause, compact HUD`);
     await page.close();
   }
 } finally {await browser.close();}

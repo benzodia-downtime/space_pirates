@@ -18,17 +18,31 @@ try {
     async function fresh() {
       await page.goto(url);await page.waitForFunction(()=>SpacePiratesAmbient?.getState().rendering.type==='webgl2');
       await page.evaluate(async()=>{
-        SpacePiratesAmbient.destroy();const {VoyageScene}=await import(new URL('./src/voyage.js?v=aftgun-1',location.href));
+        SpacePiratesAmbient.destroy();const {VoyageScene}=await import(new URL('./src/voyage.js?v=enemyorbit-1',location.href));
         window.siegeQA=new VoyageScene(document.querySelector('#starfield'));
         siegeQA.stopLoop();siegeQA.forceContact();siegeQA.navigation.forceRear(true,false);
       });await aim();
     }
     const tap=async selector=>{if(mobile)await page.locator(selector).tap();else await page.locator(selector).click();};
+    // Follow the moving stern with actual lateral input and refreshed camera aim.
+    // Only the initial pose is a fixture: armor damage and every shot remain physical.
+    async function followRear(frames) {
+      for(let i=0;i<frames;i+=5) {
+        await aim();
+        const angle=(await read()).navigation.angleDegrees;
+        const error=((angle-180+540)%360)-180;
+        const key=error>2?'a':error<-2?'d':null;
+        if(key)await page.keyboard.down(key);
+        await step(Math.min(5,frames-i));
+        if(key)await page.keyboard.up(key);
+      }
+      await aim();
+    }
     async function hold(frames) {
-      if(!mobile) {await page.keyboard.down('r');await step(frames);await page.keyboard.up('r');return;}
+      if(!mobile) {await page.keyboard.down('r');await followRear(frames);await page.keyboard.up('r');return;}
       const cdp=await page.context().newCDPSession(page),box=await page.locator('#cannon-button').boundingBox();
       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x:box.x+box.width/2,y:box.y+box.height/2}]});
-      await step(frames);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();
+      await followRear(frames);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();
     }
     async function layout(stage) {
       const original=page.viewportSize();
@@ -56,19 +70,20 @@ try {
     assert.equal(state.navigation.canHarpoon,false);assert.match(await page.locator('#cannon-button').innerText(),/장전/);
     await page.screenshot({path:`qa-output/siege-damaged-${mobile?'mobile':'desktop'}.png`});
     // Reverse and release during reload. Damage survives this real movement, not a reset fixture.
-    await page.keyboard.down('s');await step(30);await page.keyboard.up('s');await step(110);await aim();
+    await page.keyboard.down('s');await followRear(30);await page.keyboard.up('s');await followRear(110);
     assert.equal((await read()).navigation.armorHealth,60);assert.equal((await read()).cannon.shots,3);
     await hold(95);state=await read();
     assert.equal(state.cannon.shots,6);assert.equal(state.navigation.armorHealth,0);assert.equal(state.cannon.armorHits,6);
     assert.ok(state.enemyDefense.shots>0,'Enemy continues shooting until harpoon impact');assert.notEqual(state.enemyDefense.phase,'tethered');
     assert.equal(state.rendering.armourBreached,false,'Inner ramp still awaits the ram');
-    await step(90);await aim();state=await read();
+    await followRear(90);state=await read();
     assert.equal(state.rendering.rearArmorVisible,false);assert.equal(state.rendering.anchorFrameVisible,true);assert.equal(state.navigation.canHarpoon,true);
     await layout('exposed');await page.screenshot({path:`qa-output/siege-exposed-${mobile?'mobile':'desktop'}.png`});
     await tap('#boarding-action');await step(40);state=await read();assert.equal(state.mode,'tethered');
-    assert.equal(state.enemyDefense.phase,'tethered');assert.equal(state.rendering.enemyBoltsVisible,0);assert.equal(state.shooting,false);
+    assert.equal(state.enemyDefense.phase,'tethered');assert.equal(state.shooting,false);
     assert.equal(await page.locator('#cannon-button').isDisabled(),true);
-    const enemyShots=state.enemyDefense.shots;await step(150);assert.equal((await read()).enemyDefense.shots,enemyShots);
+    const enemyShots=state.enemyDefense.shots+Number(state.enemyDefense.finishingAttack);await step(180);
+    assert.equal((await read()).enemyDefense.shots,enemyShots);await aim();
     await tap('#boarding-action');await step(540);state=await read();assert.equal(state.mode,'ready');assert.equal(state.rendering.armourBreached,true);
     await layout('board-ready');await page.screenshot({path:`qa-output/siege-boarded-${mobile?'mobile':'desktop'}.png`});
 
@@ -108,7 +123,7 @@ try {
     await tap('#settings-close');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     await page.evaluate(()=>siegeQA.stopLoop());await step(60);assert.equal((await read()).cannon.shots,paused.cannon.shots);
     await page.evaluate(()=>siegeQA.startNewSearch());state=await read();assert.equal(state.navigation.armorHealth,120);assert.equal(state.cannon.shots,0);assert.equal(state.cannon.rounds,3);
-    await page.emulateMedia({reducedMotion:'reduce'});await fresh();await hold(85);await step(140);await aim();await hold(95);await step(1);
+    await page.emulateMedia({reducedMotion:'reduce'});await fresh();await hold(85);await followRear(140);await hold(95);await step(1);
     state=await read();assert.equal(state.navigation.armorHealth,0);assert.equal(state.rendering.rearArmorVisible,false);
     assert.equal(state.rendering.anchorFrameVisible,true);assert.deepEqual(errors,[]);
     console.log(`Siege ${mobile?'mobile':'desktop'} PASS: real fire/reload, six hits, persistent armor, visible break, harpoon gate/ceasefire, ram, inputs/pause/reset and seven layouts`);

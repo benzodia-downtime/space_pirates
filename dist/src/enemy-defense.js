@@ -6,9 +6,10 @@ const dot = (a,b) => a.x*b.x+a.y*b.y+a.z*b.z;
 
 export const DEFENSE = Object.freeze({
   turnRate: .04, turnSeconds: 4, holdSeconds: 6,
-  range: 600, coneYaw: .7, conePitch: .5,
+  orbitRate: .035, orbitSpeed: 12,
+  range: 1200, coneYaw: .7, conePitch: .5,
   aimSeconds: 1.8, lockSeconds: 1.2, reloadSeconds: 3.5,
-  boltSpeed: 220, boltLife: 3, hitRadius: 6, hull: 100, damage: 25,
+  boltSpeed: 220, boltLife: 6, hitRadius: 6, hull: 100, damage: 25,
   fanStep: .1, fanCount: 9,
 });
 
@@ -55,7 +56,7 @@ export class EnemyDefense {
   get charge() { return this.gunPhase === 'aim' ? this.gunTime / DEFENSE.aimSeconds : this.gunPhase === 'locked' ? 1 : 0; }
   inArc(nav, mount=this.mount) {
     const d = sub(nav.position, nav.enemyPosition);
-    if(len(d)>DEFENSE.range) return false;
+    if(len(d)>DEFENSE.range+1e-8) return false;
     if(mount==='bow' || mount==='stern') {
       const facing=nav.enemyYaw+(mount==='stern'?Math.PI:0);
       if(Math.abs(wrap(Math.atan2(d.x,d.z)-facing))>DEFENSE.coneYaw || Math.abs(Math.atan2(d.y,Math.hypot(d.x,d.z)))>DEFENSE.conePitch)return false;
@@ -92,17 +93,28 @@ export class EnemyDefense {
     if (!dt) return events;
     if(this.hitAge >= 0) this.hitAge += dt;
     if(this.muzzleAge >= 0) this.muzzleAge += dt;
-    // Attachment ends counterfire immediately, including already-fired rounds.
-    if (!nav.active || nav.anchor || breached || this.defeated) {
-      this.phase = this.defeated ? 'victory' : breached ? 'breached' : nav.anchor ? 'tethered' : 'idle';
+    if (!nav.active || this.defeated) {
+      this.phase = this.defeated ? 'victory' : 'idle';
       this.ceaseFire(); this.previousPlayer = {...nav.position}; return events;
     }
-    // Four seconds of slow, committed yaw; six seconds holding still leave a rear window.
-    if(this.phase === 'idle' || this.phase === 'tethered') { this.phase = 'turn'; this.turnTime = 0; this.turnGoal = null; }
+    // A lodged harpoon arrests the hull and prevents NEW attacks. A charged gun
+    // finishes its existing salvo at its last aim point; flying rounds stay physical.
+    const suppressed=Boolean(nav.anchor || breached);
+    if(suppressed) this.phase=breached?'breached':'tethered';
+    else {
+      if(['idle','tethered','breached'].includes(this.phase)) {this.phase='turn';this.turnTime=0;this.turnGoal=null;}
+      // Orbit the player's current position without dragging the player or forcing
+      // a fixed range. Forward thrust can still close the gap. Keep the rear window
+      // independent of movement: the hull does not instantly face the player.
+      const d=sub(nav.enemyPosition,nav.position),flat=Math.hypot(d.x,d.z);
+      const step=Math.min(DEFENSE.orbitRate,DEFENSE.orbitSpeed/(flat||1))*dt,c=Math.cos(step),s=Math.sin(step);
+      nav.setEnemyPosition({x:nav.position.x+c*d.x+s*d.z,y:nav.enemyPosition.y,z:nav.position.z-s*d.x+c*d.z});
+    }
+    // Four seconds of slow yaw; six seconds of stable heading leave a rear window.
     const weaponHold=this.gunPhase==='locked'||(this.shots>0&&this.cooldown>0);
-    if(!weaponHold)this.turnTime += dt;
+    if(!suppressed && !weaponHold)this.turnTime += dt;
     this.turning = 0;
-    if(!weaponHold && this.phase === 'turn') {
+    if(!suppressed && !weaponHold && this.phase === 'turn') {
       if(this.turnGoal === null) {
         const d = sub(nav.position,nav.enemyPosition);
         this.turnGoal = Math.atan2(d.x,d.z);
@@ -110,7 +122,7 @@ export class EnemyDefense {
       const change = clamp(wrap(this.turnGoal-nav.enemyYaw),-DEFENSE.turnRate*dt,DEFENSE.turnRate*dt);
       nav.setEnemyYaw(nav.enemyYaw+change); this.turning = change/dt;
       if(this.turnTime >= DEFENSE.turnSeconds) {this.phase='hold';this.turnTime=0;}
-    } else if(!weaponHold && this.turnTime >= DEFENSE.holdSeconds) {this.phase='turn';this.turnTime=0;this.turnGoal=null;}
+    } else if(!suppressed && !weaponHold && this.turnTime >= DEFENSE.holdSeconds) {this.phase='turn';this.turnTime=0;this.turnGoal=null;}
 
     const previousPlayer = this.previousPlayer || nav.position;
     for(const bolt of this.bolts) {
@@ -133,12 +145,12 @@ export class EnemyDefense {
     this.cooldown=Math.max(0,this.cooldown-dt);
     const mount=this.selectMount(nav),arc=mount!==null;
     if(this.gunPhase === 'idle') {
-      if(arc && this.cooldown===0) {this.mount=mount;this.pattern=this.shots%2===0?'focused':'fan';this.gunPhase='aim';this.gunTime=0;this.aimPoint={...nav.position};events.push('enemy-charge');}
+      if(!suppressed && arc && this.cooldown===0) {this.mount=mount;this.pattern=this.shots%2===0?'focused':'fan';this.gunPhase='aim';this.gunTime=0;this.aimPoint={...nav.position};events.push('enemy-charge');}
     } else if(this.gunPhase === 'aim') {
-      if(!arc) {this.gunPhase='idle';this.aimPoint=null;this.cooldown=1;}
+      if(!suppressed && !arc) {this.gunPhase='idle';this.aimPoint=null;this.cooldown=1;}
       else {
-        this.mount=mount;
-        this.aimPoint={...nav.position};this.gunTime+=dt;
+        if(!suppressed) {this.mount=mount;this.aimPoint={...nav.position};}
+        this.gunTime+=dt;
         if(this.gunTime>=DEFENSE.aimSeconds) {this.gunPhase='locked';this.gunTime=0;events.push('enemy-lock');}
       }
     } else if(this.gunPhase === 'locked') {
@@ -154,6 +166,7 @@ export class EnemyDefense {
   }
   getState() {
     return {phase:this.phase,turning:this.turning,gunPhase:this.gunPhase,charge:this.charge,pattern:this.pattern,mount:this.mount,
+      orbiting:['turn','hold'].includes(this.phase),finishingAttack:['tethered','breached'].includes(this.phase)&&this.gunPhase!=='idle',
       aimPoint:this.aimPoint && {...this.aimPoint},hull:this.hull,defeated:this.defeated,
       shots:this.shots,hits:this.hits,bolts:this.bolts.map(b=>({...b,position:{...b.position},direction:{...b.direction}}))};
   }

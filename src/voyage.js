@@ -1,10 +1,10 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=aftgun-1";
-import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=aftgun-1";
-import { AssaultAudio } from "./assault-audio.js?v=aftgun-1";
-import { EnemyDefense } from "./enemy-defense.js?v=aftgun-1";
-import { PlayerCannon } from "./player-cannon.js?v=aftgun-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=enemyorbit-1";
+import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=enemyorbit-1";
+import { AssaultAudio } from "./assault-audio.js?v=enemyorbit-1";
+import { EnemyDefense } from "./enemy-defense.js?v=enemyorbit-1";
+import { PlayerCannon } from "./player-cannon.js?v=enemyorbit-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, flightInput, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=aftgun-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, flightInput, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=enemyorbit-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -751,7 +751,12 @@ export class VoyageScene {
     }
     if(!this.navigation.active && cannonEvents.some(event=>event!=='player-fire')) {this.searchProgress=1;this.beginIntercept();}
     const breached=['impact','clamp','seal','pressurize','ready'].includes(this.assault.stage);
+    const beforeEnemyMotion=lookAt(this.navigation.position,this.navigation.enemyPosition,this.getView());
     const defenseEvents = this.enemyDefense.update(deltaSeconds, this.navigation, {breached});
+    if(this.lookTracking || this.navigation.orbiting) {
+      const afterEnemyMotion=lookAt(this.navigation.position,this.navigation.enemyPosition,beforeEnemyMotion);
+      this.shiftView({yaw:afterEnemyMotion.yaw-beforeEnemyMotion.yaw,pitch:afterEnemyMotion.pitch-beforeEnemyMotion.pitch});
+    }
     for (const event of defenseEvents) {
       this.audio.play(event);
       if (event === "enemy-lock" && this.announcement) this.announcement.textContent = this.enemyDefense.pattern==='fan' ? "적 확산 포격. 시선을 돌리고 전진·회피로 사선을 벗어나십시오." : "적 포격 조준 고정. 진행 방향을 바꿔 회피하십시오.";

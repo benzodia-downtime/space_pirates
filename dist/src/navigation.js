@@ -1,4 +1,4 @@
-import { SIEGE, traceCannon } from './player-cannon.js?v=aftgun-1';
+import { SIEGE, traceCannon } from './player-cannon.js?v=enemyorbit-1';
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const wrap = n => Math.atan2(Math.sin(n), Math.cos(n));
@@ -97,7 +97,23 @@ export class OrbitNavigation {
   setEnemyYaw(yaw) {
     if(this.anchor) return; // A seated tether arrests the defender's manoeuvre.
     this.enemyYaw=yaw;
-    const local=rotate(subtract(this.position,this.enemyPosition),-yaw);
+    this.syncEnemyGeometry();
+  }
+  setEnemyPosition(position) {
+    if(this.anchor) return;
+    this.enemyPosition={...position};
+    this.syncEnemyGeometry();
+    // Transport an inclined player-orbit plane onto the new radial, without
+    // moving the camera or losing its chosen direction.
+    if(this.orbitNormal) {
+      const radial=unit(subtract(this.position,this.enemyPosition));
+      const normal=subtract(this.orbitNormal,scale(radial,dot(this.orbitNormal,radial)));
+      if(length(normal)>1e-8)this.orbitNormal=unit(normal);
+    }
+  }
+  syncEnemyGeometry() {
+    const local=rotate(subtract(this.position,this.enemyPosition),-this.enemyYaw);
+    this.radius=length(local);
     this.angle=Math.atan2(local.x,local.z);
     this.elevation=Math.atan2(local.y,Math.hypot(local.x,local.z));
     if(this.harpoonLocalTarget) this.harpoonTarget=this.world(this.harpoonLocalTarget);

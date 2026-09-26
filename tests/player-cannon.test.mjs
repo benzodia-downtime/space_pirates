@@ -77,13 +77,13 @@ test('Surrounding deck blocks oblique harpoons even after armor is gone',()=>{
   const blocked=nav.inspect(view,.5);assert.ok(blocked.incidence>=.9);assert.equal(blocked.canFire,false);
   view=lookAt(nav.position,nav.door);assert.equal(nav.inspect(view,.5).canFire,true);
 });
-test('Breaking armor does not stop fire or yaw; only a lodged harpoon cancels counterfire',()=>{
+test('Breaking armor does not stop defence; a lodged harpoon stops new salvos, not flying rounds',()=>{
   const {nav,gun}=fixture(),enemy=new EnemyDefense();
   nav.damageArmor(120,{x:0,y:0,z:-55});
   for(let i=0;i<270;i++)enemy.update(.02,nav);
   assert.equal(enemy.shots,1);assert.ok(enemy.bolts.length>0);assert.notEqual(nav.enemyYaw,0);assert.equal(nav.anchor,null);
-  const view=lookAt(nav.position,nav.door);assert.ok(nav.attach(view));enemy.update(.02,nav);
-  assert.equal(enemy.phase,'tethered');assert.equal(enemy.bolts.length,0);assert.equal(enemy.aimPoint,null);
+  const view=nav.forceRear(true);assert.ok(nav.attach(view));enemy.update(.02,nav);
+  assert.equal(enemy.phase,'tethered');assert.ok(enemy.bolts.length>0);assert.ok(enemy.aimPoint);
   const yaw=nav.enemyYaw;for(let i=0;i<500;i++)enemy.update(.02,nav);
   assert.equal(enemy.shots,1);assert.equal(nav.enemyYaw,yaw);assert.equal(gun.fire(nav,view),false);
 });
