@@ -11,7 +11,7 @@
     />
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./voyage.css?v=breachgun-1" />
+    <link rel="stylesheet" href="./voyage.css?v=fourway-1" />
     <link rel="stylesheet" href="./battle.css?v=loot-1" />
   </head>
   <body>
@@ -102,22 +102,22 @@
                 id="steering-pad"
                 class="steering-pad"
                 role="group"
-                aria-label="상하좌우 평행이동 패드. AD는 좌우, Space와 Ctrl은 상승·하강, WS는 전진·후진. 놓으면 이동이 멈춥니다"
+                aria-label="전진·후진·좌우 이동 패드. 위로 밀면 전진, 아래로 밀면 후진, 좌우는 좌우 이동. WASD 또는 방향키도 동일합니다. 놓으면 이동이 멈춥니다"
                 tabindex="0"
               >
                 <span class="steering-pad__axis" aria-hidden="true"></span>
+                <span class="steering-pad__direction steering-pad__direction--forward" aria-hidden="true">전진</span>
+                <span class="steering-pad__direction steering-pad__direction--reverse" aria-hidden="true">후진</span>
+                <span class="steering-pad__direction steering-pad__direction--left" aria-hidden="true">←</span>
+                <span class="steering-pad__direction steering-pad__direction--right" aria-hidden="true">→</span>
                 <span id="steering-knob" class="steering-pad__knob" aria-hidden="true"></span>
               </div>
               <button id="settings-button" class="settings-button" type="button" aria-haspopup="dialog" aria-controls="settings-dialog" aria-expanded="false">설정</button>
             </section>
-            <section class="right-controls h-panel" aria-label="추진과 회피">
+            <section class="right-controls h-panel" aria-label="사격과 회피">
               <div class="combat-controls v-panel">
                 <button id="cannon-button" type="button" aria-keyshortcuts="r" aria-label="함포 발사. R, 마우스 우클릭 또는 버튼을 누르는 동안 사격. 3발 후 자동 재장전" title="후방의 황동색 갑판 장갑을 파괴해 작살 고정면을 노출. R / 우클릭 / 길게 누르기">포격 · 3</button>
                 <button id="dodge-button" type="button" aria-keyshortcuts="Shift" title="Shift · 이동 방향으로 짧게 회피. 방향 입력이 없으면 오른쪽. 무적 효과 없음">회피</button>
-              </div>
-              <div class="thrust-controls v-panel" aria-label="전진 후진 · 누르는 동안 이동">
-                <button id="thrust-forward" data-thrust="1" type="button" aria-label="누르는 동안 전진, W 키" aria-keyshortcuts="w">전진 <kbd>W</kbd></button>
-                <button id="thrust-reverse" data-thrust="-1" type="button" aria-label="누르는 동안 후진, S 키" aria-keyshortcuts="s">후진 <kbd>S</kbd></button>
               </div>
             </section>
           </div>
@@ -139,9 +139,10 @@
           </div>
           <button id="sound-button" type="button" aria-labelledby="sound-setting-label" aria-pressed="true" autofocus>켜짐</button>
         </div>
-        <p>모바일: 왼쪽 패드로 상하좌우 이동 · 오른쪽 화면 드래그로 방향 조작 · 전진/후진은 누르는 동안 이동.</p>
+        <p>모바일: 왼쪽 패드 위/아래는 전진/후진, 좌/우는 좌우 이동. 놓으면 정지합니다. 오른쪽 화면 드래그로 방향을 조작합니다. 별도의 상승·하강 이동은 없습니다.</p>
         <p>함포: R / 마우스 우클릭 / 포격 버튼을 누르는 동안 사격. 3발 후 자동 재장전. 후방의 황동색 장갑에 6발을 맞혀 고정면을 노출한 다음 작살을 발사하세요. 장갑만 부수면 적은 계속 반격합니다.</p>
-        <p>PC: W/S 전후진 · A/D 좌우 · Space/Ctrl 상승/하강 · 마우스 드래그로 방향 조작 · Shift 회피 · T 시선 추적 · O 자동 선회 · F 작살/견인/돌입.</p>
+        <p>PC: W/S 또는 ↑/↓ 전후진 · A/D 또는 ←/→ 좌우 이동 · 마우스 드래그로 방향 조작 · Shift 회피 · T 시선 추적 · O 자동 선회 · F 작살/견인/돌입.</p>
+        <p>견인 중 전후진은 잠깁니다. 패드 좌우로 진입 위치를 맞추고 화면 드래그로 문 중앙을 조준하세요.</p>
         <p>회피는 이동 방향으로 짧게 가속합니다. 방향 입력이 없으면 오른쪽으로 회피하며, 무적 효과는 없습니다. 시선 추적 중에도 드래그로 조준을 조절할 수 있습니다.</p>
       </div>
     </dialog>
@@ -292,6 +293,6 @@
       </footer>
     </section>
 
-    <script type="module" src="./src/main.js?v=breachgun-1"></script>
+    <script type="module" src="./src/main.js?v=fourway-1"></script>
   </body>
 </html>

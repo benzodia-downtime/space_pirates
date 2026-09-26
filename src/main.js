@@ -1,4 +1,4 @@
-import { VoyageScene } from "./voyage.js?v=breachgun-1";
+import { VoyageScene } from "./voyage.js?v=fourway-1";
 
 (() => {
   "use strict";

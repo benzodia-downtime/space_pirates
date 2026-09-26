@@ -18,7 +18,7 @@ try {
       await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type==='webgl2');
       await page.evaluate(async rear=>{
         SpacePiratesAmbient.destroy();
-        const {VoyageScene}=await import(new URL('./src/voyage.js?v=breachgun-1',location.href));
+        const {VoyageScene}=await import(new URL('./src/voyage.js?v=fourway-1',location.href));
         window.defenseQA=new VoyageScene(document.querySelector('#starfield'));
         const s=defenseQA;s.stopLoop();s.forceContact();
         const view=rear?s.navigation.forceRear(true):s.getView();
@@ -27,8 +27,8 @@ try {
       },rear);
     }
     const step=frames=>page.evaluate(n=>{for(let i=0;i<n;i++)defenseQA.update(.02);defenseQA.renderStill();},frames);
-    async function drag(dx,dy,frames=Math.round(Math.hypot(dx,dy)*.18/8/.02)) {
-      const box=await page.locator('#steering-pad').boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+    async function drag(dx,dy,frames=Math.round(Math.hypot(dx,dy)*.18/8/.02),selector='#steering-pad') {
+      const box=await page.locator(selector).boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
       if(mobile) {
         const touch=await page.context().newCDPSession(page);
         await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
@@ -79,14 +79,15 @@ try {
     assert.deepEqual((await read()).enemyDefense,paused.enemyDefense);
     await tap('#settings-close');await page.evaluate(()=>defenseQA.stopLoop());
     // Real pad/keyboard translation after lock avoids the non-homing salvo.
-    if(mobile) await drag(0,-35,60);
-    else {await page.locator('#steering-pad').focus();await page.keyboard.down('Space');await page.keyboard.press('Shift');await step(60);await page.keyboard.up('Space');}
+    if(mobile) await drag(35,0,60);
+    else {await page.locator('#steering-pad').focus();await page.keyboard.down('d');await page.keyboard.press('Shift');await step(60);await page.keyboard.up('d');}
     await step(10);
     assert.ok((await read()).enemyDefense.shots>=1);
     assert.ok((await read()).rendering.enemyBoltsVisible>0);
     await page.screenshot({path:`qa-output/defense-dodge-${mobile?'mobile':'desktop'}.png`});
     await step(110);assert.equal((await read()).enemyDefense.hull,100,'Translating after lock avoids damage');
-    assert.ok((await read()).navigation.position.y>locked.navigation.position.y+30);
+    const dodged=(await read()).navigation.position;
+    assert.ok(Math.hypot(dodged.x-locked.navigation.position.x,dodged.z-locked.navigation.position.z)>30);
 
     await fresh();await step(400);await until('aim');await step(40);
     assert.equal((await read()).enemyDefense.pattern,'fan');assert.equal((await read()).rendering.enemyAimRays,9);
@@ -118,8 +119,9 @@ try {
     assert.equal((await read()).rendering.enemyAimVisible,false);assert.equal((await read()).rendering.enemyBoltsVisible,0);
     assert.equal((await read()).enemyDefense.shots,tetherShots);assert.equal((await read()).enemyDefense.hull,100,'No counterfire after attachment');
     await page.screenshot({path:`qa-output/tether-ceasefire-${mobile?'mobile':'desktop'}.png`});
-    await drag(0,-45);await step(105);
-    assert.ok((await read()).navigation.correction.y>8,'Alignment input remains available');
+    await drag(45,0);await step(105);
+    assert.ok((await read()).navigation.correction.x>8,'Lateral alignment remains available');
+    assert.equal((await read()).navigation.correction.y,0,'No vertical alignment movement');
     const held=(await read()).navigation.position;await step(10);assert.deepEqual((await read()).navigation.position,held);
 
     await latch();await tap('#boarding-action');await step(80);
@@ -133,6 +135,14 @@ try {
     assert.equal((await read()).mode,'impact');assert.equal((await read()).enemyDefense.gunPhase,'idle');
     await step(350);ram=await read();assert.equal(ram.mode,'ready');assert.equal(ram.rendering.armourBreached,true);
     await page.screenshot({path:`qa-output/ram-recovered-${mobile?'mobile':'desktop'}.png`});
+
+    // A vertical aim error must remain recoverable without any vertical thrust binding.
+    await latch();await drag(0,30,0,'#look-zone');
+    const correctedView=(await read()).steering;await tap('#boarding-action');await step(200);
+    assert.equal((await read()).mode,'jammed');assert.deepEqual((await read()).steering,correctedView);
+    assert.equal((await read()).navigation.correction.y,0);
+    await drag(0,-30,0,'#look-zone');await step(25);assert.equal((await read()).mode,'impact');
+    await step(350);assert.equal((await read()).mode,'ready');
 
     await latch();await tap('#boarding-action');await step(80);await drag(48,0);await step(58);
     ram=await read();assert.equal(ram.mode,'rebound');assert.equal(ram.collision,'miss');assert.equal(ram.breachProgress,0);
@@ -150,7 +160,7 @@ try {
     await fresh();await step(1600);
     const failed=await read();assert.equal(failed.enemyDefense.hull,0);assert.equal(failed.mode,'defeated');
     assert.equal(await page.locator('#boarding-action-label').innerText(),'다시 도전');
-    assert.equal(await page.locator('#thrust-forward').isDisabled(),true);
+    assert.equal(await page.locator('#thrust-forward, #thrust-reverse').count(),0);
     const p=failed.navigation.position;
     await page.keyboard.press('o');await page.keyboard.down('w');await step(20);await page.keyboard.up('w');
     assert.deepEqual((await read()).navigation.position,p);

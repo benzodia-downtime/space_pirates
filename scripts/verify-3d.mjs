@@ -43,6 +43,13 @@ try {
     }
   }
   const dodgedSalvos = new Set();
+  async function evadeWithForward(pitch=-1) {
+    const state=await read();
+    await aim({yaw:state.steering.x*.442,pitch});
+    await page.locator('#steering-pad').focus();
+    await page.keyboard.down('w');await page.keyboard.press('Shift');
+    await page.waitForTimeout(260);await page.keyboard.up('w');
+  }
   async function orbitTo(min, max) {
     const deadline=Date.now()+90000;
     while(Date.now()<deadline) {
@@ -50,13 +57,14 @@ try {
       assert.notEqual(state.mode,'defeated','Orbit traversal must actively evade horizontal fan fire');
       if(angle>min && angle<max) return;
       if(state.enemyDefense.pattern==='fan' && state.enemyDefense.gunPhase==='locked' && !dodgedSalvos.has(state.enemyDefense.shots)) {
-        const key=dodgedSalvos.size%2 ? 'Control' : 'Space';
+        const pitch=dodgedSalvos.size%2 ? 1 : -1;
         dodgedSalvos.add(state.enemyDefense.shots);
-        await page.locator('#steering-pad').focus();
-        await page.keyboard.down(key);await page.keyboard.press('Shift');
-        await page.waitForTimeout(260);await page.keyboard.up(key);
+        await evadeWithForward(pitch);
         const moved=await read();
         await aim({yaw:moved.guidanceBearing.x*.65,pitch:moved.guidanceBearing.y*.65});
+        if((await read()).navigation.radius<150) {
+          await page.keyboard.down('s');await page.waitForFunction(()=>SpacePiratesAmbient.getState().navigation.radius>155);await page.keyboard.up('s');
+        }
         if(!(await read()).navigation.orbiting)await tap('#orbit-button');
       }
       await page.waitForTimeout(80);
@@ -69,7 +77,7 @@ try {
     assert.ok((await read()).rendering.farClipMetres >= 18000);
     await page.evaluate(async () => {
       SpacePiratesAmbient.destroy();
-      const { VoyageScene } = await import(new URL('./src/voyage.js?v=breachgun-1', location.href));
+      const { VoyageScene } = await import(new URL('./src/voyage.js?v=fourway-1', location.href));
       window.qaVisibilityScene = new VoyageScene(document.getElementById('starfield'));
       qaVisibilityScene.pause();
     });
@@ -267,10 +275,12 @@ try {
   assert.equal((await read()).starTravel, idle.starTravel);
   assert.equal((await read()).speed, 0);
 
-  async function holdThrust(id, ms, cancel = false) {
-    const b = await page.locator('#'+id).boundingBox(), x = b.x+b.width/2, y = b.y+b.height/2;
-    if (mobile) await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-    else { await page.mouse.move(x,y); await page.mouse.down(); }
+  async function holdThrust(direction, ms, cancel = false) {
+    const b = await page.locator('#steering-pad').boundingBox(), x = b.x+b.width/2, y = b.y+b.height/2;
+    if (mobile) {
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y:y+direction*35 }] });
+    } else { await page.mouse.move(x,y); await page.mouse.down(); await page.mouse.move(x,y+direction*35); }
     await page.waitForTimeout(ms);
     const moving = await read();
     if (mobile) await touch.send('Input.dispatchTouchEvent', { type: cancel ? 'touchCancel' : 'touchEnd', touchPoints: [] });
@@ -282,14 +292,15 @@ try {
     assert.deepEqual((await read()).navigation.position, stopped.navigation.position, 'No coast after release');
     return moving;
   }
-  const forward = await holdThrust('thrust-forward', 500);
+  assert.equal(await page.locator('#thrust-forward, #thrust-reverse, [data-thrust]').count(),0);
+  const forward = await holdThrust(-1, 500);
   assert.ok(forward.speed > 0); assert.ok(forward.navigation.position.z < idle.navigation.position.z);
-  const reverse = await holdThrust('thrust-reverse', 500, true);
+  const reverse = await holdThrust(1, 500, true);
   assert.ok(reverse.speed < 0); assert.ok(reverse.navigation.position.z > forward.navigation.position.z);
   const noScan = await read();
   await page.locator('#steering-pad').focus();
   await page.keyboard.down('Space'); await page.waitForTimeout(120); await page.keyboard.up('Space');
-  assert.ok((await read()).navigation.position.y > noScan.navigation.position.y, 'Space now ascends instead of triggering scan/attack');
+  assert.deepEqual((await read()).navigation.position, noScan.navigation.position, 'Space no longer moves vertically');
   assert.deepEqual((await read()).rendering.enemyPosition, noScan.rendering.enemyPosition);
   await page.keyboard.down('w'); await page.keyboard.down('s');
   await page.waitForTimeout(80); const opposed = await read(); await page.waitForTimeout(200);
@@ -302,12 +313,12 @@ try {
   assert.equal((await read()).thrust, 0); assert.deepEqual((await read()).navigation.position, blurred.navigation.position);
 
   if (mobile) {
-    const p = await page.locator('#steering-pad').boundingBox(), b = await page.locator('#thrust-forward').boundingBox();
+    const p = await page.locator('#steering-pad').boundingBox(), b = await page.locator('#look-zone').boundingBox();
     const pad = { x: p.x+p.width/2, y: p.y+p.height/2, id: 1 };
-    const forwardPoint = { x: b.x+b.width/2, y: b.y+b.height/2, id: 2 };
+    const lookPoint = { x: b.x+b.width/2, y: b.y+b.height*.35, id: 2 };
     await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pad] });
-    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pad, forwardPoint] });
-    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{...pad, x:pad.x+12}, forwardPoint] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pad, lookPoint] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{...pad, y:pad.y-35}, {...lookPoint,x:lookPoint.x+12}] });
     await page.waitForTimeout(200);
     assert.equal((await read()).thrust, 1, 'Two-finger steering and forward thrust coexist');
     await touch.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
@@ -366,7 +377,7 @@ try {
   // Manual reverse overrides autopilot; releasing holds the new position.
   await tap('#orbit-button');
   await page.waitForTimeout(120);
-  await holdThrust('thrust-reverse', 200);
+  await holdThrust(1, 200);
   assert.equal((await read()).navigation.orbiting, false);
   await aim({ yaw: (await read()).guidanceBearing.x*.65, pitch: (await read()).guidanceBearing.y*.65 });
   const fixedEnemy = (await read()).rendering.enemyPosition;
@@ -398,8 +409,7 @@ try {
   while((await read()).navigation.armorHealth>0 && Date.now()<armorDeadline) {
     const combat=await read();assert.notEqual(combat.mode,'defeated','Armor assault must remain survivable');
     if(combat.enemyDefense.gunPhase==='locked') {
-      await page.keyboard.up('r');await page.locator('#steering-pad').focus();
-      await page.keyboard.down('Space');await page.keyboard.press('Shift');await page.waitForTimeout(260);await page.keyboard.up('Space');
+      await page.keyboard.up('r');await evadeWithForward(-1);
     }
     await aim((await read()).navigation.doorBearing);
     await page.keyboard.down('r');await page.waitForTimeout(150);
@@ -544,7 +554,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=breachgun-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=fourway-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();

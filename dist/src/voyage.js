@@ -1,10 +1,10 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=breachgun-1";
-import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=breachgun-1";
-import { AssaultAudio } from "./assault-audio.js?v=breachgun-1";
-import { EnemyDefense } from "./enemy-defense.js?v=breachgun-1";
-import { PlayerCannon } from "./player-cannon.js?v=breachgun-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=fourway-1";
+import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=fourway-1";
+import { AssaultAudio } from "./assault-audio.js?v=fourway-1";
+import { EnemyDefense } from "./enemy-defense.js?v=fourway-1";
+import { PlayerCannon } from "./player-cannon.js?v=fourway-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=breachgun-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, flightInput, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=fourway-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -57,12 +57,7 @@ export class VoyageScene {
     this.orbitButton = document.getElementById("orbit-button");
     this.orbitReadout = document.getElementById("orbit-readout");
     this.onOrbit = event => { if (!this.isTouchClick(event)) this.toggleOrbit(); };
-    this.thrustButtons = [...document.querySelectorAll("[data-thrust]")];
-    this.thrustPointers = new Map();
-    this.thrustKeyButton = 0;
-    this.onThrustContext = event => event.preventDefault();
-    this.onThrustDown = this.onThrustDown.bind(this);
-    this.onThrustLost = event => this.endThrustPointer(event.pointerId);
+    this.onControlContext = event => event.preventDefault();
     this.onBlur = () => { this.keys.clear(); this.releasePad(); this.releaseLook(); this.clearThrust(); this.clearCannon(); this.navigation.cancelDodge(); };
     this.padOrigin = null; this.padDrag = { x: 0, y: 0 };
     this.audio = new AssaultAudio();
@@ -178,19 +173,14 @@ export class VoyageScene {
     this.cannonButton?.addEventListener('pointerdown',this.onCannonDown);
     this.cannonButton?.addEventListener('lostpointercapture',this.onCannonLost);
     this.cannonButton?.addEventListener('click',this.onCannonClick);
-    this.cannonButton?.addEventListener('contextmenu',this.onThrustContext);
+    this.cannonButton?.addEventListener('contextmenu',this.onControlContext);
     for (const button of this.touchActions.keys()) button?.addEventListener("pointerdown", this.onTouchAction);
     this.lookZone?.addEventListener("pointerdown", this.onLookDown);
     this.lookZone?.addEventListener("lostpointercapture", this.onLookLost);
-    this.lookZone?.addEventListener("contextmenu", this.onThrustContext);
+    this.lookZone?.addEventListener("contextmenu", this.onControlContext);
     this.steeringPad?.addEventListener("lostpointercapture", this.onPadLost);
     this.trackButton?.addEventListener("click", this.onTrack);
     this.dodgeButton?.addEventListener("click", this.onDodge);
-    for (const button of this.thrustButtons) {
-      button.addEventListener("pointerdown", this.onThrustDown);
-      button.addEventListener("lostpointercapture", this.onThrustLost);
-      button.addEventListener("contextmenu", this.onThrustContext);
-    }
     this.orbitButton?.addEventListener("click", this.onOrbit);
     window.addEventListener("blur", this.onBlur);
     this.soundButton?.addEventListener("click", this.onSoundToggle);
@@ -221,19 +211,14 @@ export class VoyageScene {
     this.cannonButton?.removeEventListener('pointerdown',this.onCannonDown);
     this.cannonButton?.removeEventListener('lostpointercapture',this.onCannonLost);
     this.cannonButton?.removeEventListener('click',this.onCannonClick);
-    this.cannonButton?.removeEventListener('contextmenu',this.onThrustContext);
+    this.cannonButton?.removeEventListener('contextmenu',this.onControlContext);
     for (const button of this.touchActions.keys()) button?.removeEventListener("pointerdown", this.onTouchAction);
     this.lookZone?.removeEventListener("pointerdown", this.onLookDown);
     this.lookZone?.removeEventListener("lostpointercapture", this.onLookLost);
-    this.lookZone?.removeEventListener("contextmenu", this.onThrustContext);
+    this.lookZone?.removeEventListener("contextmenu", this.onControlContext);
     this.steeringPad?.removeEventListener("lostpointercapture", this.onPadLost);
     this.trackButton?.removeEventListener("click", this.onTrack);
     this.dodgeButton?.removeEventListener("click", this.onDodge);
-    for (const button of this.thrustButtons) {
-      button.removeEventListener("pointerdown", this.onThrustDown);
-      button.removeEventListener("lostpointercapture", this.onThrustLost);
-      button.removeEventListener("contextmenu", this.onThrustContext);
-    }
     this.orbitButton?.removeEventListener("click", this.onOrbit);
     window.removeEventListener("blur", this.onBlur);
     this.soundButton?.removeEventListener("click", this.onSoundToggle);
@@ -279,7 +264,7 @@ export class VoyageScene {
       this.mouseGunHeld=held;
     }
     if (this.manuallyPaused || this.destroyed || this.helmLocked || this.enemyDefense.defeated) return;
-    if (this.lookPointer?.id === event.pointerId && !this.navigation.anchor) {
+    if (this.lookPointer?.id === event.pointerId && (!this.navigation.anchor || this.assault.canCorrect)) {
       this.pointerTarget = relativeHelm(this.pointer, event.clientX - this.lookPointer.x, event.clientY - this.lookPointer.y);
       this.pointer = { ...this.pointerTarget };
       this.lookPointer.x = event.clientX; this.lookPointer.y = event.clientY;
@@ -296,7 +281,7 @@ export class VoyageScene {
   }
 
   onLookDown(event) {
-    if (this.manuallyPaused || this.destroyed || this.navigation.anchor || this.enemyDefense.defeated || this.lookPointer || !this.visuals.available) return;
+    if (this.manuallyPaused || this.destroyed || (this.navigation.anchor && !this.assault.canCorrect) || this.enemyDefense.defeated || this.lookPointer || !this.visuals.available) return;
     this.audio.unlock();
     this.lookPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
     if(event.pointerType==='mouse' && (event.buttons&2) && this.canShoot) {this.mouseGunHeld=true;this.fireCannon();}
@@ -323,51 +308,16 @@ export class VoyageScene {
   onPointerEnd(event) {
     if(event.pointerType==='mouse')this.mouseGunHeld=false;
     this.endCannonPointer(event.pointerId);
-    this.endThrustPointer(event.pointerId);
     if (this.activePointerId === event.pointerId) this.releasePad();
     if (this.lookPointer?.id === event.pointerId) this.releaseLook();
   }
 
-  onThrustDown(event) {
-    if (this.manuallyPaused || this.destroyed || this.spaceScene?.hidden || this.navigation.anchor || this.enemyDefense.defeated || !this.visuals.available) return;
-    this.audio.unlock();
-    const button = event.currentTarget;
-    this.thrustPointers.set(event.pointerId, { direction: Number(button.dataset.thrust), button });
-    button.setPointerCapture?.(event.pointerId);
-    event.preventDefault();
-    this.updateThrustUi();
-  }
-
-  endThrustPointer(pointerId) {
-    const input = this.thrustPointers.get(pointerId);
-    if (!input) return;
-    this.thrustPointers.delete(pointerId);
-    if (input.button.hasPointerCapture?.(pointerId)) input.button.releasePointerCapture(pointerId);
-    this.updateThrustUi();
-  }
-
   clearThrust() {
-    this.thrustKeyButton = 0;
-    for (const id of [...this.thrustPointers.keys()]) this.endThrustPointer(id);
     this.navigation.speed = 0;
-    this.updateThrustUi();
   }
 
   getThrust() {
-    if (this.manuallyPaused || this.destroyed || this.spaceScene?.hidden || this.navigation.anchor || this.enemyDefense.defeated || !this.visuals.available) return 0;
-    const inputs = [...this.thrustPointers.values()].map(input => input.direction);
-    const forward = this.keys.has("w") || inputs.includes(1) || this.thrustKeyButton === 1;
-    const reverse = this.keys.has("s") || inputs.includes(-1) || this.thrustKeyButton === -1;
-    return Number(forward) - Number(reverse);
-  }
-
-  updateThrustUi() {
-    const thrust = this.getThrust();
-    const locked = Boolean(this.navigation.anchor) || this.enemyDefense.defeated;
-    for (const button of this.thrustButtons) {
-      button.disabled = locked;
-      button.classList.toggle("is-held", thrust === Number(button.dataset.thrust));
-    }
+    return this.navigation.anchor ? 0 : this.getMovement().z;
   }
 
   getView() { return { yaw: this.pointer.x * HELM.yawScale, pitch: this.pointer.y * HELM.pitchScale }; }
@@ -394,10 +344,9 @@ export class VoyageScene {
 
   getMovement() {
     if (this.manuallyPaused || this.destroyed || this.spaceScene?.hidden || this.helmLocked || this.enemyDefense.defeated || !this.visuals.available) return { x: 0, y: 0, z: 0 };
-    const keyboard = this.getKeyboardTarget() || { x: 0, y: 0 };
-    const pad = Math.hypot(this.padDrag.x, this.padDrag.y) >= .12 ? this.padDrag : { x: 0, y: 0 };
-    const x = clamp(keyboard.x + pad.x, -1, 1), y = clamp(-keyboard.y - pad.y, -1, 1);
-    return { x, y, z: this.getThrust() };
+    const movement = flightInput(this.keys,this.padDrag);
+    if(this.navigation.anchor)movement.z=0;
+    return movement;
   }
 
   get canTrack() { return this.navigation.placed && (this.navigation.active || this.searchProgress >= VOYAGE_CONFIG.signalProgress) && !this.navigation.anchor && !this.enemyDefense.defeated; }
@@ -474,11 +423,6 @@ export class VoyageScene {
       if ((event.code === "Space" || event.key === "Enter") && !event.repeat) { event.preventDefault(); this.handleBoardingAction(); }
       return;
     }
-    if (event.target?.dataset?.thrust && (event.code === "Space" || event.key === "Enter")) {
-      event.preventDefault();
-      if (!this.navigation.anchor) this.thrustKeyButton = Number(event.target.dataset.thrust);
-      return;
-    }
     if (event.code === 'KeyR' || (event.target===this.cannonButton && isNativeButtonAction)) {
       event.preventDefault();
       if(this.canShoot && (!event.repeat || this.keys.has('r') || this.cannonKeyButton)) {
@@ -507,7 +451,8 @@ export class VoyageScene {
       return;
     }
     const key = this.movementKey(event);
-    if (["w", "a", "s", "d", "space", "control", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
+    if(event.code === 'Space')event.preventDefault(); // No vertical flight or page scroll.
+    if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
       if (!event.repeat) this.audio.unlock();
       if (!this.helmLocked && (!event.repeat || this.keys.has(key))) this.keys.add(key);
       event.preventDefault();
@@ -523,17 +468,7 @@ export class VoyageScene {
   onKeyUp(event) {
     const key = this.movementKey(event);
     this.keys.delete(key);
-    if (event.code === "Space" || event.key === "Enter") this.thrustKeyButton = 0;
     if (event.code === "Space" || event.key === "Enter") {this.cannonKeyButton=false;if(event.target===this.cannonButton)event.preventDefault();}
-    this.updateThrustUi();
-  }
-
-  getKeyboardTarget() {
-    const x = Number(this.keys.has("d") || this.keys.has("arrowright")) - Number(this.keys.has("a") || this.keys.has("arrowleft"));
-    const y = Number(this.keys.has("control") || this.keys.has("arrowdown")) - Number(this.keys.has("space") || this.keys.has("arrowup"));
-    if (!x && !y) return null;
-    const length = Math.hypot(x, y) || 1;
-    return { x: x / length, y: y / length };
   }
 
   onResize() {
@@ -603,7 +538,7 @@ export class VoyageScene {
     this.updateHud(true);
 
     if (announce && this.announcement) {
-      this.announcement.textContent = "정지 상태로 복귀했습니다. W / S 또는 전진·후진 버튼으로 이동하십시오.";
+      this.announcement.textContent = "정지 상태로 복귀했습니다. 왼쪽 패드 또는 WASD로 이동하십시오.";
     }
   }
 
@@ -673,13 +608,11 @@ export class VoyageScene {
     } else {
       if (!this.assault.canCommit()) return;
       this.audio.unlock();
+      this.assault.tetherBearing = {...this.getView()};
       if (!this.assault.commit()) return;
       this.navigation.stopOrbit();
       this.keys.clear(); this.releasePad();
-      const bearing = this.assault.attackBearing;
-      const delta = bearing.yaw - this.getView().yaw;
-      this.pointerTarget.x = this.pointer.x + Math.atan2(Math.sin(delta), Math.cos(delta)) / HELM.yawScale;
-      this.pointerTarget.y = bearing.pitch / HELM.pitchScale;
+      this.pointerTarget = {...this.pointer}; // Preserve the player's current alignment.
     }
     this.setVoyageMode(this.assault.stage, ASSAULT_COPY[this.assault.stage][1]);
     this.updateHud(true);
@@ -706,7 +639,7 @@ export class VoyageScene {
     }
     // Only compact actions are visible; detailed guidance stays in accessible labels/tooltips.
     const label = a.stage==='jammed' ? "걸림 · 패드로 정렬" : a.stage==='charge' ? "문 중앙에 맞추기" : a.stage==='rebound' ? "이탈 중…" : pull ? "견인 돌입" : a.committed ? "돌입 중…" : a.stage === "harpoon" ? "작살 비행 중…" : nav.armorHealth>0 ? "작살 · 장갑 폐쇄" : "작살 발사";
-    const hint = a.canCorrect ? "이동 패드 또는 A/D·Space/Ctrl로 기체를 옮겨 문 중앙에 맞추세요." + (pull ? " F로 견인 돌입." : "") : fire ? "F · 노출된 문에 작살 발사" : a.committed ? "강습 완료까지 대기" : nav.armorHealth>0 ? "R / 우클릭 / 포격 버튼으로 후방의 황동색 장갑을 파괴하세요" : "오른쪽 화면 드래그로 노출된 후방 문 중앙을 조준하세요";
+    const hint = a.canCorrect ? "패드 좌우 또는 A/D로 좌우 정렬하고, 화면 드래그로 문 중앙을 조준하세요. 견인 중 전후진은 잠깁니다." + (pull ? " F로 견인 돌입." : "") : fire ? "F · 노출된 문에 작살 발사" : a.committed ? "강습 완료까지 대기" : nav.armorHealth>0 ? "R / 우클릭 / 포격 버튼으로 후방의 황동색 장갑을 파괴하세요" : "오른쪽 화면 드래그로 노출된 후방 문 중앙을 조준하세요";
     if (this.boardingActionLabel) this.boardingActionLabel.textContent = label;
     this.boardingAction?.setAttribute("aria-label", label + ". " + hint);
     this.boardingAction?.setAttribute("title", hint);
@@ -772,7 +705,7 @@ export class VoyageScene {
     const movement = this.getMovement();
     if (this.assault.canCorrect) {
       const magnitude = Math.max(1, Math.hypot(movement.x, movement.y));
-      this.navigation.correct(this.navigation.correction.x + movement.x / magnitude * 8 * deltaSeconds, this.navigation.correction.y + movement.y / magnitude * 8 * deltaSeconds);
+      this.navigation.correct(this.navigation.correction.x + movement.x / magnitude * 8 * deltaSeconds, this.navigation.correction.y);
     }
     const target = this.pointerTarget;
     const pointerEase = 1 - Math.exp(-deltaSeconds * 3.8);
@@ -821,7 +754,7 @@ export class VoyageScene {
     const defenseEvents = this.enemyDefense.update(deltaSeconds, this.navigation, {breached});
     for (const event of defenseEvents) {
       this.audio.play(event);
-      if (event === "enemy-lock" && this.announcement) this.announcement.textContent = this.enemyDefense.pattern==='fan' ? "적 수평 확산 포격. 위나 아래로 회피하십시오." : "적 포격 조준 고정. 진행 방향을 바꿔 회피하십시오.";
+      if (event === "enemy-lock" && this.announcement) this.announcement.textContent = this.enemyDefense.pattern==='fan' ? "적 확산 포격. 시선을 돌리고 전진·회피로 사선을 벗어나십시오." : "적 포격 조준 고정. 진행 방향을 바꿔 회피하십시오.";
       if (event === "enemy-hit" && this.announcement) this.announcement.textContent = `피격. 함선 내구도 ${this.enemyDefense.hull}.`;
     }
     if(this.enemyDefense.defeated && this.mode!=='defeated') {
@@ -882,7 +815,6 @@ export class VoyageScene {
       this.dodgeButton.disabled = cooldown > 0 || Boolean(this.navigation.anchor) || this.helmLocked || this.enemyDefense.defeated;
       this.dodgeButton.textContent = cooldown > 0 ? `회피 ${cooldown.toFixed(1)}` : "회피";
     }
-    this.updateThrustUi();
     this.updateBoardingControls();
     if (force) this.updateContactVisuals();
   }

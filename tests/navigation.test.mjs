@@ -1,7 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { OrbitNavigation, ORBIT, HELM, FLIGHT, DODGE, flightVector, lookAt, relativeHelm, pitchOffsetDegrees } from '../src/navigation.js';
+import { OrbitNavigation, ORBIT, HELM, FLIGHT, DODGE, flightInput, flightVector, lookAt, relativeHelm, pitchOffsetDegrees } from '../src/navigation.js';
 const near = (a, b, eps = 1e-8) => assert.ok(Math.abs(a - b) < eps, a + ' ~= ' + b);
+test('Four-way pad and WASD/arrows share forward/reverse/strafe; vertical inputs do nothing',()=>{
+  for(const [pad,keys,expected] of [
+    [{x:0,y:-1},['w','arrowup'],{x:0,y:0,z:1}],
+    [{x:0,y:1},['s','arrowdown'],{x:0,y:0,z:-1}],
+    [{x:-1,y:0},['a','arrowleft'],{x:-1,y:0,z:0}],
+    [{x:1,y:0},['d','arrowright'],{x:1,y:0,z:0}],
+  ]) {
+    assert.deepEqual(flightInput(new Set(),pad),expected);
+    for(const key of keys)assert.deepEqual(flightInput(new Set([key])),expected);
+  }
+  assert.deepEqual(flightInput(new Set(['space','control'])),{x:0,y:0,z:0});
+  assert.deepEqual(flightInput(new Set(),{x:.05,y:-.05}),{x:0,y:0,z:0});
+  assert.deepEqual(flightInput(new Set(['w','s','a','d'])),{x:0,y:0,z:0});
+  assert.deepEqual(flightInput(new Set(['s']),{x:0,y:-1}),{x:0,y:0,z:0});
+  const diagonal=flightInput(new Set(['w','d']),{x:1,y:-1});
+  near(Math.hypot(diagonal.x,diagonal.y,diagonal.z),1);assert.equal(diagonal.y,0);
+});
 // Geometry fixtures have an already exposed ramp; cannon tests cover the sealed prerequisite.
 function setup() { const nav = new OrbitNavigation(); nav.begin({ x: 0.31, y: -0.04 }); nav.armorHealth=0; return nav; }
 

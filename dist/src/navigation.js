@@ -1,4 +1,4 @@
-import { SIEGE, traceCannon } from './player-cannon.js?v=breachgun-1';
+import { SIEGE, traceCannon } from './player-cannon.js?v=fourway-1';
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const wrap = n => Math.atan2(Math.sin(n), Math.cos(n));
@@ -14,6 +14,16 @@ export const HELM = Object.freeze({ yawScale: 0.442, pitchScale: 0.312, dragRadi
 export const FLIGHT = Object.freeze({ contactDistance: 1100, surveyDistance: 220, forwardSpeed: 80, reverseSpeed: 45, closeSpeed: 22, strafeSpeed: 32, safetyRadius: 85 });
 export const DODGE = Object.freeze({ speed: 110, duration: 0.22, cooldown: 1.2 });
 export const ORBIT = Object.freeze({ radius: 155, minRadius: 120, speed: 0.095, sternZ: -51, doorHalfSize: 3.65 });
+
+// Pad up/down means forward/reverse, never vertical strafe. Keys and touch share
+// one normalized input so a diagonal or two devices cannot give a speed boost.
+export function flightInput(keys, pad = {x:0,y:0}) {
+  const active = Math.hypot(pad.x,pad.y) >= .12;
+  const x = clamp(Number(keys.has('d') || keys.has('arrowright')) - Number(keys.has('a') || keys.has('arrowleft')) + (active?pad.x:0),-1,1);
+  const z = clamp(Number(keys.has('w') || keys.has('arrowup')) - Number(keys.has('s') || keys.has('arrowdown')) - (active?pad.y:0),-1,1);
+  const magnitude = Math.max(1,Math.hypot(x,z));
+  return {x:x/magnitude,y:0,z:z/magnitude};
+}
 
 export function relativeHelm(origin, dragX, dragY) {
   // An orbit can carry the camera over a pole. Regripping must not clamp that view back.

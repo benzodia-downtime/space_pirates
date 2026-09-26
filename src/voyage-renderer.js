@@ -1,6 +1,6 @@
 import * as THREE from "../vendor/three.module.js";
-import { GUN_MOUNTS } from "./enemy-defense.js?v=breachgun-1";
-import { SIEGE } from "./player-cannon.js?v=breachgun-1";
+import { GUN_MOUNTS } from "./enemy-defense.js?v=fourway-1";
+import { SIEGE } from "./player-cannon.js?v=fourway-1";
 
 const smoothstep = THREE.MathUtils.smoothstep;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);

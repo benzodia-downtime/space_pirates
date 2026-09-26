@@ -158,9 +158,6 @@
 .voyage-ui .voyage-action { width: 148px; flex: 0 0 auto; }
 .voyage-action strong { font: inherit; font-weight: 700; }
 .flight-controls { display: flex; align-items: flex-end; gap: 12px; }
-.thrust-controls { gap: 8px; width: 112px; }
-.voyage-ui .thrust-controls button { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-.thrust-controls kbd { margin-left: 8px; opacity: .7; font: inherit; }
 .steering-pad {
   position: relative;
   width: 5.5rem;
@@ -174,6 +171,11 @@
 }
 
 .steering-pad:active { cursor: grabbing; }
+.steering-pad__direction { position: absolute; color: #96c5cf; font-size: 10px; line-height: 12px; pointer-events: none; user-select: none; }
+.steering-pad__direction--forward { top: 4px; left: 50%; transform: translateX(-50%); }
+.steering-pad__direction--reverse { bottom: 4px; left: 50%; transform: translateX(-50%); }
+.steering-pad__direction--left { left: 5px; top: 50%; transform: translateY(-50%); }
+.steering-pad__direction--right { right: 5px; top: 50%; transform: translateY(-50%); }
 
 .steering-pad:focus-visible {
   outline: 2px solid #b8fbff;
@@ -416,7 +418,6 @@
   .action-notice { font-size: 10px; }
   .flight-controls { gap: 8px; }
   .steering-pad { width: 88px; height: 88px; }
-  .thrust-controls { width: 92px; gap: 6px; }
   .combat-controls { gap: 6px; }
   .voyage-ui button { font-size: 11px; padding: 7px; }
 }
@@ -435,15 +436,13 @@
   .flight-controls { align-items: center; gap: 6px; }
   .voyage-ui .settings-button { min-width: 44px; }
   .steering-pad { width: 44px; height: 44px; }
-  .thrust-controls { flex-direction: row; align-items: center; gap: 6px; width: auto; }
-  .thrust-controls button { width: 60px; }
+  .steering-pad__direction { display: none; }
   .combat-controls { flex-direction: row; }
   #cannon-button, #dodge-button { width: 60px; }
   .cockpit-console { height: 26vh; }
 }
 @media (max-width: 360px) and (orientation: portrait) {
   .steering-pad { width: 76px; height: 76px; }
-  .thrust-controls { width: 80px; }
   #orbit-button { width: 88px; }
   #track-button { width: 90px; }
   .voyage-ui .voyage-action { width: 102px; }
