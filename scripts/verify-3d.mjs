@@ -501,28 +501,20 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => SpacePiratesAmbient.resume());
   await page.locator('#battle-start').click();
-  // Boarding is now a manual TPS, not an automatic exchange of 2D sprite shots.
+  // Full physical crew combat/looting is covered by verify-boarding.mjs.
+  // Here verify the real voyage -> upper helm -> lower lever -> voyage boundary.
   await page.evaluate(()=>SpacePiratesBattle.stopLoop());
-  for(let shot=0;shot<8&&(await page.evaluate(()=>SpacePiratesBattle.getState().phase))==='active';shot++) {
-    for(let correction=0;correction<5;correction++) {
-      const b=await page.evaluate(()=>SpacePiratesBattle.getState()),cam=b.rendering.camera;
-      const dx=b.enemy.x-cam[0],dz=b.enemy.z-cam[2],yaw=Math.atan2(dx,-dz),pitch=Math.atan2(cam[1]-1.25,Math.hypot(dx,dz));
-      const look=await page.locator('#battle-look').boundingBox(),x=look.width*.65,y=look.height*.42;
-      const dragX=Math.atan2(Math.sin(yaw-b.view.yaw),Math.cos(yaw-b.view.yaw))/.005,dragY=(pitch-b.view.pitch)/.004;
-      await page.mouse.move(x,y);await page.mouse.down({button:'right'});await page.mouse.move(x+dragX,y+dragY);await page.mouse.up({button:'right'});
-      await page.evaluate(()=>SpacePiratesBattle.redraw());
-    }
-    await page.locator('#battle-fire').click();
-    await page.evaluate(()=>{for(let i=0;i<14;i++)SpacePiratesBattle.update(.02);SpacePiratesBattle.redraw();});
-  }
-  await page.evaluate(()=>{for(let i=0;i<50;i++)SpacePiratesBattle.update(.02);SpacePiratesBattle.redraw();});
-  assert.equal(await page.evaluate(()=>SpacePiratesBattle.getState().phase),'victory');
-  await page.waitForFunction(() => !document.getElementById('battle-result').hidden);
-  await page.screenshot({ path: 'qa-output/battle-result.png' });
-  console.log('battle', await page.locator('#battle-result').innerText());
-  await page.locator('#battle-result-action').click();
-  assert.deepEqual(await page.evaluate(() => SpacePiratesBattle.getCargo()), { fuelCells: 2, ammoCrates: 1, medicalSupplies: 1 });
-  await page.locator('#battle-result-action').click();
+  const boarding=await page.evaluate(()=>SpacePiratesBattle.getState());
+  assert.equal(boarding.zone,'cockpit');assert.equal(boarding.player.y,4);
+  assert.equal(ready.rendering.lowerBreach,true);
+  assert.ok(ready.rendering.cameraPosition[1]-ready.rendering.playerHatch[1]>3,'Breach below cockpit');
+  const crewStep=async n=>page.evaluate(n=>{for(let i=0;i<n;i++)SpacePiratesBattle.update(.02);SpacePiratesBattle.redraw();},n);
+  await page.keyboard.down('w');await crewStep(209);await page.keyboard.up('w');
+  await page.keyboard.down('d');await crewStep(34);await page.keyboard.up('d');
+  assert.equal((await page.evaluate(()=>SpacePiratesBattle.getState())).interaction.type,'extract');
+  await page.keyboard.press('e');await crewStep(100);
+  assert.equal((await page.evaluate(()=>SpacePiratesBattle.getState())).lastOutcome,'extracted');
+  assert.deepEqual(await page.evaluate(()=>SpacePiratesBattle.getCargo()),{fuelCells:0,ammoCrates:0,medicalSupplies:0});
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().mode), 'cruise');
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().rendering.bridgeVisible), false);
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().steeringLocked), false);
@@ -584,7 +576,8 @@ try {
     scene.destroy();
     return { state, flash };
   });
-  assert.ok(reduced.state.rendering.cameraPosition.every((value, index) => Math.abs(value - Object.values(reduced.state.navigation.position)[index]) < 1e-10), 'Reduced motion removes recoil');
+  const cockpitOffset=reduced.state.rendering.cameraPosition.map((value,index)=>value-Object.values(reduced.state.navigation.position)[index]);
+  assert.ok(Math.abs(Math.hypot(...cockpitOffset)-1.6)<1e-10, 'Reduced motion removes recoil while retaining the physical upper-cockpit docking offset');
   assert.equal(reduced.state.rendering.debrisVisible, false, 'Reduced motion removes flying debris');
   assert.equal(Number(reduced.flash), 0, 'Reduced motion removes contact flash');
 

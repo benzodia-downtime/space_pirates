@@ -434,7 +434,8 @@ export class VoyageRenderer {
     this.harpoonCable = this.mesh(this.scene, this.cylinderGeometry, m.trim);
     this.harpoonBolt = this.mesh(this.scene, this.keep(new THREE.ConeGeometry(0.3, 1.5, 5)), m.amber);
     this.playerHatch = new THREE.Object3D();
-    this.playerHatch.position.set(0, 0, -14);
+    // The breach is on the lower forward deck, below the raised cockpit.
+    this.playerHatch.position.set(0, -4, -14);
     this.player.add(this.playerHatch);
     this.canopy = new THREE.Group();
     this.camera.add(this.canopy);
@@ -576,6 +577,9 @@ export class VoyageRenderer {
     const origin = nav?.placed ? nav.position : { x: 0, y: 0, z: 6 };
     this.camera.position.set(origin.x + Math.sin(a.impactAge*71)*shock*0.06, origin.y + Math.sin(a.impactAge*53)*shock*0.1, origin.z + shock*0.48 - chargeMotion*0.2);
     this.camera.rotation.set(-steering.y*0.312 + Math.sin(a.impactAge*49)*shock*0.016, -steering.x*0.442, Math.sin(a.impactAge*63)*shock*0.012);
+    // The docking cradle settles the lower deck onto the ram axis after impact.
+    // Keep the puncture fixed in world space while the upper helm seats above it.
+    this.camera.position.add(new THREE.Vector3(0,4*a.breach,0).applyEuler(this.camera.rotation));
     const range = distance;
     if (nav?.placed) {
       this.enemy.position.set(nav.enemyPosition.x, nav.enemyPosition.y, nav.enemyPosition.z);
@@ -600,7 +604,7 @@ export class VoyageRenderer {
       panel.rotation.set(y*a.breach*0.72,-x*a.breach*0.8,x*y*a.breach*0.22);
     }
     this.ramHead.visible = a.ram > 0;
-    this.ramHead.position.set(0,-6.8*(1-a.ram),-14-a.ram*4);
+    this.ramHead.position.set(0,-4*a.breach-6.8*(1-a.ram),-14-a.ram*4);
     this.ramPistons.forEach(piston => { piston.visible = a.ram > 0; piston.scale.z = 3+a.ram*5; piston.position.z = -11.5-a.ram*2.5; });
     this.claws.forEach(claw => {
       claw.visible = a.clamps > 0;
@@ -700,6 +704,7 @@ export class VoyageRenderer {
       gunMounts: this.guns.map(g=>({mount:g.mount,position:g.group.getWorldPosition(new THREE.Vector3()).toArray(),direction:g.group.getWorldDirection(new THREE.Vector3()).toArray()})),
       bowFacing: new THREE.Vector3(0,0,1).applyQuaternion(this.enemy.quaternion).toArray(),
       passageEnd: this.passageEnd.getWorldPosition(new THREE.Vector3()).toArray(),
+      playerHatch: this.playerHatch.getWorldPosition(new THREE.Vector3()).toArray(),lowerBreach:true,
       armourBreached: this.lastFrame.assault.breach >= 1, ramVisible: this.ramHead.visible,
       clawsVisible: this.claws.every(claw => claw.visible), debrisVisible: this.debris.visible,
       bridgeEnd: this.collar.position.toArray(), bridgeVisible: this.bridge.visible,

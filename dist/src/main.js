@@ -1,6 +1,6 @@
-import { VoyageScene } from "./voyage.js?v=enemyorbit-1";
-import { BoardingController } from "./boarding-controller.js?v=tps-1";
-import { CREW } from "./boarding-combat.js?v=tps-1";
+import { VoyageScene } from "./voyage.js?v=extraction-1";
+import { BoardingController } from "./boarding-controller.js?v=extraction-1";
+import { CREW } from "./boarding-combat.js?v=extraction-1";
 
 (() => {
   "use strict";

@@ -21,6 +21,9 @@
 .crew-vital--enemy .health-track span{background:#e48a68}
 .battle-spacer{flex:1}
 .battle-controls{display:flex;flex-direction:column;gap:10px}
+.battle-action-row{display:flex;justify-content:flex-end;align-items:center;gap:12px;min-height:48px}
+#battle-bag{font-size:12px;color:#ffe1a1;margin-right:auto;text-shadow:0 1px 4px #000;max-width:50%;word-break:keep-all}
+#battle-interact{border-color:#f3c781;background:#463720ee;max-width:55%}
 .battle-help{margin:0;text-align:center;color:#b2c7d0;font-size:11px;text-shadow:0 1px 4px #000}
 .battle-control-row{display:flex;justify-content:space-between;align-items:flex-end;gap:18px}
 .battle-pad{width:124px;height:124px;position:relative;border:1px solid #9abcca65;border-radius:50%;background:radial-gradient(#31576b66,#10222d99);pointer-events:auto;touch-action:none;flex:none}
@@ -48,3 +51,4 @@
 @media(max-width:350px){.battle-ui{padding-left:10px;padding-right:10px}.battle-pad{width:90px;height:90px}.battle-control-row{gap:7px}.battle-secondary button{max-width:86px}.battle-mission p{max-width:190px}}
 @media(max-height:480px){.battle-ui{padding-top:10px;padding-bottom:10px;gap:6px}.battle-mission h1{display:none}.battle-mission p{margin-top:3px}.battle-vitals{position:absolute;right:130px;top:12px;max-width:255px;gap:8px}.crew-vital{width:115px;padding:6px 8px}.battle-pad{width:88px;height:88px}.battle-help{display:none}.battle-secondary,.battle-weapon{flex-direction:row}.battle-control-row{gap:10px}#battle-fire{height:55px;width:80px}.battle-modal{padding:18px}}
 @media(prefers-reduced-motion:reduce){.health-track span{transition:none}}
+@media(max-height:480px){.battle-action-row{min-height:44px}.battle-controls{gap:5px}.battle-mission p{max-width:230px}.battle-vitals{position:static;max-width:255px}.battle-ui{gap:5px}.battle-pad{width:76px;height:76px}#battle-bag{font-size:10px}}

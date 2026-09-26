@@ -1,6 +1,7 @@
 import * as THREE from '../vendor/three.module.js';
-import {COVER,cameraPose,muzzle} from './boarding-combat.js?v=tps-1';
-import {CrewRig} from './crew-rig.js?v=tps-1';
+import {COVER,cameraPose,muzzle} from './boarding-combat.js?v=extraction-1';
+import {WALLS,INTERIOR} from './boarding-layout.js?v=extraction-1';
+import {CrewRig} from './crew-rig.js?v=extraction-1';
 
 export class BoardingRenderer {
   constructor(canvas) {
@@ -9,14 +10,15 @@ export class BoardingRenderer {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));this.renderer.outputColorSpace=THREE.SRGBColorSpace;
     this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.25;
     this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-    this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x101b28);this.scene.fog=new THREE.Fog(0x172330,18,48);
+    this.scene=new THREE.Scene();this.scene.background=new THREE.Color(0x050d18);this.scene.fog=new THREE.Fog(0x172330,32,90);
     this.camera=new THREE.PerspectiveCamera(60,1,.06,100);
     this.boxGeometry=this.keep(new THREE.BoxGeometry(1,1,1));
     this.scene.add(new THREE.HemisphereLight(0xc8e4ef,0x27333e,2));
     const key=new THREE.DirectionalLight(0xd7f2ff,2.7);key.position.set(-5,10,9);key.castShadow=true;
-    key.shadow.mapSize.set(1024,1024);Object.assign(key.shadow.camera,{left:-12,right:12,top:18,bottom:-18,near:1,far:40});key.shadow.bias=-.0005;this.scene.add(key);
+    key.shadow.mapSize.set(1024,1024);Object.assign(key.shadow.camera,{left:-16,right:16,top:48,bottom:-40,near:1,far:85});key.shadow.bias=-.0005;this.scene.add(key);
     const rim=new THREE.DirectionalLight(0xff8b56,1.7);rim.position.set(5,5,-14);this.scene.add(rim);
-    this.makeRoom();this.batch([...this.scene.children].filter(o=>o.isMesh&&o.geometry===this.boxGeometry));
+    this.makeRoom();this.makeOwnShip();this.batch([...this.scene.children].filter(o=>o.isMesh&&o.geometry===this.boxGeometry));
+    this.lootMarker=new THREE.Mesh(this.keep(new THREE.OctahedronGeometry(.14)),this.material(0xffd67d,.4,true));this.scene.add(this.lootMarker);
     this.player=new CrewRig(this);this.enemy=new CrewRig(this,true);
     this.lines=Array.from({length:12},()=>{
       const geometry=this.keep(new THREE.BufferGeometry());geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(6),3));
@@ -57,7 +59,9 @@ export class BoardingRenderer {
       for(let z=-13;z<15;z+=4){this.box(this.scene,beam,.45,5.4,.35,side*8.88,2.7,z);this.box(this.scene,dark,.07,1.8,2.7,side*8.95,2.7,z+1.8);this.box(this.scene,light,.09,.07,1.7,side*8.85,3.9,z+1.8);}
       this.box(this.scene,brass,.16,.16,29,side*8.6,.5,0);
     }
-    this.box(this.scene,wall,18,5.6,.4,0,2.8,-15.2);this.box(this.scene,wall,18,5.6,.4,0,2.8,15.2);
+    this.box(this.scene,wall,18,5.6,.4,0,2.8,-15.2);
+    for(const side of [-1,1])this.box(this.scene,wall,6.8,5.6,.4,side*5.6,2.8,15.2);
+    this.box(this.scene,wall,4.4,1.8,.4,0,4.7,15.2);
     this.box(this.scene,dark,4,3.5,.12,0,1.75,-14.96);this.box(this.scene,beam,3.5,3.1,.16,0,1.55,-14.86);
     this.box(this.scene,red,.06,2.6,.08,0,1.5,-14.74);
     for(let z=-12;z<=12;z+=6){this.box(this.scene,beam,18,.35,.35,0,5.3,z);this.box(this.scene,light,4,.04,.28,0,5.08,z);}
@@ -70,10 +74,73 @@ export class BoardingRenderer {
     }
     // Physical floor markings and the breached entry behind the player.
     for(let z=8;z<=13;z+=1)this.box(this.scene,brass,.13,.015,.5,-3.9,.01,z);
-    this.box(this.scene,dark,3.8,3.5,.15,0,1.75,14.94);
-    for(const x of [-1.9,1.9])this.box(this.scene,light,.07,3.4,.1,x,1.7,14.82);
+    for(const x of [-2.12,2.12])this.box(this.scene,light,.07,3.7,.1,x,1.85,14.82);
+    this.sign('NAUTILUS / RETURN',0,3.35,14.82,3.3,.36,Math.PI);
     this.sign('CARGO / 07',0,3.95,-14.92,2.8,.48);
     this.sign('BOARDING SECTOR',-8.85,2.2,1,2.5,.4,Math.PI/2);
+  }
+  makeOwnShip() {
+    const existing=new Set(this.scene.children);
+    const blue=this.material(0x1b394a),floor=this.material(0x385461),trim=this.material(0x557984),dark=this.material(0x0a1926),cyan=this.material(0x69e2ed,.4,true),amber=this.material(0xf5ba6a,.4,true);
+    // Walkable lower airlock and elevated cockpit share the simulation's plan.
+    this.box(this.scene,floor,8,.25,5,0,-.15,25.5);
+    this.box(this.scene,floor,10,.25,8,0,3.85,40);
+    this.box(this.scene,dark,10,.2,8,0,8.15,40);
+    this.box(this.scene,dark,8,.2,5,0,4.15,25.5);
+    this.box(this.scene,dark,4.4,.2,8,0,8.15,32);
+    for(const w of WALLS.filter(w=>w.z>=22.8)) {
+      this.box(this.scene,blue,w.w,w.h,w.d,w.x,(w.y||0)+w.h/2,w.z);
+    }
+    for(let i=0;i<16;i++) {
+      const h=(i+1)*.25,z=28+i*.5+.25;
+      this.box(this.scene,floor,4,h,.5,0,h/2,z);
+      this.box(this.scene,cyan,3.9,.018,.035,0,h+.015,z-.22);
+    }
+    for(const side of [-1,1]) {
+      // Repeating short rails follow the stairs down to the forward lower deck.
+      for(let i=0;i<8;i++)this.box(this.scene,trim,.065,.07,1.1,side*1.85,1+i*.5,28.5+i);
+      this.box(this.scene,cyan,.07,.06,4,side*3.8,.25,25.5);
+      this.box(this.scene,cyan,.07,.06,7.7,side*4.8,4.25,40);
+      this.box(this.scene,cyan,3.7,.045,.06,side*2.9,7.4,36.05);
+      // Forward observation windows above the lower breach; enemy silhouette outside.
+      this.box(this.scene,this.material(0x06121e,.7,true),2.7,2.3,.06,side*3.45,6.05,36.04);
+      for(let i=0;i<7;i++)this.box(this.scene,cyan,.016,.016,.02,side*3.45+Math.sin(i*3.1)*1.15,5.2+(i%4)*.42,36.09);
+      this.box(this.scene,trim,2.3,.35,1.3,side*2.5,4.85,38.4);
+      const display=this.box(this.scene,cyan,1.4,.035,.65,side*2.5,5.05,38.4);display.rotation.x=-.25;
+      this.box(this.scene,dark,.8,.35,.8,side*2.5,4.5,40);
+      this.box(this.scene,blue,.85,1,.25,side*2.5,5,40.4);
+    }
+    this.sign('NAUTILUS / HELM',0,7.3,36.06,3.2,.4);
+    this.sign('BREACH / LOWER DECK',0,3.35,23.15,3.5,.32);
+    this.sign('RETURN TO HELM',0,6.5,35.75,2.9,.36,Math.PI);
+    this.sign('DISCONNECT',3,2,25.3,1.55,.26);
+    for(const z of [24.3,26.5,37,39,41]) {
+      const y=z>36?4:0;
+      this.box(this.scene,cyan,.08,.018,.9,-.6,y+.02,z);
+      this.box(this.scene,cyan,.08,.018,.9,.6,y+.02,z);
+    }
+    // Transparent, ribbed bridge: visibly spans the gap instead of a painted door.
+    this.passage=new THREE.Group();this.passage.position.z=23;this.scene.add(this.passage);
+    this.box(this.passage,floor,4.4,.25,8,0,-.15,-4);
+    this.box(this.passage,dark,4.6,.18,8,0,3.9,-4);
+    const glass=this.keep(new THREE.MeshStandardMaterial({color:0x4c8ca5,transparent:true,opacity:.28,side:THREE.DoubleSide,roughness:.35}));
+    for(const side of [-1,1]) {
+      this.box(this.passage,glass,.1,3.8,8,side*2.25,1.9,-4);
+      this.box(this.passage,cyan,.045,.08,8,side*2.1,.35,-4);
+      for(let z=-8;z<=0;z+=2)this.box(this.passage,trim,.12,3.8,.18,side*2.2,1.9,z);
+    }
+    for(let z=-8;z<=0;z+=2)this.box(this.passage,trim,4.5,.12,.18,0,3.8,z);
+    const background=this.material(0x2a394a);
+    for(const side of [-1,1])this.box(this.scene,background,8,8,25,side*13,1,4);
+    this.lever=new THREE.Group();this.lever.position.set(INTERIOR.lever.x,1.1,INTERIOR.lever.z);this.scene.add(this.lever);
+    this.box(this.lever,dark,.5,.95,.5,0,-.5,0);
+    this.leverArm=new THREE.Group();this.lever.add(this.leverArm);
+    this.box(this.leverArm,trim,.075,.55,.075,0,.22,0);
+    this.box(this.leverArm,amber,.42,.12,.14,0,.51,0);
+    this.sealDoor=this.box(this.passage,blue,4.4,3.8,.18,0,5.8,-.1);
+    // Architectural ceilings should not cast coarse, room-wide bands through
+    // the much smaller combat shadow map. Characters/cargo retain shadows.
+    for(const child of this.scene.children)if(!existing.has(child))child.traverse(o=>{if(o.isMesh)o.castShadow=false;});
   }
   sign(text,x,y,z,w,h,yaw=0) {
     const canvas=document.createElement('canvas');canvas.width=512;canvas.height=80;
@@ -90,12 +157,19 @@ export class BoardingRenderer {
     this.camera.lookAt(pose.position.x+pose.direction.x,pose.position.y+pose.direction.y+recoil,pose.position.z+pose.direction.z);
     if(this.camera.fov!==pose.fov){this.camera.fov=pose.fov;this.camera.updateProjectionMatrix();}
     this.player.update(sim.player,sim.time,sim.view.pitch,reduced);this.enemy.update(sim.enemy,sim.time,0,reduced);
+    this.lootMarker.visible=sim.enemy.health<=0&&!sim.enemy.looted;
+    this.lootMarker.position.set(sim.enemy.x,.7+(reduced?0:Math.sin(sim.time*3)*.07),sim.enemy.z);
+    this.lootMarker.rotation.y=sim.time;
+    this.leverArm.rotation.x=-sim.extraction*1.1;
+    this.sealDoor.position.y=5.8-Math.min(1,sim.extraction*2)*3.9;
+    // First seal our airlock, then visibly shorten the bridge behind it.
+    this.passage.scale.z=1-Math.max(0,sim.extraction-.5)*1.8;
     this.lines.forEach((line,i)=>{const shot=sim.tracers[i];line.visible=Boolean(shot);if(shot)this.line(line,shot.from,shot.to,shot.color,1-shot.age/.1);});
     this.sparks.forEach((mesh,i)=>{const impact=sim.impacts[i];mesh.visible=Boolean(impact)&&!reduced;if(impact){mesh.position.set(impact.point.x,impact.point.y,impact.point.z);mesh.scale.setScalar(1+impact.age*4);mesh.material.color.setHex(impact.color);}});
     this.laser.visible=sim.phase==='active'&&['aim','lock'].includes(sim.enemyPhase);
-    if(this.laser.visible){const from=muzzle(sim.enemy,{yaw:sim.enemy.yaw}),to=sim.enemyPhase==='lock'?sim.enemyAim:{x:sim.player.x,y:sim.player.crouch?.65:1.25,z:sim.player.z};this.line(this.laser,from,to,sim.enemyPhase==='lock'?0xff5942:0xffc56b,.48);}
+    if(this.laser.visible){const from=muzzle(sim.enemy,{yaw:sim.enemy.yaw}),to=sim.enemyPhase==='lock'?sim.enemyAim:{x:sim.player.x,y:sim.player.y+(sim.player.crouch?.65:1.25),z:sim.player.z};this.line(this.laser,from,to,sim.enemyPhase==='lock'?0xff5942:0xffc56b,.48);}
     this.renderer.render(this.scene,this.camera);
   }
-  getState(){return {type:this.available?'webgl2':'unavailable',camera:this.camera?.position.toArray(),fov:this.camera?.fov,player:this.player?.getState(),enemy:this.enemy?.getState(),drawCalls:this.renderer?.info.render.calls,triangles:this.renderer?.info.render.triangles,pixelRatio:this.renderer?.getPixelRatio()};}
+  getState(){return {type:this.available?'webgl2':'unavailable',camera:this.camera?.position.toArray(),fov:this.camera?.fov,player:this.player?.getState(),enemy:this.enemy?.getState(),connectedInterior:true,cockpitHeight:4,bridgeHeight:0,leverAngle:this.leverArm?.rotation.x,drawCalls:this.renderer?.info.render.calls,triangles:this.renderer?.info.render.triangles,pixelRatio:this.renderer?.getPixelRatio()};}
   destroy(){this.canvas.removeEventListener('webglcontextlost',this.onLost);this.canvas.removeEventListener('webglcontextrestored',this.onRestored);for(const r of this.resources)r.dispose();this.renderer?.dispose();}
 }

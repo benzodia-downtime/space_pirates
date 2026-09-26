@@ -12,7 +12,7 @@
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./voyage.css?v=enemyorbit-1" />
-    <link rel="stylesheet" href="./battle.css?v=tps-1" />
+    <link rel="stylesheet" href="./battle.css?v=extraction-1" />
   </head>
   <body>
     <a class="skip-link" href="#steering-pad">항해 조작으로 바로가기</a>
@@ -83,6 +83,7 @@
         </div>
         <div class="hud-view" aria-hidden="true"></div>
         <div class="hud-bottom v-panel">
+          <output id="boarding-notice" class="action-notice" aria-live="polite" hidden></output>
           <output id="orbit-readout" class="action-notice" hidden></output>
           <div class="hud-action-row h-panel">
             <section id="orbit-controls" class="orbit-controls h-panel" aria-label="표적 중심 자동항법" hidden>
@@ -93,7 +94,7 @@
               <strong id="boarding-action-label">작살 발사</strong>
             </button>
             <button id="battle-start" class="voyage-action" type="button" aria-keyshortcuts="f" disabled hidden>
-              <strong>적함 돌입</strong>
+              <strong>조종석에서 일어나기</strong>
             </button>
           </div>
           <div class="hud-control-row h-panel">
@@ -148,16 +149,16 @@
     </dialog>
 
     <section id="battle-level" class="battle-level" aria-labelledby="battle-title" tabindex="-1" hidden>
-      <canvas id="battle-canvas" aria-label="3D 인간 승무원이 싸우는 적함 내부, 어깨 너머 TPS 시점"></canvas>
+      <canvas id="battle-canvas" aria-label="조종석과 아래층, 연결 통로와 적함 내부를 걸어 다니는 3D TPS 시점"></canvas>
       <div id="battle-look" aria-label="드래그로 조준 방향 변경"></div>
       <div class="crew-damage" aria-hidden="true"></div>
       <div id="battle-crosshair" class="battle-crosshair" aria-hidden="true"><i></i><b></b></div>
       <div class="battle-ui">
         <header class="battle-hud">
           <div class="battle-mission">
-            <span class="battle-eyebrow">BOARDING / CARGO 07</span>
-            <h1 id="battle-title">함내 교전</h1>
-            <p id="battle-phase" aria-live="polite">적 승무원 제압</p>
+            <span class="battle-eyebrow">NAUTILUS / BOARDING</span>
+            <h1 id="battle-title">약탈과 생환</h1>
+            <p id="battle-phase" aria-live="polite">아래층 연결 통로로 이동</p>
           </div>
           <button id="battle-pause" type="button" aria-label="전투 일시 정지" aria-pressed="false">일시 정지</button>
         </header>
@@ -173,7 +174,8 @@
         </div>
         <div class="battle-spacer"></div>
         <div id="battle-controls" class="battle-controls">
-          <p class="battle-help">WASD 이동 · 우클릭 드래그 조준 · 좌클릭 / F 사격 · R 장전 · C 낮추기 · Shift 달리기</p>
+          <div class="battle-action-row"><output id="battle-bag" hidden></output><button id="battle-interact" type="button" aria-keyshortcuts="e" hidden>상호작용 · E</button></div>
+          <p class="battle-help">WASD 이동 · 드래그 시선 · 좌클릭 / F 사격 · E 수색 / 레버 · R 장전 · C 낮추기 · Shift 달리기</p>
           <div class="battle-control-row">
             <div id="battle-pad" class="battle-pad" role="group" tabindex="0" aria-label="승무원 이동 패드. 위아래 전후진, 좌우 이동">
               <span class="battle-pad-label">이동</span><span class="battle-pad-axis"></span><span id="battle-pad-knob"></span>
@@ -191,20 +193,15 @@
       </div>
       <div id="battle-pause-panel" class="battle-overlay" role="dialog" aria-modal="true" aria-labelledby="battle-pause-title" hidden>
         <div class="battle-modal"><span class="battle-eyebrow">BOARDING / PAUSED</span><h2 id="battle-pause-title">일시 정지</h2>
-          <p>왼쪽 패드로 이동하고 오른쪽 화면을 드래그해 조준하세요. 화물 상자 뒤에서 몸을 낮추면 사선을 피할 수 있습니다.</p>
-          <p>PC: WASD 이동 · 우클릭 드래그 조준 · 좌클릭 / F 사격 · R 장전 · C 낮추기 · Shift 달리기</p>
-          <button id="battle-resume" type="button">계속하기</button><button id="battle-return" type="button">아군 함선으로 철수</button>
+          <p>승리 조건은 생환입니다. 적이 살아 있어도 왔던 연결 통로로 돌아갈 수 있습니다. 내 배 아래층의 분리 레버를 당기면 전리품이 확정됩니다.</p>
+          <p>적 시신 가까이에서 E / 수색 버튼으로 루팅하세요. 사망하면 휴대 물자를 잃고 조종석에서 부활합니다. 철수는 직접 걸어서 해야 합니다.</p>
+          <p>WASD 이동 · 드래그 시선 · 좌클릭 / F 사격 · E 수색 / 레버 · R 장전 · C 낮추기 · Shift 달리기</p>
+          <button id="battle-resume" type="button">계속하기</button>
         </div>
       </div>
-      <div id="battle-result" class="battle-overlay" role="dialog" aria-modal="true" aria-labelledby="battle-result-title" aria-describedby="battle-result-copy" hidden>
-        <div class="battle-modal"><span id="battle-result-eyebrow" class="battle-eyebrow">SECTOR SECURED</span><h2 id="battle-result-title">적함 제압</h2><p id="battle-result-copy"></p>
-          <ul id="battle-loot" class="loot-manifest" aria-label="회수 물자" hidden><li><span>연료 전지</span><strong>×2</strong></li><li><span>탄약 상자</span><strong>×1</strong></li><li><span>의료 물자</span><strong>×1</strong></li></ul>
-          <button id="battle-result-action" type="button">전리품 모두 회수</button><button id="battle-result-exit" type="button">회수 없이 철수</button>
-        </div>
-      </div>
-      <div id="battle-graphics-error" class="battle-overlay" role="alert" hidden><div class="battle-modal"><h2>3D 화면 연결 중단</h2><p>그래픽 복구 후 계속하기를 누르거나 새로고침해 주세요.</p><button id="battle-error-exit" type="button">항해로 돌아가기</button></div></div>
+      <div id="battle-graphics-error" class="battle-overlay" role="alert" hidden><div class="battle-modal"><h2>3D 화면 연결 중단</h2><p>그래픽 복구 후 계속하기를 누르거나 휴대 물자를 포기하고 조종석에서 부활하세요.</p><button id="battle-error-exit" type="button">휴대 물자 포기 · 조종석 부활</button></div></div>
     </section>
 
-    <script type="module" src="./src/main.js?v=tps-1"></script>
+    <script type="module" src="./src/main.js?v=extraction-1"></script>
   </body>
 </html>

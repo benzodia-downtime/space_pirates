@@ -1,5 +1,5 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=enemyorbit-1";
-import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=enemyorbit-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=extraction-1";
+import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=extraction-1";
 import { AssaultAudio } from "./assault-audio.js?v=enemyorbit-1";
 import { EnemyDefense } from "./enemy-defense.js?v=enemyorbit-1";
 import { PlayerCannon } from "./player-cannon.js?v=enemyorbit-1";
@@ -542,8 +542,10 @@ export class VoyageScene {
     }
   }
 
-  resolveEncounter({ lootRecovered = false } = {}) {
-    if (lootRecovered) this.startNewSearch({ announce: true });
+  resolveEncounter({ extracted = false } = {}) {
+    // Live withdrawal is a success even with an empty bag and a living guard.
+    // A death leaves the same breach connected for respawning at the helm.
+    if (extracted) this.startNewSearch({ announce: true });
   }
 
   setVoyageMode(nextMode, announcement = "") {

@@ -50,7 +50,7 @@ export class CrewRig {
     const pieces=[];this.root.traverse(o=>{if(o.isMesh&&o.geometry===host.boxGeometry)pieces.push(o);});this.instances=host.batch(pieces);
   }
   update(actor,time,viewPitch=0,reduced=false) {
-    this.root.position.set(actor.x,0,actor.z);this.root.rotation.set(0,-actor.yaw,0);
+    this.root.position.set(actor.x,actor.y||0,actor.z);this.root.rotation.set(0,-actor.yaw,0);
     const dt=Math.min(.05,Math.max(0,time-(this.lastTime??time))),weight=1-Math.exp(-16*dt);this.lastTime=time;
     if(time===0){this.crouch=actor.crouch?1:0;this.blend=0;}
     this.crouch+=((actor.crouch?1:0)-this.crouch)*weight;

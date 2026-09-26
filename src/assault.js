@@ -21,7 +21,7 @@ export const ASSAULT_COPY = Object.freeze({
   clamp: ["선체 고정", "고정 발톱을 펼쳐 충각을 적함 격벽에 고정합니다.", "04 / CLAW LOCK"],
   seal: ["진입구 밀폐", "충각 내부의 기밀 통로를 손상된 격벽에 결합합니다.", "05 / BREACH SEAL"],
   pressurize: ["압력 동기화", "기밀 확인 후 내부 차단문을 개방합니다.", "06 / PRESSURE EQUALIZING"],
-  ready: ["강습로 확보", "진입구가 확보되었습니다. 승무원을 적함 내부로 투입하십시오.", "PASSAGE CLEAR"],
+  ready: ["강습로 확보", "조종석에서 일어나 아래층 연결 통로로 내려가십시오. 생환 후 분리 레버로 철수합니다.", "PASSAGE CLEAR"],
 });
 
 // Simulation time only: pausing, a hidden tab or a lost GPU context cannot skip a beat.
