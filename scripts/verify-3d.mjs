@@ -48,7 +48,7 @@ try {
     assert.ok((await read()).rendering.farClipMetres >= 18000);
     await page.evaluate(async () => {
       SpacePiratesAmbient.destroy();
-      const { VoyageScene } = await import(new URL('./src/voyage.js?v=tetherpeace-1', location.href));
+      const { VoyageScene } = await import(new URL('./src/voyage.js?v=turret360-1', location.href));
       window.qaVisibilityScene = new VoyageScene(document.getElementById('starfield'));
       qaVisibilityScene.pause();
     });
@@ -508,7 +508,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=tetherpeace-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=turret360-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();

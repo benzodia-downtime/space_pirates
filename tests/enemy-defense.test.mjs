@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {EnemyDefense,DEFENSE} from '../src/enemy-defense.js';
+import {EnemyDefense,DEFENSE,GUN_MOUNTS} from '../src/enemy-defense.js';
 import {OrbitNavigation,ORBIT,lookAt} from '../src/navigation.js';
 const setup=()=>{const nav=new OrbitNavigation();nav.begin({x:0,y:0});return {nav,enemy:new EnemyDefense()};};
 const advance=(enemy,nav,seconds)=>{for(let t=0;t<seconds;t+=.02)enemy.update(.02,nav);};
 
 test('Defensive yaw is slower than player orbit and alternates turns with a real opening',()=>{
-  const {nav,enemy}=setup();nav.angle=1.2;nav.updatePosition();
+  const {nav,enemy}=setup();nav.angle=1.2;nav.radius=800;nav.updatePosition();
   const p={...nav.position},center={...nav.enemyPosition};
   advance(enemy,nav,3);
   assert.ok(nav.enemyYaw>0);assert.ok(nav.enemyYaw<3.1*DEFENSE.turnRate);
@@ -24,11 +24,38 @@ test('Continuous orbital movement gains the rear despite enemy defence',()=>{
   }
   assert.ok(rear);assert.ok(enemy.hull>0);
 });
-test('Turret has no rear or overhead firing solution, and stays asleep at long range',()=>{
-  for(const pose of [{angle:Math.PI,elevation:0},{angle:0,elevation:1},{angle:0,elevation:0,radius:800}]) {
+test('Dorsal turret covers 360 degrees and overhead, including a rotated enemy hull',()=>{
+  for(const yaw of [0,1.3]) for(const angle of [0,Math.PI/4,Math.PI/2,Math.PI,-Math.PI/2]) {
+    const {nav,enemy}=setup();nav.setEnemyYaw(yaw);nav.angle=angle;nav.updatePosition();
+    assert.equal(enemy.inArc(nav,'dorsal'),true);
+    advance(enemy,nav,5.2);assert.equal(enemy.shots,1);
+    assert.equal(enemy.mount,enemy.inArc(nav,'bow')?'bow':'dorsal');
+    const bolt=enemy.bolts[0],pivot=nav.world(GUN_MOUNTS[enemy.mount]);
+    const d={x:enemy.aimPoint.x-pivot.x,y:enemy.aimPoint.y-pivot.y,z:enemy.aimPoint.z-pivot.z};
+    const length=Math.hypot(d.x,d.y,d.z),muzzle=enemy.muzzle(nav);
+    for(const axis of ['x','y','z']) {
+      assert.ok(Math.abs(bolt.direction[axis]-d[axis]/length)<1e-8);
+      assert.ok(Math.abs(muzzle[axis]-pivot[axis]-d[axis]/length*6)<1e-8);
+    }
+  }
+  const {nav,enemy}=setup();nav.elevation=Math.PI/2;nav.updatePosition();
+  advance(enemy,nav,5.2);assert.equal(enemy.mount,'dorsal');assert.equal(enemy.shots,1);
+});
+test('Turrets do not shoot through their own hull or beyond range',()=>{
+  for(const pose of [{angle:0,elevation:-Math.PI/2},{angle:Math.PI,elevation:-.6},{angle:0,elevation:0,radius:800}]) {
     const {nav,enemy}=setup();Object.assign(nav,pose);nav.updatePosition();
     advance(enemy,nav,8);assert.equal(enemy.shots,0);assert.equal(enemy.hull,100);
   }
+});
+test('Side-to-rear tracking retains its charge and locked turret cannot home or switch mounts',()=>{
+  const {nav,enemy}=setup();nav.angle=Math.PI/2;nav.updatePosition();enemy.cooldown=0;
+  advance(enemy,nav,.8);assert.equal(enemy.mount,'dorsal');const time=enemy.gunTime;
+  nav.angle=Math.PI;nav.updatePosition();enemy.update(.02,nav);assert.ok(enemy.gunTime>time);
+  while(enemy.gunPhase!=='locked')enemy.update(.02,nav);
+  const target={...enemy.aimPoint},muzzle=enemy.muzzle(nav);
+  nav.angle=0;nav.updatePosition();advance(enemy,nav,1.3);
+  assert.equal(enemy.mount,'dorsal');assert.deepEqual(enemy.aimPoint,target);assert.deepEqual(enemy.muzzle(nav),muzzle);
+  assert.equal(enemy.shots,1);
 });
 test('Charging tracks, then locks a point for a full dodge window; fired bolts do not home',()=>{
   const {nav,enemy}=setup();
@@ -60,8 +87,9 @@ test('Pause freezes AI; attachment immediately stops counterfire and arrests the
   enemy.reset();assert.equal(enemy.hull,100);assert.equal(enemy.shots,0);
 });
 test('Attachment cancels tracking, locked salvos and flying rounds; release restores defence',()=>{
-  for(const phase of ['aim','locked','fired']) {
+  for(const angle of [0,Math.PI]) for(const phase of ['aim','locked','fired']) {
     const {nav,enemy}=setup();
+    nav.angle=angle;nav.updatePosition();
     for(let i=0;i<400 && !(phase==='fired'?enemy.bolts.length:enemy.gunPhase===phase);i++) enemy.update(.02,nav);
     assert.ok(phase==='fired'?enemy.bolts.length:enemy.gunPhase===phase);
     const shots=enemy.shots,hull=enemy.hull;

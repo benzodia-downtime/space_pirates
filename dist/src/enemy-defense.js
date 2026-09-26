@@ -12,6 +12,33 @@ export const DEFENSE = Object.freeze({
   fanStep: .1, fanCount: 9,
 });
 
+// Gun pivots are shared with the renderer; a rotating barrel's muzzle follows its bore.
+export const GUN_MOUNTS = Object.freeze({
+  bow: Object.freeze({x:0,y:2,z:33}),
+  dorsal: Object.freeze({x:0,y:20,z:8}),
+});
+// Conservative local-space hull/bridge/engine bounds prevent firing through our own ship.
+const HULL_BOUNDS = [
+  [[-16.5,-10.5,-50.5],[16.5,10.5,32.2]],
+  [[-7.5,8.75,-30],[7.5,13.9,-4]],
+  [[-22.5,-7,-39],[-15.5,3,9]], [[15.5,-7,-39],[22.5,3,9]],
+];
+function blockedByHull(from,to) {
+  return HULL_BOUNDS.some(([lo,hi])=>{
+    let enter=0,exit=1;
+    for(const [i,axis] of ['x','y','z'].entries()) {
+      const step=to[axis]-from[axis];
+      if(Math.abs(step)<1e-9) {if(from[axis]<lo[i] || from[axis]>hi[i])return false;}
+      else {
+        const a=(lo[i]-from[axis])/step,b=(hi[i]-from[axis])/step;
+        enter=Math.max(enter,Math.min(a,b));exit=Math.min(exit,Math.max(a,b));
+        if(enter>exit)return false;
+      }
+    }
+    return exit>0 && enter<1;
+  });
+}
+
 // Deterministic, simulation-time AI. The gun cannot track once its amber aim turns red.
 export class EnemyDefense {
   constructor() { this.reset(); }
@@ -25,12 +52,22 @@ export class EnemyDefense {
   }
   get defeated() { return this.hull <= 0; }
   get charge() { return this.gunPhase === 'aim' ? this.gunTime / DEFENSE.aimSeconds : this.gunPhase === 'locked' ? 1 : 0; }
-  inArc(nav) {
+  inArc(nav, mount=this.mount) {
     const d = sub(nav.position, nav.enemyPosition);
-    const facing=nav.enemyYaw;
-    return len(d) <= DEFENSE.range && Math.abs(wrap(Math.atan2(d.x,d.z)-facing)) <= DEFENSE.coneYaw && Math.abs(Math.atan2(d.y,Math.hypot(d.x,d.z))) <= DEFENSE.conePitch;
+    if(len(d)>DEFENSE.range) return false;
+    if(mount==='bow' && (Math.abs(wrap(Math.atan2(d.x,d.z)-nav.enemyYaw))>DEFENSE.coneYaw || Math.abs(Math.atan2(d.y,Math.hypot(d.x,d.z)))>DEFENSE.conePitch)) return false;
+    const c=Math.cos(nav.enemyYaw),s=Math.sin(nav.enemyYaw);
+    const local={x:c*d.x-s*d.z,y:d.y,z:s*d.x+c*d.z};
+    return !blockedByHull(GUN_MOUNTS[mount],local);
   }
-  muzzle(nav) { return nav.world({x:0,y:2,z:39}); }
+  selectMount(nav) {
+    return this.inArc(nav,'bow') ? 'bow' : this.inArc(nav,'dorsal') ? 'dorsal' : null;
+  }
+  muzzle(nav) {
+    const pivot=nav.world(GUN_MOUNTS[this.mount]);
+    const aim=this.aimPoint || nav.position,d=sub(aim,pivot),distance=len(d)||1;
+    return {x:pivot.x+d.x/distance*6,y:pivot.y+d.y/distance*6,z:pivot.z+d.z/distance*6};
+  }
   directions(nav) {
     if(!this.aimPoint) return [];
     const d=sub(this.aimPoint,this.muzzle(nav)), length=len(d)||1;
@@ -90,12 +127,13 @@ export class EnemyDefense {
     this.previousPlayer={...nav.position};
     if(this.defeated) { this.phase='victory';this.ceaseFire();nav.stopOrbit();events.push('defeated');return events; }
     this.cooldown=Math.max(0,this.cooldown-dt);
-    const arc=this.inArc(nav);
+    const mount=this.selectMount(nav),arc=mount!==null;
     if(this.gunPhase === 'idle') {
-      if(arc && this.cooldown===0) {this.pattern=this.shots%2===0?'focused':'fan';this.gunPhase='aim';this.gunTime=0;this.aimPoint={...nav.position};events.push('enemy-charge');}
+      if(arc && this.cooldown===0) {this.mount=mount;this.pattern=this.shots%2===0?'focused':'fan';this.gunPhase='aim';this.gunTime=0;this.aimPoint={...nav.position};events.push('enemy-charge');}
     } else if(this.gunPhase === 'aim') {
       if(!arc) {this.gunPhase='idle';this.aimPoint=null;this.cooldown=1;}
       else {
+        this.mount=mount;
         this.aimPoint={...nav.position};this.gunTime+=dt;
         if(this.gunTime>=DEFENSE.aimSeconds) {this.gunPhase='locked';this.gunTime=0;events.push('enemy-lock');}
       }

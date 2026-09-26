@@ -34,7 +34,7 @@ try {
     // Set up a stopped contact, then test the real touch/mouse and keyboard input paths.
     await page.evaluate(async ()=>{
       SpacePiratesAmbient.destroy();
-      const {VoyageScene}=await import(new URL("./src/voyage.js?v=tetherpeace-1",location.href));
+      const {VoyageScene}=await import(new URL("./src/voyage.js?v=turret360-1",location.href));
       window.orbitQA=new VoyageScene(document.getElementById("starfield"));
       const s=orbitQA; s.stopLoop(); s.forceContact();
       const b=s.getActualBearing();
@@ -98,7 +98,7 @@ try {
     await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type === 'webgl2');
     await page.evaluate(async ()=>{
       SpacePiratesAmbient.destroy();
-      const {VoyageScene}=await import(new URL('./src/voyage.js?v=tetherpeace-1',location.href));
+      const {VoyageScene}=await import(new URL('./src/voyage.js?v=turret360-1',location.href));
       window.orbitQA=new VoyageScene(document.getElementById('starfield'));
       const s=orbitQA; s.stopLoop(); s.forceContact();
       const view=s.navigation.forceRear(true);

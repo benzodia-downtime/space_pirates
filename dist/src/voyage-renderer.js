@@ -1,4 +1,5 @@
 import * as THREE from "../vendor/three.module.js";
+import { GUN_MOUNTS } from "./enemy-defense.js?v=turret360-1";
 
 const smoothstep = THREE.MathUtils.smoothstep;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -244,7 +245,7 @@ export class VoyageRenderer {
 
   makeDefense() {
     const m=this.materials;
-    this.cannon=new THREE.Group(); this.cannon.position.set(0,2,33); this.enemy.add(this.cannon);
+    this.cannon=new THREE.Group(); this.cannon.position.copy(GUN_MOUNTS.bow); this.enemy.add(this.cannon);
     this.box(this.cannon,m.dark,[0,0,0],[5,3,2]);
     this.chargeMaterial=this.keep(new THREE.MeshBasicMaterial({color:0xffae48}));
     for(const x of [-1.4,1.4]) {
@@ -262,15 +263,18 @@ export class VoyageRenderer {
     this.gunGlowMaterial=this.keep(new THREE.SpriteMaterial({map:glowTexture,color:0xffa33a,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
     this.gunGlow=new THREE.Sprite(this.gunGlowMaterial);this.gunGlow.position.set(0,0,5.5);this.cannon.add(this.gunGlow);
     this.guns=[{group:this.cannon,charge:this.chargeMaterial,light:this.cannonLight,glow:this.gunGlow,mount:'bow',restYaw:0}];
-    const rear=this.cannon.clone(), rearCharge=this.keep(this.chargeMaterial.clone());
-    const rearGun={group:rear,charge:rearCharge,mount:'aft',restYaw:Math.PI};
-    rear.position.set(0,9,-52); rear.rotation.y=Math.PI;
-    rear.traverse(object=>{
-      if(object.material===this.chargeMaterial) object.material=rearCharge;
-      if(object.isPointLight) rearGun.light=object;
-      if(object.isSprite) {object.material=this.keep(object.material.clone());rearGun.glow=object;}
+    // Raised circular barbette clears the bridge for a full azimuth sweep.
+    this.mesh(this.enemy,this.cylinderGeometry,m.hull,[0,14.2,8],[3.4,8.4,3.4]);
+    this.mesh(this.enemy,this.cylinderGeometry,m.trim,[0,18.4,8],[3.8,.6,3.8]);
+    const dorsal=this.cannon.clone(), dorsalCharge=this.keep(this.chargeMaterial.clone());
+    const dorsalGun={group:dorsal,charge:dorsalCharge,mount:'dorsal',restYaw:0};
+    dorsal.name='dorsal-360-turret';dorsal.position.copy(GUN_MOUNTS.dorsal);
+    dorsal.traverse(object=>{
+      if(object.material===this.chargeMaterial) object.material=dorsalCharge;
+      if(object.isPointLight) dorsalGun.light=object;
+      if(object.isSprite) {object.material=this.keep(object.material.clone());dorsalGun.glow=object;}
     });
-    this.enemy.add(rear);this.guns.push(rearGun);
+    this.enemy.add(dorsal);this.guns.push(dorsalGun);
     this.aimMaterial=this.keep(new THREE.MeshBasicMaterial({color:0xff9c3b,transparent:true,opacity:.65,depthWrite:false}));
     this.aimBeams=Array.from({length:9},()=>this.mesh(this.scene,this.cylinderGeometry,this.aimMaterial));
     const boltMaterial=this.keep(new THREE.MeshBasicMaterial({color:0xffdb98}));
@@ -597,6 +601,8 @@ export class VoyageRenderer {
       enemyAimVisible: this.aimBeams.some(b=>b.visible), enemyAimRays: this.aimBeams.filter(b=>b.visible).length,
       enemyBoltsVisible: this.enemyBolts.filter(b=>b.visible).length,
       turretChargeColor: this.guns.find(g=>g.mount===this.lastFrame.defense?.mount)?.charge.color.getHex(),
+      activeGun: this.lastFrame.defense?.mount,
+      gunMounts: this.guns.map(g=>({mount:g.mount,position:g.group.getWorldPosition(new THREE.Vector3()).toArray(),direction:g.group.getWorldDirection(new THREE.Vector3()).toArray()})),
       bowFacing: new THREE.Vector3(0,0,1).applyQuaternion(this.enemy.quaternion).toArray(),
       passageEnd: this.passageEnd.getWorldPosition(new THREE.Vector3()).toArray(),
       armourBreached: this.lastFrame.assault.breach >= 1, ramVisible: this.ramHead.visible,

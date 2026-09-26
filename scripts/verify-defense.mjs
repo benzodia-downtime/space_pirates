@@ -15,7 +15,7 @@ try {
       await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type==='webgl2');
       await page.evaluate(async rear=>{
         SpacePiratesAmbient.destroy();
-        const {VoyageScene}=await import(new URL('./src/voyage.js?v=tetherpeace-1',location.href));
+        const {VoyageScene}=await import(new URL('./src/voyage.js?v=turret360-1',location.href));
         window.defenseQA=new VoyageScene(document.querySelector('#starfield'));
         const s=defenseQA;s.stopLoop();s.forceContact();
         const view=rear?s.navigation.forceRear(true):s.getView();
@@ -95,6 +95,26 @@ try {
     await page.screenshot({path:`qa-output/fan-${mobile?'mobile':'desktop'}.png`});
     await until('locked');await step(63);assert.equal((await read()).rendering.enemyBoltsVisible,9);
 
+    for(const [name,angle,elevation] of [['starboard',Math.PI/2,0],['port',-Math.PI/2,0],['rear',Math.PI,0],['above',Math.PI/2,1]]) {
+      await fresh();
+      await page.evaluate(({angle,elevation})=>{
+        const s=defenseQA;s.navigation.angle=angle;s.navigation.elevation=elevation;s.navigation.updatePosition();
+        const p=s.navigation.position,t=s.navigation.enemyPosition,dx=t.x-p.x,dy=t.y-p.y,dz=t.z-p.z;
+        // This fixture teleports between viewpoints: choose an upright view, not orbital Euler continuity.
+        s.pointer={x:Math.atan2(dx,-dz)/.442,y:Math.atan2(-dy,Math.hypot(dx,dz))/.312};s.pointerTarget={...s.pointer};s.renderStill();
+      },{angle,elevation});
+      await until('aim');await step(45);
+      const state=await read(),gun=state.rendering.gunMounts.find(g=>g.mount==='dorsal'),aim=state.enemyDefense.aimPoint;
+      assert.equal(state.rendering.activeGun,'dorsal',name+' uses the visible roof turret');
+      assert.equal(state.rendering.enemyAimVisible,true);
+      assert.ok(gun.position[1]>state.navigation.enemyPosition.y+19);
+      const target=[aim.x,aim.y,aim.z].map((v,i)=>v-gun.position[i]),length=Math.hypot(...target);
+      assert.ok(target.reduce((sum,v,i)=>sum+v/length*gun.direction[i],0)>.99999,name+' barrel points at its actual aim point');
+      await page.screenshot({path:`qa-output/turret-${name}-${mobile?'mobile':'desktop'}.png`});
+      await until('locked');await step(65);assert.ok((await read()).rendering.enemyBoltsVisible>0);
+      await step(100);assert.equal((await read()).enemyDefense.hull,75,name+' shot actually reaches a stationary player');
+    }
+
     await latch();const tetherShots=(await read()).enemyDefense.shots;await step(1000);
     assert.equal((await read()).enemyDefense.phase,'tethered');
     assert.equal((await read()).rendering.enemyAimVisible,false);assert.equal((await read()).rendering.enemyBoltsVisible,0);
@@ -142,7 +162,7 @@ try {
     assert.equal(reset.navigation.radius,220);assert.equal(reset.enemyDefense.shots,0);
     assert.equal(await page.locator('#boarding-panel, #assault-cue, #orbit-direction').count(),0);
     assert.deepEqual(errors,[]);
-    console.log(`Defense ${mobile?'mobile':'desktop'} PASS: focused/fan telegraphs, immediate tether ceasefire, clean/graze/miss ram, pad recovery, defeat/retry, pause, compact HUD`);
+    console.log(`Defense ${mobile?'mobile':'desktop'} PASS: visible 360-degree roof turret, side/rear/above hits, focused/fan telegraphs, immediate tether ceasefire, ram recovery/retry, pause, compact HUD`);
     await page.close();
   }
 } finally {await browser.close();}

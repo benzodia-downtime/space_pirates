@@ -1,9 +1,9 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=tetherpeace-1";
-import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=tetherpeace-1";
-import { AssaultAudio } from "./assault-audio.js?v=tetherpeace-1";
-import { EnemyDefense } from "./enemy-defense.js?v=tetherpeace-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=turret360-1";
+import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=turret360-1";
+import { AssaultAudio } from "./assault-audio.js?v=turret360-1";
+import { EnemyDefense } from "./enemy-defense.js?v=turret360-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=tetherpeace-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=turret360-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
