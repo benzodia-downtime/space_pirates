@@ -18,7 +18,7 @@ try {
       await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type==='webgl2');
       await page.evaluate(async rear=>{
         SpacePiratesAmbient.destroy();
-        const {VoyageScene}=await import(new URL('./src/voyage.js?v=fourway-1',location.href));
+        const {VoyageScene}=await import(new URL('./src/voyage.js?v=aftgun-1',location.href));
         window.defenseQA=new VoyageScene(document.querySelector('#starfield'));
         const s=defenseQA;s.stopLoop();s.forceContact();
         const view=rear?s.navigation.forceRear(true):s.getView();
@@ -65,6 +65,18 @@ try {
         return false;
       },phase);assert.ok(reached,phase);await step(0);
     };
+    // Real encounter activation, without forceContact bypassing the detection gate.
+    await fresh();await page.evaluate(()=>{
+      const s=defenseQA;s.startNewSearch();s.stopLoop();s.navigation.radius=440.1;s.navigation.updatePosition();
+      const p=s.navigation.position,t=s.navigation.enemyPosition,dx=t.x-p.x,dy=t.y-p.y,dz=t.z-p.z;
+      s.pointer={x:Math.atan2(dx,-dz)/.442,y:Math.atan2(-dy,Math.hypot(dx,dz))/.312};s.pointerTarget={...s.pointer};s.renderStill();
+    });
+    await step(400);assert.equal((await read()).navigation.active,false);assert.equal((await read()).enemyDefense.shots,0);
+    await page.keyboard.down('w');await step(1);await page.keyboard.up('w');
+    assert.equal((await read()).navigation.active,true);assert.equal((await read()).mode,'survey');
+    assert.ok((await read()).navigation.radius>430,'Detects at 440m rather than the old 220m');
+    await until('locked');await step(0);await page.screenshot({path:`qa-output/range-lock-${mobile?'mobile':'desktop'}.png`});
+    await step(180);assert.equal((await read()).enemyDefense.hull,75,'Distant fire actually reaches the player');
     await fresh();
     await until('aim');await step(45);
     assert.equal((await read()).rendering.enemyAimVisible,true);
@@ -103,10 +115,10 @@ try {
         s.pointer={x:Math.atan2(dx,-dz)/.442,y:Math.atan2(-dy,Math.hypot(dx,dz))/.312};s.pointerTarget={...s.pointer};s.renderStill();
       },{angle,elevation});
       await until('aim');await step(45);
-      const state=await read(),gun=state.rendering.gunMounts.find(g=>g.mount==='dorsal'),aim=state.enemyDefense.aimPoint;
-      assert.equal(state.rendering.activeGun,'dorsal',name+' uses the visible roof turret');
+      const state=await read(),mount=name==='rear'?'stern':'dorsal',gun=state.rendering.gunMounts.find(g=>g.mount===mount),aim=state.enemyDefense.aimPoint;
+      assert.equal(state.rendering.gunMounts.length,3);assert.equal(state.rendering.activeGun,mount,name+' uses its visible turret');
       assert.equal(state.rendering.enemyAimVisible,true);
-      assert.ok(gun.position[1]>state.navigation.enemyPosition.y+19);
+      assert.ok(gun.position[1]>state.navigation.enemyPosition.y+(mount==='stern'?15:19));
       const target=[aim.x,aim.y,aim.z].map((v,i)=>v-gun.position[i]),length=Math.hypot(...target);
       assert.ok(target.reduce((sum,v,i)=>sum+v/length*gun.direction[i],0)>.99999,name+' barrel points at its actual aim point');
       await page.screenshot({path:`qa-output/turret-${name}-${mobile?'mobile':'desktop'}.png`});
@@ -167,7 +179,7 @@ try {
     await page.screenshot({path:`qa-output/defense-defeated-${mobile?'mobile':'desktop'}.png`});
     await tap('#boarding-action');
     const reset=await read();assert.equal(reset.enemyDefense.hull,100);assert.equal(reset.mode,'survey');
-    assert.equal(reset.navigation.radius,220);assert.equal(reset.enemyDefense.shots,0);
+    assert.equal(reset.navigation.radius,440);assert.equal(reset.enemyDefense.shots,0);
     assert.equal(await page.locator('#boarding-panel, #assault-cue, #orbit-direction').count(),0);
     assert.deepEqual(errors,[]);
     console.log(`Defense ${mobile?'mobile':'desktop'} PASS: visible 360-degree roof turret, side/rear/above hits, focused/fan telegraphs, immediate tether ceasefire, ram recovery/retry, pause, compact HUD`);

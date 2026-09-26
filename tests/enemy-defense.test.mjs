@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {EnemyDefense,DEFENSE,GUN_MOUNTS} from '../src/enemy-defense.js';
-import {OrbitNavigation,ORBIT,lookAt} from '../src/navigation.js';
+import {OrbitNavigation,ORBIT,FLIGHT,lookAt} from '../src/navigation.js';
 const setup=()=>{const nav=new OrbitNavigation();nav.begin({x:0,y:0});return {nav,enemy:new EnemyDefense()};};
 const advance=(enemy,nav,seconds)=>{for(let t=0;t<seconds;t+=.02)enemy.update(.02,nav);};
 
@@ -29,7 +29,7 @@ test('Dorsal turret covers 360 degrees and overhead, including a rotated enemy h
     const {nav,enemy}=setup();nav.setEnemyYaw(yaw);nav.angle=angle;nav.updatePosition();
     assert.equal(enemy.inArc(nav,'dorsal'),true);
     advance(enemy,nav,5.2);assert.equal(enemy.shots,1);
-    assert.equal(enemy.mount,enemy.inArc(nav,'bow')?'bow':'dorsal');
+    assert.equal(enemy.mount,enemy.inArc(nav,'bow')?'bow':enemy.inArc(nav,'stern')?'stern':'dorsal');
     const bolt=enemy.bolts[0],pivot=nav.world(GUN_MOUNTS[enemy.mount]);
     const d={x:enemy.aimPoint.x-pivot.x,y:enemy.aimPoint.y-pivot.y,z:enemy.aimPoint.z-pivot.z};
     const length=Math.hypot(d.x,d.y,d.z),muzzle=enemy.muzzle(nav);
@@ -54,7 +54,7 @@ test('Side-to-rear tracking retains its charge and locked turret cannot home or 
   while(enemy.gunPhase!=='locked')enemy.update(.02,nav);
   const target={...enemy.aimPoint},muzzle=enemy.muzzle(nav);
   nav.angle=0;nav.updatePosition();advance(enemy,nav,1.3);
-  assert.equal(enemy.mount,'dorsal');assert.deepEqual(enemy.aimPoint,target);assert.deepEqual(enemy.muzzle(nav),muzzle);
+  assert.equal(enemy.mount,'stern');assert.deepEqual(enemy.aimPoint,target);assert.deepEqual(enemy.muzzle(nav),muzzle);
   assert.equal(enemy.shots,1);
 });
 test('Charging tracks, then locks a point for a full dodge window; fired bolts do not home',()=>{
@@ -133,4 +133,28 @@ test('Rotating rear ramp carries the in-flight harpoon target; tether arrests th
   assert.notDeepEqual(nav.harpoonTarget,hit);assert.deepEqual(nav.harpoonTarget,nav.world(nav.harpoonLocalTarget));
   assert.deepEqual(nav.position,player);
   nav.attach(view);const yaw=nav.enemyYaw;nav.setEnemyYaw(.2);assert.equal(nav.enemyYaw,yaw);
+});
+
+test('Rear turret is a distinct rear-facing mount and prioritised behind rotated ships',()=>{
+  assert.ok(GUN_MOUNTS.stern.z<-35);assert.ok(GUN_MOUNTS.stern.y>10.5);
+  for(const yaw of [0,1.3,-2.4]) {
+    const {nav,enemy}=setup();nav.setEnemyYaw(yaw);
+    for(const [angle,mount] of [[0,'bow'],[Math.PI,'stern'],[Math.PI-.4,'stern'],[Math.PI/2,'dorsal']]) {
+      nav.angle=angle;nav.updatePosition();assert.equal(enemy.selectMount(nav),mount);
+    }
+    nav.angle=Math.PI;nav.updatePosition();advance(enemy,nav,6);
+    assert.equal(enemy.mount,'stern');assert.equal(enemy.hits,1);assert.equal(enemy.hull,75);
+  }
+});
+
+test('Detection and weapon range are doubled; actual rounds reach 600m from all three mounts',()=>{
+  assert.equal(FLIGHT.surveyDistance,220*2);assert.equal(DEFENSE.range,300*2);
+  for(const [angle,mount] of [[0,'bow'],[Math.PI,'stern'],[Math.PI/2,'dorsal']]) {
+    const {nav,enemy}=setup();nav.radius=600;nav.angle=angle;nav.updatePosition();
+    assert.equal(enemy.selectMount(nav),mount);advance(enemy,nav,8);
+    assert.equal(enemy.mount,mount);assert.equal(enemy.shots,1);assert.equal(enemy.hits,1,'Round must arrive before its lifetime expires');
+    assert.equal(enemy.hull,75);
+    enemy.reset();nav.radius=600.01;nav.updatePosition();
+    assert.equal(enemy.selectMount(nav),null);advance(enemy,nav,8);assert.equal(enemy.shots,0);
+  }
 });

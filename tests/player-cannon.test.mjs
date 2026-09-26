@@ -31,6 +31,7 @@ test('Nearest swept collision only damages the exposed rear face, including rota
       [{x:200,y:0,z:0},{x:0,y:0,z:-54}],
       [{x:0,y:100,z:-54},{x:0,y:0,z:-54}],
       [{x:6,y:0,z:-200},{x:6,y:0,z:0}],
+      [{x:0,y:16,z:-200},{x:0,y:16,z:-30}],
     ])assert.equal(trace(a,b).kind,'hull');
     assert.equal(trace({x:70,y:0,z:-200},{x:70,y:0,z:100}),null);
     nav.damageArmor(120,{x:0,y:0,z:-55});

@@ -1,4 +1,4 @@
-import { SIEGE, traceCannon } from './player-cannon.js?v=fourway-1';
+import { SIEGE, traceCannon } from './player-cannon.js?v=aftgun-1';
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const wrap = n => Math.atan2(Math.sin(n), Math.cos(n));
@@ -11,7 +11,7 @@ const unit = v => scale(v, 1 / (length(v) || 1));
 const rotate = (v, yaw) => ({ x: Math.cos(yaw) * v.x + Math.sin(yaw) * v.z, y: v.y, z: -Math.sin(yaw) * v.x + Math.cos(yaw) * v.z });
 
 export const HELM = Object.freeze({ yawScale: 0.442, pitchScale: 0.312, dragRadians: 0.006 });
-export const FLIGHT = Object.freeze({ contactDistance: 1100, surveyDistance: 220, forwardSpeed: 80, reverseSpeed: 45, closeSpeed: 22, strafeSpeed: 32, safetyRadius: 85 });
+export const FLIGHT = Object.freeze({ contactDistance: 1100, surveyDistance: 440, forwardSpeed: 80, reverseSpeed: 45, closeSpeed: 22, strafeSpeed: 32, safetyRadius: 85 });
 export const DODGE = Object.freeze({ speed: 110, duration: 0.22, cooldown: 1.2 });
 export const ORBIT = Object.freeze({ radius: 155, minRadius: 120, speed: 0.095, sternZ: -51, doorHalfSize: 3.65 });
 

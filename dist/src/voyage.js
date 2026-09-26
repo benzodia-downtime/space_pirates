@@ -1,10 +1,10 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=fourway-1";
-import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=fourway-1";
-import { AssaultAudio } from "./assault-audio.js?v=fourway-1";
-import { EnemyDefense } from "./enemy-defense.js?v=fourway-1";
-import { PlayerCannon } from "./player-cannon.js?v=fourway-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=aftgun-1";
+import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=aftgun-1";
+import { AssaultAudio } from "./assault-audio.js?v=aftgun-1";
+import { EnemyDefense } from "./enemy-defense.js?v=aftgun-1";
+import { PlayerCannon } from "./player-cannon.js?v=aftgun-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, flightInput, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=fourway-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, flightInput, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=aftgun-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 

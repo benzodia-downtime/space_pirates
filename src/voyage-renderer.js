@@ -1,6 +1,6 @@
 import * as THREE from "../vendor/three.module.js";
-import { GUN_MOUNTS } from "./enemy-defense.js?v=fourway-1";
-import { SIEGE } from "./player-cannon.js?v=fourway-1";
+import { GUN_MOUNTS } from "./enemy-defense.js?v=aftgun-1";
+import { SIEGE } from "./player-cannon.js?v=aftgun-1";
 
 const smoothstep = THREE.MathUtils.smoothstep;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -349,18 +349,22 @@ export class VoyageRenderer {
     this.gunGlowMaterial=this.keep(new THREE.SpriteMaterial({map:glowTexture,color:0xffa33a,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
     this.gunGlow=new THREE.Sprite(this.gunGlowMaterial);this.gunGlow.position.set(0,0,5.5);this.cannon.add(this.gunGlow);
     this.guns=[{group:this.cannon,charge:this.chargeMaterial,light:this.cannonLight,glow:this.gunGlow,mount:'bow',restYaw:0}];
-    // Raised circular barbette clears the bridge for a full azimuth sweep.
-    this.mesh(this.enemy,this.cylinderGeometry,m.hull,[0,14.2,8],[3.4,8.4,3.4]);
-    this.mesh(this.enemy,this.cylinderGeometry,m.trim,[0,18.4,8],[3.8,.6,3.8]);
-    const dorsal=this.cannon.clone(), dorsalCharge=this.keep(this.chargeMaterial.clone());
-    const dorsalGun={group:dorsal,charge:dorsalCharge,mount:'dorsal',restYaw:0};
-    dorsal.name='dorsal-360-turret';dorsal.position.copy(GUN_MOUNTS.dorsal);
-    dorsal.traverse(object=>{
-      if(object.material===this.chargeMaterial) object.material=dorsalCharge;
-      if(object.isPointLight) dorsalGun.light=object;
-      if(object.isSprite) {object.material=this.keep(object.material.clone());dorsalGun.glow=object;}
-    });
-    this.enemy.add(dorsal);this.guns.push(dorsalGun);
+    // Separate roof and stern gun platforms. The rear gun sits above the cargo
+    // ramp, leaving the destructible plates and boarding path unobstructed.
+    for(const mount of ['dorsal','stern']) {
+      const pivot=GUN_MOUNTS[mount],top=pivot.y-1.6;
+      this.mesh(this.enemy,this.cylinderGeometry,m.hull,[pivot.x,(10+top)/2,pivot.z],[3.4,top-10,3.4]);
+      this.mesh(this.enemy,this.cylinderGeometry,m.trim,[pivot.x,top,pivot.z],[3.8,.6,3.8]);
+      const group=this.cannon.clone(),charge=this.keep(this.chargeMaterial.clone());
+      const gun={group,charge,mount,restYaw:mount==='stern'?Math.PI:0};
+      group.name=mount+'-turret';group.position.copy(pivot);group.rotation.y=gun.restYaw;
+      group.traverse(object=>{
+        if(object.material===this.chargeMaterial)object.material=charge;
+        if(object.isPointLight)gun.light=object;
+        if(object.isSprite){object.material=this.keep(object.material.clone());gun.glow=object;}
+      });
+      this.enemy.add(group);this.guns.push(gun);
+    }
     this.aimMaterial=this.keep(new THREE.MeshBasicMaterial({color:0xff9c3b,transparent:true,opacity:.65,depthWrite:false}));
     this.aimBeams=Array.from({length:9},()=>this.mesh(this.scene,this.cylinderGeometry,this.aimMaterial));
     const boltMaterial=this.keep(new THREE.MeshBasicMaterial({color:0xffdb98}));

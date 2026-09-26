@@ -13,6 +13,7 @@ const hullBounds = [
   [[-7.5,8.75,-30],[7.5,13.9,-4]],
   [[-22.5,-7,-39],[-15.5,3,9]], [[15.5,-7,-39],[22.5,3,9]],
   [[-3.5,14,5],[3.5,22,14]],
+  [[-3.8,10,-50],[3.8,18,-39]], // Raised aft turret, above (not in) the boarding path.
   [[-3.7,-3.7,-51.8],[3.7,3.7,-50.5]], // The inner ramp remains for the ram to tear.
 ];
 const axes=['x','y','z'];

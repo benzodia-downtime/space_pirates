@@ -6,7 +6,7 @@ const dot = (a,b) => a.x*b.x+a.y*b.y+a.z*b.z;
 
 export const DEFENSE = Object.freeze({
   turnRate: .04, turnSeconds: 4, holdSeconds: 6,
-  range: 300, coneYaw: .7, conePitch: .5,
+  range: 600, coneYaw: .7, conePitch: .5,
   aimSeconds: 1.8, lockSeconds: 1.2, reloadSeconds: 3.5,
   boltSpeed: 220, boltLife: 3, hitRadius: 6, hull: 100, damage: 25,
   fanStep: .1, fanCount: 9,
@@ -16,6 +16,7 @@ export const DEFENSE = Object.freeze({
 export const GUN_MOUNTS = Object.freeze({
   bow: Object.freeze({x:0,y:2,z:33}),
   dorsal: Object.freeze({x:0,y:20,z:8}),
+  stern: Object.freeze({x:0,y:16,z:-43}),
 });
 // Conservative local-space hull/bridge/engine bounds prevent firing through our own ship.
 const HULL_BOUNDS = [
@@ -55,13 +56,16 @@ export class EnemyDefense {
   inArc(nav, mount=this.mount) {
     const d = sub(nav.position, nav.enemyPosition);
     if(len(d)>DEFENSE.range) return false;
-    if(mount==='bow' && (Math.abs(wrap(Math.atan2(d.x,d.z)-nav.enemyYaw))>DEFENSE.coneYaw || Math.abs(Math.atan2(d.y,Math.hypot(d.x,d.z)))>DEFENSE.conePitch)) return false;
+    if(mount==='bow' || mount==='stern') {
+      const facing=nav.enemyYaw+(mount==='stern'?Math.PI:0);
+      if(Math.abs(wrap(Math.atan2(d.x,d.z)-facing))>DEFENSE.coneYaw || Math.abs(Math.atan2(d.y,Math.hypot(d.x,d.z)))>DEFENSE.conePitch)return false;
+    }
     const c=Math.cos(nav.enemyYaw),s=Math.sin(nav.enemyYaw);
     const local={x:c*d.x-s*d.z,y:d.y,z:s*d.x+c*d.z};
     return !blockedByHull(GUN_MOUNTS[mount],local);
   }
   selectMount(nav) {
-    return this.inArc(nav,'bow') ? 'bow' : this.inArc(nav,'dorsal') ? 'dorsal' : null;
+    return this.inArc(nav,'bow') ? 'bow' : this.inArc(nav,'stern') ? 'stern' : this.inArc(nav,'dorsal') ? 'dorsal' : null;
   }
   muzzle(nav) {
     const pivot=nav.world(GUN_MOUNTS[this.mount]);

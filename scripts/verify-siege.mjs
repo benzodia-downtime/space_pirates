@@ -18,7 +18,7 @@ try {
     async function fresh() {
       await page.goto(url);await page.waitForFunction(()=>SpacePiratesAmbient?.getState().rendering.type==='webgl2');
       await page.evaluate(async()=>{
-        SpacePiratesAmbient.destroy();const {VoyageScene}=await import(new URL('./src/voyage.js?v=fourway-1',location.href));
+        SpacePiratesAmbient.destroy();const {VoyageScene}=await import(new URL('./src/voyage.js?v=aftgun-1',location.href));
         window.siegeQA=new VoyageScene(document.querySelector('#starfield'));
         siegeQA.stopLoop();siegeQA.forceContact();siegeQA.navigation.forceRear(true,false);
       });await aim();
