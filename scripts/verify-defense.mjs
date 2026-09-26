@@ -15,7 +15,7 @@ try {
       await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type==='webgl2');
       await page.evaluate(async rear=>{
         SpacePiratesAmbient.destroy();
-        const {VoyageScene}=await import(new URL('./src/voyage.js?v=breachplay-1',location.href));
+        const {VoyageScene}=await import(new URL('./src/voyage.js?v=tetherpeace-1',location.href));
         window.defenseQA=new VoyageScene(document.querySelector('#starfield'));
         const s=defenseQA;s.stopLoop();s.forceContact();
         const view=rear?s.navigation.forceRear(true):s.getView();
@@ -95,18 +95,21 @@ try {
     await page.screenshot({path:`qa-output/fan-${mobile?'mobile':'desktop'}.png`});
     await until('locked');await step(63);assert.equal((await read()).rendering.enemyBoltsVisible,9);
 
-    await latch();await until('locked');
-    assert.equal((await read()).enemyDefense.mount,'aft');
-    await page.screenshot({path:`qa-output/rear-defense-${mobile?'mobile':'desktop'}.png`});
+    await latch();const tetherShots=(await read()).enemyDefense.shots;await step(1000);
+    assert.equal((await read()).enemyDefense.phase,'tethered');
+    assert.equal((await read()).rendering.enemyAimVisible,false);assert.equal((await read()).rendering.enemyBoltsVisible,0);
+    assert.equal((await read()).enemyDefense.shots,tetherShots);assert.equal((await read()).enemyDefense.hull,100,'No counterfire after attachment');
+    await page.screenshot({path:`qa-output/tether-ceasefire-${mobile?'mobile':'desktop'}.png`});
     await drag(0,-45);await step(105);
-    assert.ok((await read()).enemyDefense.shots>0);assert.equal((await read()).enemyDefense.hull,100,'Tethered pad dodge avoids rear shot');
+    assert.ok((await read()).navigation.correction.y>8,'Alignment input remains available');
     const held=(await read()).navigation.position;await step(10);assert.deepEqual((await read()).navigation.position,held);
 
     await latch();await tap('#boarding-action');await step(80);
     assert.equal((await read()).mode,'charge');assert.equal((await read()).steeringLocked,false);
     await drag(18,0);await step(112);
     let ram=await read();assert.equal(ram.mode,'jammed');assert.equal(ram.collision,'graze');assert.ok(ram.enemyDefense.hull<=90);
-    assert.equal(ram.breachProgress,0);await step(25);assert.equal((await read()).mode,'jammed');
+    assert.equal(ram.breachProgress,0);await step(1000);assert.equal((await read()).mode,'jammed');
+    assert.equal((await read()).enemyDefense.hull,90,'Jammed ram costs collision damage only, no counterfire');
     await layout('jammed');await page.screenshot({path:`qa-output/ram-jammed-${mobile?'mobile':'desktop'}.png`});
     await drag(-18,0);await step(30);
     assert.equal((await read()).mode,'impact');assert.equal((await read()).enemyDefense.gunPhase,'idle');
@@ -139,7 +142,7 @@ try {
     assert.equal(reset.navigation.radius,220);assert.equal(reset.enemyDefense.shots,0);
     assert.equal(await page.locator('#boarding-panel, #assault-cue, #orbit-direction').count(),0);
     assert.deepEqual(errors,[]);
-    console.log(`Defense ${mobile?'mobile':'desktop'} PASS: focused/fan telegraphs, tether dodge, clean/graze/miss ram, pad recovery, defeat/retry, pause, compact HUD`);
+    console.log(`Defense ${mobile?'mobile':'desktop'} PASS: focused/fan telegraphs, immediate tether ceasefire, clean/graze/miss ram, pad recovery, defeat/retry, pause, compact HUD`);
     await page.close();
   }
 } finally {await browser.close();}

@@ -48,16 +48,30 @@ test('Ignoring a telegraphed shot damages hull and four hits defeat the ship',()
   assert.equal(enemy.hits,4);assert.equal(enemy.hull,0);assert.equal(enemy.defeated,true);
   assert.equal(enemy.bolts.length,0);assert.equal(enemy.gunPhase,'idle');
 });
-test('Pause freezes AI; tether arrests hull but rear gun keeps firing until a breach',()=>{
+test('Pause freezes AI; attachment immediately stops counterfire and arrests the hull',()=>{
   const {nav,enemy}=setup();advance(enemy,nav,5.1);
   const snapshot=JSON.stringify(enemy);enemy.update(0,nav);assert.equal(JSON.stringify(enemy),snapshot);
   nav.forceRear();enemy.update(.02,nav);
-  assert.equal(enemy.mount,'aft');assert.equal(enemy.aimPoint,null);
-  const yaw=nav.enemyYaw,shots=enemy.shots;advance(enemy,nav,5);assert.equal(nav.enemyYaw,yaw);
-  assert.ok(enemy.shots>shots);assert.equal(enemy.hull,65);
+  assert.equal(enemy.phase,'tethered');assert.equal(enemy.aimPoint,null);assert.equal(enemy.bolts.length,0);
+  const yaw=nav.enemyYaw,shots=enemy.shots,hull=enemy.hull;advance(enemy,nav,20);assert.equal(nav.enemyYaw,yaw);
+  assert.equal(enemy.shots,shots);assert.equal(enemy.hull,hull);
   enemy.update(.02,nav,{breached:true});
   assert.equal(enemy.phase,'breached');assert.equal(enemy.bolts.length,0);assert.equal(enemy.aimPoint,null);
   enemy.reset();assert.equal(enemy.hull,100);assert.equal(enemy.shots,0);
+});
+test('Attachment cancels tracking, locked salvos and flying rounds; release restores defence',()=>{
+  for(const phase of ['aim','locked','fired']) {
+    const {nav,enemy}=setup();
+    for(let i=0;i<400 && !(phase==='fired'?enemy.bolts.length:enemy.gunPhase===phase);i++) enemy.update(.02,nav);
+    assert.ok(phase==='fired'?enemy.bolts.length:enemy.gunPhase===phase);
+    const shots=enemy.shots,hull=enemy.hull;
+    nav.forceRear();assert.deepEqual(enemy.update(.02,nav),[]);
+    assert.equal(enemy.gunPhase,'idle');assert.equal(enemy.charge,0);assert.equal(enemy.muzzleAge,-1);
+    assert.equal(enemy.aimPoint,null);assert.equal(enemy.bolts.length,0);
+    advance(enemy,nav,20);assert.equal(enemy.hull,hull);assert.equal(enemy.shots,shots);
+    nav.releaseTether();nav.angle=0;nav.elevation=0;nav.updatePosition();
+    advance(enemy,nav,8);assert.ok(enemy.shots>shots);assert.notEqual(enemy.phase,'tethered');
+  }
 });
 test('Fan telegraph becomes nine horizontal non-homing rounds, one damage event per volley',()=>{
   const {nav,enemy}=setup();enemy.shots=1;enemy.cooldown=0;

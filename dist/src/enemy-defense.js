@@ -9,7 +9,7 @@ export const DEFENSE = Object.freeze({
   range: 300, coneYaw: .7, conePitch: .5,
   aimSeconds: 1.8, lockSeconds: 1.2, reloadSeconds: 3.5,
   boltSpeed: 220, boltLife: 3, hitRadius: 6, hull: 100, damage: 25,
-  fanStep: .1, fanCount: 9, aftDamage: 10,
+  fanStep: .1, fanCount: 9,
 });
 
 // Deterministic, simulation-time AI. The gun cannot track once its amber aim turns red.
@@ -27,10 +27,10 @@ export class EnemyDefense {
   get charge() { return this.gunPhase === 'aim' ? this.gunTime / DEFENSE.aimSeconds : this.gunPhase === 'locked' ? 1 : 0; }
   inArc(nav) {
     const d = sub(nav.position, nav.enemyPosition);
-    const facing=nav.enemyYaw+(this.mount==='aft'?Math.PI:0);
+    const facing=nav.enemyYaw;
     return len(d) <= DEFENSE.range && Math.abs(wrap(Math.atan2(d.x,d.z)-facing)) <= DEFENSE.coneYaw && Math.abs(Math.atan2(d.y,Math.hypot(d.x,d.z))) <= DEFENSE.conePitch;
   }
-  muzzle(nav) { return nav.world(this.mount==='aft'?{x:0,y:9,z:-58}:{x:0,y:2,z:39}); }
+  muzzle(nav) { return nav.world({x:0,y:2,z:39}); }
   directions(nav) {
     if(!this.aimPoint) return [];
     const d=sub(this.aimPoint,this.muzzle(nav)), length=len(d)||1;
@@ -44,24 +44,21 @@ export class EnemyDefense {
   damage(amount) { this.hull=Math.max(0,this.hull-amount);this.hitAge=0; }
   ceaseFire() {
     this.gunPhase = 'idle'; this.gunTime = 0; this.aimPoint = null;
-    this.bolts = []; this.turning = 0;
+    this.bolts = []; this.turning = 0; this.muzzleAge = -1; this.hitVolleys.clear();
   }
   update(delta, nav, {breached=false}={}) {
     const dt = clamp(delta,0,.05), events = [];
     if (!dt) return events;
     if(this.hitAge >= 0) this.hitAge += dt;
     if(this.muzzleAge >= 0) this.muzzleAge += dt;
-    if (!nav.active || breached || this.defeated) {
-      this.phase = this.defeated ? 'victory' : breached ? 'breached' : 'idle';
+    // Attachment ends counterfire immediately, including already-fired rounds.
+    if (!nav.active || nav.anchor || breached || this.defeated) {
+      this.phase = this.defeated ? 'victory' : breached ? 'breached' : nav.anchor ? 'tethered' : 'idle';
       this.ceaseFire(); this.previousPlayer = {...nav.position}; return events;
     }
-    const mount=nav.anchor?'aft':'bow';
-    if(this.mount!==mount) {
-      this.mount=mount;this.gunPhase='idle';this.gunTime=0;this.aimPoint=null;this.cooldown=.4;
-    }
     // Four seconds of slow, committed yaw; six seconds holding still leave a rear window.
-    if(this.phase === 'idle') { this.phase = 'turn'; this.turnTime = 0; this.turnGoal = null; }
-    const weaponHold=this.gunPhase==='locked'||(this.shots>0&&this.cooldown>0)||Boolean(nav.anchor);
+    if(this.phase === 'idle' || this.phase === 'tethered') { this.phase = 'turn'; this.turnTime = 0; this.turnGoal = null; }
+    const weaponHold=this.gunPhase==='locked'||(this.shots>0&&this.cooldown>0);
     if(!weaponHold)this.turnTime += dt;
     this.turning = 0;
     if(!weaponHold && this.phase === 'turn') {
@@ -106,7 +103,7 @@ export class EnemyDefense {
       this.gunTime+=dt;
       if(this.gunTime>=DEFENSE.lockSeconds) {
         const position=this.muzzle(nav);
-        for(const direction of this.directions(nav)) this.bolts.push({position:{...position},direction,age:0,volley:this.shots+1,damage:this.mount==='aft'?DEFENSE.aftDamage:DEFENSE.damage});
+        for(const direction of this.directions(nav)) this.bolts.push({position:{...position},direction,age:0,volley:this.shots+1,damage:DEFENSE.damage});
         this.shots++;this.muzzleAge=0;this.cooldown=DEFENSE.reloadSeconds;
         this.gunPhase='idle';this.gunTime=0;events.push('enemy-fire');
       }

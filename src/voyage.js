@@ -1,9 +1,9 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=breachplay-1";
-import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=breachplay-1";
-import { AssaultAudio } from "./assault-audio.js?v=breachplay-1";
-import { EnemyDefense } from "./enemy-defense.js?v=breachplay-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=tetherpeace-1";
+import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=tetherpeace-1";
+import { AssaultAudio } from "./assault-audio.js?v=tetherpeace-1";
+import { EnemyDefense } from "./enemy-defense.js?v=tetherpeace-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=breachplay-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=tetherpeace-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -555,7 +555,7 @@ export class VoyageScene {
     }
     // Only compact actions are visible; detailed guidance stays in accessible labels/tooltips.
     const label = a.stage==='jammed' ? "걸림 · 패드로 정렬" : a.stage==='charge' ? "문 중앙에 맞추기" : a.stage==='rebound' ? "이탈 중…" : pull ? "견인 돌입" : a.committed ? "돌입 중…" : a.stage === "harpoon" ? "작살 비행 중…" : "작살 발사";
-    const hint = a.canCorrect ? "패드나 방향키로 기체를 옮겨 포격을 피하고 문 중앙에 맞추세요." + (pull ? " Space로 견인 돌입." : "") : fire ? "Space / F · 조준한 문에 작살 발사" : a.committed ? "강습 완료까지 대기" : nav.discovered ? "후방 문 중앙을 조준하세요" : "자동 선회로 후방 하강문을 찾으세요";
+    const hint = a.canCorrect ? "패드나 방향키로 기체를 옮겨 문 중앙에 맞추세요." + (pull ? " Space로 견인 돌입." : "") : fire ? "Space / F · 조준한 문에 작살 발사" : a.committed ? "강습 완료까지 대기" : nav.discovered ? "후방 문 중앙을 조준하세요" : "자동 선회로 후방 하강문을 찾으세요";
     if (this.boardingActionLabel) this.boardingActionLabel.textContent = label;
     this.boardingAction?.setAttribute("aria-label", label + ". " + hint);
     this.boardingAction?.setAttribute("title", hint);
