@@ -69,7 +69,7 @@ try {
     assert.ok((await read()).rendering.farClipMetres >= 18000);
     await page.evaluate(async () => {
       SpacePiratesAmbient.destroy();
-      const { VoyageScene } = await import(new URL('./src/voyage.js?v=evasion-1', location.href));
+      const { VoyageScene } = await import(new URL('./src/voyage.js?v=breachgun-1', location.href));
       window.qaVisibilityScene = new VoyageScene(document.getElementById('starfield'));
       qaVisibilityScene.pause();
     });
@@ -392,6 +392,20 @@ try {
   state = await read();
   assert.deepEqual(state.navigation.position, parked, 'Stopping orbit holds world position');
   assert.equal(state.navigation.doorDiscovered, true);
+  assert.equal(state.navigation.canHarpoon, false, 'Sealed rear armor blocks the harpoon');
+  // Aim real rounds at the rear plates, release for each evasive boost, then reacquire.
+  const armorDeadline=Date.now()+30000;
+  while((await read()).navigation.armorHealth>0 && Date.now()<armorDeadline) {
+    const combat=await read();assert.notEqual(combat.mode,'defeated','Armor assault must remain survivable');
+    if(combat.enemyDefense.gunPhase==='locked') {
+      await page.keyboard.up('r');await page.locator('#steering-pad').focus();
+      await page.keyboard.down('Space');await page.keyboard.press('Shift');await page.waitForTimeout(260);await page.keyboard.up('Space');
+    }
+    await aim((await read()).navigation.doorBearing);
+    await page.keyboard.down('r');await page.waitForTimeout(150);
+  }
+  await page.keyboard.up('r');await aim((await read()).navigation.doorBearing);await page.waitForTimeout(150);
+  state=await read();assert.equal(state.navigation.armorHealth,0);
   assert.equal(state.navigation.canHarpoon, true);
   await page.screenshot({ path: 'qa-output/orbit-rear.png' });
   for (const id of ['orbit-button', 'boarding-action']) {
@@ -530,7 +544,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=evasion-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=breachgun-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();

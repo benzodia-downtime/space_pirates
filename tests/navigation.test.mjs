@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { OrbitNavigation, ORBIT, HELM, FLIGHT, DODGE, flightVector, lookAt, relativeHelm, pitchOffsetDegrees } from '../src/navigation.js';
 const near = (a, b, eps = 1e-8) => assert.ok(Math.abs(a - b) < eps, a + ' ~= ' + b);
-function setup() { const nav = new OrbitNavigation(); nav.begin({ x: 0.31, y: -0.04 }); return nav; }
+// Geometry fixtures have an already exposed ramp; cannon tests cover the sealed prerequisite.
+function setup() { const nav = new OrbitNavigation(); nav.begin({ x: 0.31, y: -0.04 }); nav.armorHealth=0; return nav; }
 
 test('An aligned bow or side view cannot reveal or harpoon the rear ramp through the hull', () => {
   const n = setup();
@@ -132,6 +133,7 @@ test('Orbital steering cannot move an inactive, paused or tethered ship', () => 
 });
 test('Harpooning after an over-the-top orbit preserves the current camera orientation', () => {
   const n = new OrbitNavigation(); n.begin({x:0,y:0});
+  n.armorHealth=0;
   n.angle=Math.PI; n.updatePosition();
   const view={yaw:0,pitch:Math.PI};
   n.inspect(view,.5);

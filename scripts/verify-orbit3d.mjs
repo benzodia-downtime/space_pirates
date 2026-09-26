@@ -39,7 +39,7 @@ try {
     // Set up a stopped contact, then test the real touch/mouse and keyboard input paths.
     await page.evaluate(async ()=>{
       SpacePiratesAmbient.destroy();
-      const {VoyageScene}=await import(new URL("./src/voyage.js?v=evasion-1",location.href));
+      const {VoyageScene}=await import(new URL("./src/voyage.js?v=breachgun-1",location.href));
       window.orbitQA=new VoyageScene(document.getElementById("starfield"));
       const s=orbitQA; s.stopLoop(); s.forceContact();
       const b=s.getActualBearing();
@@ -109,9 +109,9 @@ try {
       const before=await read();
       await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[pad]});
       const held={...pad,y:pad.y-35};
-      await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[held]});
+      await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[button]});
       await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[held,button]});
-      await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[held]});
+      await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[held]});
       assert.equal((await read()).navigation.dodging,true,'Right thumb activates dodge while left holds a direction');
       await advance(12);
       assert.ok((await read()).navigation.position.y>before.navigation.position.y+20);
@@ -135,7 +135,7 @@ try {
     await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type === 'webgl2');
     await page.evaluate(async ()=>{
       SpacePiratesAmbient.destroy();
-      const {VoyageScene}=await import(new URL('./src/voyage.js?v=evasion-1',location.href));
+      const {VoyageScene}=await import(new URL('./src/voyage.js?v=breachgun-1',location.href));
       window.orbitQA=new VoyageScene(document.getElementById('starfield'));
       const s=orbitQA; s.stopLoop(); s.forceContact();
       const view=s.navigation.forceRear(true);

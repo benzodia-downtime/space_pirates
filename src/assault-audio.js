@@ -32,6 +32,10 @@ export class AssaultAudio {
   }
 
   play(stage) {
+    if (stage === 'player-fire') {this.tone(130,35,.2,.09,'sawtooth');this.tone(780,180,.08,.025,'triangle');}
+    if (stage === 'armor-hit') {this.tone(310,70,.22,.065,'triangle');this.tone(75,35,.25,.07);}
+    if (stage === 'armor-ricochet') this.tone(1350,420,.12,.035,'triangle');
+    if (stage === 'armor-break') {this.tone(90,24,.7,.14);this.tone(390,55,.4,.06,'sawtooth');}
     if (stage === "enemy-charge") this.tone(160, 470, 1.4, 0.035, "triangle");
     if (stage === "enemy-lock") this.tone(920, 600, 0.25, 0.06, "square");
     if (stage === "enemy-fire") this.tone(180, 38, 0.45, 0.11, "sawtooth");

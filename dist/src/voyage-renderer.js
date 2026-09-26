@@ -1,5 +1,6 @@
 import * as THREE from "../vendor/three.module.js";
-import { GUN_MOUNTS } from "./enemy-defense.js?v=evasion-1";
+import { GUN_MOUNTS } from "./enemy-defense.js?v=breachgun-1";
+import { SIEGE } from "./player-cannon.js?v=breachgun-1";
 
 const smoothstep = THREE.MathUtils.smoothstep;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -64,7 +65,9 @@ export class VoyageRenderer {
     this.enemy.rotation.order = "YXZ";
     this.scene.add(this.enemy);
     this.makeEnemy();
+    this.makeSiegeArmor();
     this.makePlayer();
+    this.makePlayerCannon();
     this.makeDefense();
     this.makeRig();
     this.makeRam();
@@ -241,6 +244,89 @@ export class VoyageRenderer {
     this.impactLight = new THREE.PointLight(0xffb264, 0, 65, 2);
     this.impactLight.position.set(0, 0, 35);
     this.stern.add(this.impactLight);
+  }
+
+  makeSiegeArmor() {
+    const m=this.materials;
+    this.siegeFrame=new THREE.Group();this.enemy.add(this.siegeFrame);
+    for(const [lo,hi] of SIEGE.frameBounds) {
+      this.box(this.siegeFrame,m.dark,lo.map((v,i)=>(v+hi[i])/2),lo.map((v,i)=>hi[i]-v));
+    }
+    for(const x of [-6.4,6.4]) {
+      this.box(this.siegeFrame,m.trim,[x,0,-58.1],[.25,11,.16]);
+      this.box(this.siegeFrame,m.panel,[x,-5.7,-54],[1.4,.35,8]);
+    }
+    this.siegeMaterial=this.material(0x8a6a47);
+    this.siegePlates=[];
+    for(const x of [-1,0,1])for(const y of [-1,1]) {
+      const group=new THREE.Group();group.userData={x,y};this.enemy.add(group);
+      this.box(group,this.siegeMaterial,[0,0,0],[3.73,5.2,2]);
+      this.box(group,m.dark,[0,y*.9,-1.04],[3.1,.3,.1]);
+      this.box(group,m.trim,[0,0,-1.06],[3.3,.14,.12]);
+      this.box(group,m.panel,[x*.8,y*1.8,-1.1],[.5,.5,.2]);
+      this.siegePlates.push(group);
+    }
+    this.siegeCracks=[];
+    for(let i=0;i<8;i++) {
+      const crack=this.box(this.enemy,m.dark,[Math.sin(i*2.1)*3.5,Math.cos(i*1.7)*3.4,-55.05],[.09,2.8,.07]);
+      crack.rotation.z=(i%2?1:-1)*(.3+(i%3)*.25);this.siegeCracks.push(crack);
+    }
+    this.siegeScars=Array.from({length:6},()=>this.box(this.enemy,m.dark,[0,0,-55.08],[.9,.9,.08]));
+    this.anchorFrame=new THREE.Group();this.enemy.add(this.anchorFrame);
+    for(const x of [-3.4,3.4])this.box(this.anchorFrame,m.cyan,[x,0,-51.86],[.15,6.6,.1]);
+    for(const y of [-3.3,3.3])this.box(this.anchorFrame,m.cyan,[0,y,-51.86],[6.8,.15,.1]);
+    this.siegeFlash=this.keep(new THREE.MeshBasicMaterial({color:0xffb45e}));
+    this.siegeImpactMeshes=Array.from({length:8},()=>this.mesh(this.enemy,this.keep(new THREE.OctahedronGeometry(1)),this.siegeFlash));
+  }
+
+  makePlayerCannon() {
+    const m=this.materials;
+    this.playerGun=new THREE.Group();this.playerGun.position.set(SIEGE.muzzle.x,SIEGE.muzzle.y,-SIEGE.muzzle.z);this.player.add(this.playerGun);
+    this.box(this.playerGun,m.dark,[0,0,1.7],[1.5,1.5,3.4]);
+    this.box(this.playerGun,m.trim,[0,0,.25],[1.8,1.8,.5]);
+    this.playerGunTip=this.box(this.playerGun,m.cyan,[0,0,-.03],[.8,.8,.12]);
+    this.playerMuzzle=this.mesh(this.playerGun,this.keep(new THREE.OctahedronGeometry(1)),m.cyan,[0,0,-.45]);
+    this.playerRounds=Array.from({length:8},()=>this.mesh(this.scene,this.cylinderGeometry,m.cyan));
+  }
+
+  drawPlayerCannon(cannon,nav,assault,motion) {
+    const damage=1-(nav?.armorHealth??SIEGE.armorHealth)/SIEGE.armorHealth;
+    const exposed=damage>=1;
+    const age=Math.max(0,nav?.armorBreakAge??0);
+    const peel=exposed?(motion?Math.min(1,age/.65):1):0;
+    this.siegeMaterial.color.setHex(damage>.65?0x514b42:damage>.3?0x72604c:0x8a6a47);
+    this.siegePlates.forEach(plate=>{
+      const {x,y}=plate.userData;
+      plate.visible=!exposed || (motion && age<1.6);
+      plate.position.set(x*(3.73+peel*5),y*(2.6+peel*5),-54-peel*4);
+      plate.rotation.set(y*(damage*.04+peel*.8),x*(damage*.06+peel*.6),x*y*peel*.3);
+      plate.scale.setScalar(exposed?Math.max(.01,1-Math.max(0,age-.7)/.9):1);
+    });
+    this.siegeCracks.forEach((crack,i)=>{crack.visible=!exposed && damage>=(i+1)/12;});
+    this.siegeScars.forEach((scar,i)=>{
+      const hit=nav?.armorScars[i];scar.visible=!exposed && Boolean(hit);
+      if(hit) {scar.position.set(hit.x,hit.y,-55.13);scar.rotation.z=i*1.2;}
+    });
+    this.anchorFrame.visible=exposed && assault.breach<.1;
+    const impacts=cannon?.impacts||[];
+    this.siegeImpactMeshes.forEach((mesh,i)=>{
+      const hit=impacts[i];mesh.visible=Boolean(motion && hit);
+      if(!hit)return;
+      mesh.position.set(hit.point.x,hit.point.y,hit.point.z);
+      mesh.scale.setScalar((hit.kind==='armor'?1.6:.8)*Math.max(.05,1-hit.age/.7));
+      mesh.rotation.set(hit.age*9,i,hit.age*6);
+      mesh.material=hit.kind==='armor'?this.siegeFlash:this.materials.cyan;
+    });
+    this.playerMuzzle.visible=Boolean(motion && cannon?.shotAge>=0 && cannon.shotAge<.12);
+    this.playerMuzzle.scale.setScalar(1.4*Math.max(0,1-(cannon?.shotAge||0)/.12));
+    this.playerGun.position.z=-SIEGE.muzzle.z+(motion && cannon?.shotAge>=0?Math.exp(-cannon.shotAge*15)*.35:0);
+    this.playerGunTip.material=cannon?.reloadTime>0?this.materials.trim:this.materials.cyan;
+    this.playerRounds.forEach((mesh,i)=>{
+      const bolt=cannon?.bolts[i];mesh.visible=Boolean(bolt);
+      if(!bolt)return;
+      const head=new THREE.Vector3(bolt.position.x,bolt.position.y,bolt.position.z);
+      this.barBetween(mesh,head.clone().addScaledVector(new THREE.Vector3(bolt.direction.x,bolt.direction.y,bolt.direction.z),-7),head,.2,true);
+    });
   }
 
   makeDefense() {
@@ -500,6 +586,7 @@ export class VoyageRenderer {
     // Camera frustum/distance determine what can be seen, never a progress threshold.
     this.enemy.visible = Boolean(nav?.placed);
     this.drawDefense(frame.defense, nav, motion);
+    this.drawPlayerCannon(frame.cannon, nav, a, motion);
     const opening = smoothstep(a.pressure, 0.7, 1);
     this.doors.forEach((door,i) => { door.position.x = (i === 0 ? -1 : 1) * (1.72 + opening*3.5); });
     this.hatchLamp.material.color.setHex(a.pressure >= 1 ? 0x71f2c3 : 0xff9260);
@@ -600,6 +687,10 @@ export class VoyageRenderer {
       harpoonVisible: this.harpoonCable.visible, harpoonTip: this.harpoonBolt.position.toArray(),
       enemyAimVisible: this.aimBeams.some(b=>b.visible), enemyAimRays: this.aimBeams.filter(b=>b.visible).length,
       enemyBoltsVisible: this.enemyBolts.filter(b=>b.visible).length,
+      playerBoltsVisible:this.playerRounds.filter(b=>b.visible).length,
+      rearArmorVisible:this.siegePlates.some(p=>p.visible), rearArmorPieces:this.siegePlates.filter(p=>p.visible).length,
+      rearArmorCracks:this.siegeCracks.filter(p=>p.visible).length, anchorFrameVisible:this.anchorFrame.visible,
+      playerGunVisible:this.playerGun.visible,
       turretChargeColor: this.guns.find(g=>g.mount===this.lastFrame.defense?.mount)?.charge.color.getHex(),
       activeGun: this.lastFrame.defense?.mount,
       gunMounts: this.guns.map(g=>({mount:g.mount,position:g.group.getWorldPosition(new THREE.Vector3()).toArray(),direction:g.group.getWorldDirection(new THREE.Vector3()).toArray()})),

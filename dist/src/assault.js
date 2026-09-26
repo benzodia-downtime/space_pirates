@@ -10,7 +10,7 @@ export const ASSAULT_CONFIG = Object.freeze({
 });
 
 export const ASSAULT_COPY = Object.freeze({
-  survey: ["진입점 탐색", "자동 선회로 적함 뒤를 살펴보고 하강문을 직접 조준하십시오.", "FIND THE AFT RAMP"],
+  survey: ["후방 장갑 파괴", "후방 갑판 장갑을 함포로 파괴하고 노출된 내부에 작살을 꽂으십시오.", "BREACH THE REAR ARMOR"],
   harpoon: ["작살 발사", "후방 하강문에 작살을 박고 견인 케이블을 고정합니다.", "HARPOON AWAY"],
   tethered: ["작살 고정", "적 포격 중지. 이동 패드로 문 중앙에 맞추고 F 또는 견인 돌입으로 돌파를 시작합니다.", "TETHER LOCKED / AWAITING INPUT"],
   "ram-deploy": ["충각 전개", "선수 돌파 장치를 전개합니다. 패드로 문 중앙에 진입 위치를 맞추십시오.", "01 / RAM DEPLOYING"],

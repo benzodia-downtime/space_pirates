@@ -1,3 +1,5 @@
+import { SIEGE, traceCannon } from './player-cannon.js?v=breachgun-1';
+
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const wrap = n => Math.atan2(Math.sin(n), Math.cos(n));
 const subtract = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
@@ -53,6 +55,7 @@ export class OrbitNavigation {
     this.active = false; this.placed = false; this.orbiting = false; this.direction = 1;
     this.speed = 0; this.safetyStop = false;
     this.dodgeTime = 0; this.dodgeCooldown = 0; this.dodgeVector = null;
+    this.armorHealth = SIEGE.armorHealth; this.armorHitAge = -1; this.armorBreakAge = -1; this.armorScars = [];
     this.angle = 0; this.elevation = 0; this.radius = ORBIT.radius;
     this.orbitNormal = null;
     this.correction = { x: 0, y: 0 }; this.tetherDistance = 0;
@@ -74,6 +77,13 @@ export class OrbitNavigation {
     return { x: r.x + this.enemyPosition.x, y: r.y + this.enemyPosition.y, z: r.z + this.enemyPosition.z };
   }
   get door() { return this.world({ x: 0, y: 0, z: ORBIT.sternZ }); }
+  damageArmor(amount, point) {
+    if(this.armorHealth<=0 || this.anchor || amount<=0)return false;
+    this.armorHealth=Math.max(0,this.armorHealth-amount);this.armorHitAge=0;
+    this.armorScars.push({...point});this.armorScars=this.armorScars.slice(-6);
+    if(this.armorHealth===0)this.armorBreakAge=0;
+    return true;
+  }
   setEnemyYaw(yaw) {
     if(this.anchor) return; // A seated tether arrests the defender's manoeuvre.
     this.enemyYaw=yaw;
@@ -197,7 +207,8 @@ export class OrbitNavigation {
     if (this.observeTime >= 0.3) this.discovered = true;
     const t = Math.abs(direction.z) > 1e-6 ? (ORBIT.sternZ - local.z) / direction.z : -1;
     const hit = { x: local.x + direction.x * t, y: local.y + direction.y * t, z: ORBIT.sternZ };
-    const canFire = !this.anchor && !this.harpoonTarget && this.discovered && visible && incidence >= 0.9 && t > 0 && Math.abs(hit.x) < ORBIT.doorHalfSize && Math.abs(hit.y) < ORBIT.doorHalfSize;
+    const rampRay = this.armorHealth === 0 && t > 0 ? traceCannon(this,this.position,this.world(hit)) : null;
+    const canFire = this.armorHealth === 0 && !this.anchor && !this.harpoonTarget && this.discovered && visible && incidence >= 0.9 && t > 0 && Math.abs(hit.x) < ORBIT.doorHalfSize && Math.abs(hit.y) < ORBIT.doorHalfSize && rampRay?.point.z > -52;
     this.solution = { visible, canFire, distance, incidence, aimError, hit: canFire ? this.world(hit) : null };
     return this.solution;
   }
@@ -249,7 +260,9 @@ export class OrbitNavigation {
     const local=rotate(subtract(this.position,this.enemyPosition),-this.enemyYaw);
     this.radius=length(local); this.angle=Math.atan2(local.x,local.z);this.elevation=Math.atan2(local.y,Math.hypot(local.x,local.z));
   }
-  forceRear(viewOnly = false) {
+  forceRear(viewOnly = false, exposed = true) {
+    // Explicit QA fixture, not a gameplay transition. Armoured tests pass exposed=false.
+    if(exposed)this.armorHealth=0;
     this.angle = Math.PI; this.elevation = 0; this.updatePosition();
     const view = lookAt(this.position, this.door);
     this.inspect(view, 0.5);
@@ -261,6 +274,7 @@ export class OrbitNavigation {
       position: { ...this.position }, enemyPosition: { ...this.enemyPosition }, enemyYaw: this.enemyYaw,
       orbitNormal: this.orbitNormal && { ...this.orbitNormal }, elevationDegrees: this.elevation * 180 / Math.PI,
       doorDiscovered: this.discovered, doorVisible: this.solution.visible, canHarpoon: this.solution.canFire,
+      armorHealth:this.armorHealth, armorMaxHealth:SIEGE.armorHealth, anchorExposed:this.armorHealth===0,
       doorDistance: this.solution.distance, incidence: this.solution.incidence, anchor: this.anchor && { ...this.anchor },
       harpoonTarget: this.harpoonTarget && { ...this.harpoonTarget },
       correction: {...this.correction},
