@@ -42,6 +42,27 @@ try {
       await drag(Math.max(-35, Math.min(35, dx)), Math.max(-25, Math.min(25, dy)));
     }
   }
+  const dodgedSalvos = new Set();
+  async function orbitTo(min, max) {
+    const deadline=Date.now()+90000;
+    while(Date.now()<deadline) {
+      const state=await read(), angle=state.navigation.angleDegrees;
+      assert.notEqual(state.mode,'defeated','Orbit traversal must actively evade horizontal fan fire');
+      if(angle>min && angle<max) return;
+      if(state.enemyDefense.pattern==='fan' && state.enemyDefense.gunPhase==='locked' && !dodgedSalvos.has(state.enemyDefense.shots)) {
+        const key=dodgedSalvos.size%2 ? 'Control' : 'Space';
+        dodgedSalvos.add(state.enemyDefense.shots);
+        await page.locator('#steering-pad').focus();
+        await page.keyboard.down(key);await page.keyboard.press('Shift');
+        await page.waitForTimeout(260);await page.keyboard.up(key);
+        const moved=await read();
+        await aim({yaw:moved.guidanceBearing.x*.65,pitch:moved.guidanceBearing.y*.65});
+        if(!(await read()).navigation.orbiting)await tap('#orbit-button');
+      }
+      await page.waitForTimeout(80);
+    }
+    assert.fail('Orbit angle timeout: '+JSON.stringify(await read()));
+  }
   async function checkDistantVisibility() {
     assert.equal((await read()).searchProgress, 0);
     assert.equal((await read()).rendering.shipVisible, true, 'Hull exists before sensor identification');
@@ -351,7 +372,7 @@ try {
   const fixedEnemy = (await read()).rendering.enemyPosition;
   const initialShots = (await read()).enemyDefense.shots;
   await tap('#orbit-button');
-  await page.waitForFunction(() => { const a=SpacePiratesAmbient.getState().navigation.angleDegrees; return a>75 && a<110; });
+  await orbitTo(75,110);
   await page.screenshot({ path: 'qa-output/orbit-side.png' });
   assert.deepEqual((await read()).rendering.enemyPosition, fixedEnemy, 'Enemy stays fixed as player orbits');
   assert.ok((await read()).enemyDefense.shots > initialShots, 'Defender remains active while the cockpit orbits');
@@ -363,7 +384,7 @@ try {
   assert.equal((await read()).navigation.orbiting,false,'Manual strafe overrides orbit');
   await aim({yaw:(await read()).guidanceBearing.x*.65,pitch:(await read()).guidanceBearing.y*.65});
   await tap('#orbit-button');
-  await page.waitForFunction(() => { const a=SpacePiratesAmbient.getState().navigation.angleDegrees; return a>178 && a<210; }, null, { timeout: 40000 });
+  await orbitTo(178,210);
   await tap('#orbit-button');
   const parked = (await read()).navigation.position;
   await aim((await read()).navigation.doorBearing);
