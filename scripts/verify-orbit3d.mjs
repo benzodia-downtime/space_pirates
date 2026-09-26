@@ -11,21 +11,26 @@ try {
     const errors = []; page.on('pageerror', e=>errors.push(e.message));
     const touch = mobile ? await page.context().newCDPSession(page) : null;
     const read = () => page.evaluate(()=>orbitQA.getState());
-    const tap = selector => mobile ? page.locator(selector).tap() : page.locator(selector).click();
+    const tap = async selector => {
+      if(mobile) await page.locator(selector).tap(); else await page.locator(selector).click();
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    };
     const advance = frames => page.evaluate(count=>{
       const scene = orbitQA;
       for(let i=0;i<count;i++) scene.update(.02);
       scene.renderStill();
     }, frames);
-    async function drag(dx,dy) {
-      const b=await page.locator('#steering-pad').boundingBox(), x=b.x+b.width/2, y=b.y+b.height/2;
+    async function drag(dx,dy,frames=0,selector='#steering-pad') {
+      const b=await page.locator(selector).boundingBox(), x=b.x+b.width/2, y=b.y+b.height*.35;
       if(mobile) {
         await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
         if(dx || dy) await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx,y:y+dy}]});
+        await advance(frames);
         await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
       } else {
         await page.mouse.move(x,y); await page.mouse.down();
         if(dx || dy) await page.mouse.move(x+dx,y+dy);
+        await advance(frames);
         await page.mouse.up();
       }
     }
@@ -34,71 +39,103 @@ try {
     // Set up a stopped contact, then test the real touch/mouse and keyboard input paths.
     await page.evaluate(async ()=>{
       SpacePiratesAmbient.destroy();
-      const {VoyageScene}=await import(new URL("./src/voyage.js?v=turret360-1",location.href));
+      const {VoyageScene}=await import(new URL("./src/voyage.js?v=evasion-1",location.href));
       window.orbitQA=new VoyageScene(document.getElementById("starfield"));
       const s=orbitQA; s.stopLoop(); s.forceContact();
       const b=s.getActualBearing();
       s.pointer={x:b.x*.65/.442,y:b.y*.65/.312}; s.pointerTarget={...s.pointer};
       s.renderStill();
     });
-    await tap('#orbit-button');
-    const start=await read();
-    await drag(0,-30);
-    const chosen=(await read()).navigation.orbitNormal;
-    assert.deepEqual((await read()).navigation.position,start.navigation.position,'No input teleport');
-    assert.deepEqual((await read()).steering,start.steering,'Orbit pad changes path, not just camera');
-    await advance(300);
+    const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
+    const start=await read(); await advance(10);
+    assert.deepEqual((await read()).navigation.position,start.navigation.position,'Starts stopped');
+    await drag(35,0,20);
     let state=await read();
-    assert.ok(state.navigation.position.y>start.navigation.position.y+50,'Pad up causes real vertical travel');
-    assert.deepEqual(state.navigation.orbitNormal,chosen,'Release preserves selected orbit');
-    assert.ok(Math.abs(state.radarPitchDegrees)<.001,'Target remains vertically tracked');
-    assert.ok(Math.abs(state.navigation.radius-start.navigation.radius)<1e-7);
-    assert.deepEqual(state.rendering.enemyPosition,start.rendering.enemyPosition);
-    assert.ok(state.rendering.enemyRotation.every((v,i)=>Math.abs(v-start.rendering.enemyRotation[i])<.001),'No artificial hull spin on a vertical orbital path');
-    await page.screenshot({path:`qa-output/orbit3d-above-${mobile?'mobile':'desktop'}.png`});
-    await drag(0,0);
-    assert.deepEqual((await read()).navigation.orbitNormal,chosen,'Regrip does not flatten orbit');
-    // Cross a pole via the integrated scene: camera and radar must agree, without a flip.
-    const polar=await page.evaluate(()=>{
-      const s=orbitQA; let maxYaw=0,maxPitch=0,maxRadar=0;
-      for(let i=0;i<1800;i++) {
-        const prev=s.getView(); s.update(.02); const next=s.getView();
-        maxYaw=Math.max(maxYaw,Math.abs(next.yaw-prev.yaw));
-        maxPitch=Math.max(maxPitch,Math.abs(next.pitch-prev.pitch));
-        maxRadar=Math.max(maxRadar,Math.abs(s.getState().radarPitchDegrees));
-      }
-      s.renderStill(); return {maxYaw,maxPitch,maxRadar};
+    assert.ok(dist(state.navigation.position,start.navigation.position)>12,'Pad translates');
+    assert.deepEqual(state.steering,start.steering,'Pad never changes look');
+    const parked=state.navigation.position;await advance(10);
+    assert.deepEqual((await read()).navigation.position,parked,'Release stops with no drift');
+    await drag(25,-12,0,'#look-zone');
+    const aimed=await read();
+    assert.deepEqual(aimed.navigation.position,parked,'Look never moves the ship');
+    assert.ok(aimed.steering.x>state.steering.x+.2);
+    await drag(0,0,0,'#look-zone');await advance(10);
+    assert.deepEqual((await read()).steering,aimed.steering,'Regrip and release preserve heading');
+
+    await tap('#track-button');await advance(100);
+    const tracked=await read();
+    assert.equal(tracked.lookTracking,true);assert.deepEqual(tracked.navigation.position,parked,'Tracking is not autopilot');
+    assert.equal(tracked.navigation.doorDiscovered,false,'Front lock does not discover the ramp');
+    await drag(0,-35,35);state=await read();
+    assert.ok(state.navigation.position.y>tracked.navigation.position.y+20);
+    const centreError=await page.evaluate(()=>{
+      const s=orbitQA,p=s.navigation.position,t=s.navigation.enemyPosition,v=s.getView();
+      const d={x:t.x-p.x,y:t.y-p.y,z:t.z-p.z},len=Math.hypot(d.x,d.y,d.z);
+      return 1-(d.x*Math.sin(v.yaw)*Math.cos(v.pitch)-d.y*Math.sin(v.pitch)-d.z*Math.cos(v.yaw)*Math.cos(v.pitch))/len;
     });
-    assert.ok(polar.maxYaw<.02 && polar.maxPitch<.02,JSON.stringify(polar));
-    // The hatch may become the guidance target after discovery; allow its physical offset.
-    assert.ok(polar.maxRadar<20,JSON.stringify(polar));
-    assert.equal(await page.locator('#orbit-direction').count(),0);
-    await page.keyboard.press('q');
-    assert.deepEqual((await read()).navigation.orbitNormal,chosen,'Removed Q shortcut does nothing');
-    await drag(0,30);
-    const reversed=(await read()).navigation.orbitNormal;
-    for(const key of ['x','y','z']) assert.ok(Math.abs(reversed[key]+chosen[key])<1e-8);
-    await drag(25,-25);
-    const diagonal=(await read()).navigation.orbitNormal;
-    assert.notDeepEqual(diagonal,reversed);
-    await advance(70);
-    assert.deepEqual((await read()).navigation.orbitNormal,diagonal);
-    await page.screenshot({path:`qa-output/orbit3d-diagonal-${mobile?'mobile':'desktop'}.png`});
-    await page.keyboard.down('ArrowDown'); await advance(30); await page.keyboard.up('ArrowDown');
-    assert.notDeepEqual((await read()).navigation.orbitNormal,diagonal,'Arrow keys steer orbital plane too');
-    await tap('#orbit-button');
-    state=await read(); await drag(20,0); await advance(20);
-    const manual=await read();
-    assert.deepEqual(manual.navigation.position,state.navigation.position,'Stopped orbit stays still');
-    assert.ok(manual.steering.x>state.steering.x+.1,'Stopped orbit restores manual aiming');
-    assert.ok(Math.abs(manual.steering.y-state.steering.y)<1e-8,'No pitch reset after crossing poles');
+    assert.ok(centreError<.0001,'Manual strafe retains hull-centre tracking');
+    await tap('#track-button');const unlocked=await read();
+    assert.equal(unlocked.lookTracking,false);await advance(5);
+    assert.deepEqual((await read()).steering,unlocked.steering,'Turning tracking off does not snap view');
+
+    await tap('#orbit-button');await advance(5);const orbitStart=await read();
+    await drag(-35,0,5);
+    state=await read();assert.equal(state.navigation.orbiting,false,'Translation overrides optional orbit');
+    assert.ok(dist(state.navigation.position,orbitStart.navigation.position)<4,'No teleport on takeover');
+    await advance(5);assert.deepEqual((await read()).navigation.position,state.navigation.position);
+
+    await page.locator('#steering-pad').focus();
+    const keyboardStart=await read();
+    await page.keyboard.down('Space');await advance(10);await page.keyboard.up('Space');
+    state=await read();assert.ok(state.navigation.position.y>keyboardStart.navigation.position.y);
+    assert.equal(state.mode,'survey','Space ascends, never fires');
+    assert.deepEqual(state.steering,keyboardStart.steering);
+    await page.keyboard.down('Control');await advance(10);await page.keyboard.up('Control');
+    assert.ok(dist((await read()).navigation.position,keyboardStart.navigation.position)<1e-6);
+
+    const dodgeStart=await read();
+    await page.keyboard.down('a');await page.keyboard.press('Shift');await page.keyboard.up('a');await advance(12);
+    state=await read();assert.ok(dist(state.navigation.position,dodgeStart.navigation.position)>24);
+    assert.equal(state.navigation.dodging,false);assert.ok(state.navigation.dodgeCooldown>0);
+    await page.keyboard.press('Shift');await advance(5);
+    assert.deepEqual((await read()).navigation.position,state.navigation.position,'Cooldown prevents double boost');
+    await tap('#settings-button');const paused=await read();await advance(30);
+    assert.equal((await read()).navigation.dodgeCooldown,paused.navigation.dodgeCooldown);
+    await tap('#settings-close');await page.evaluate(()=>orbitQA.stopLoop());await advance(80);
+
+    if(mobile) {
+      const p=await page.locator('#steering-pad').boundingBox(),b=await page.locator('#dodge-button').boundingBox();
+      const pad={x:p.x+p.width/2,y:p.y+p.height/2,id:1},button={x:b.x+b.width/2,y:b.y+b.height/2,id:2};
+      const before=await read();
+      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[pad]});
+      const held={...pad,y:pad.y-35};
+      await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[held]});
+      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[held,button]});
+      await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[held]});
+      assert.equal((await read()).navigation.dodging,true,'Right thumb activates dodge while left holds a direction');
+      await advance(12);
+      assert.ok((await read()).navigation.position.y>before.navigation.position.y+20);
+      await touch.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
+      await advance(1);const released=await read();await advance(10);
+      assert.deepEqual((await read()).navigation.position,released.navigation.position,'Cancel clears pad');
+      // Two independent pointers move and look simultaneously.
+      const l=await page.locator('#look-zone').boundingBox(),look={x:l.x+l.width/2,y:l.y+l.height*.35,id:2};
+      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[pad]});
+      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[pad,look]});
+      await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{...pad,x:pad.x+35},{...look,x:look.x+20}]});
+      await advance(10);state=await read();
+      assert.ok(dist(state.navigation.position,released.navigation.position)>5);
+      assert.ok(state.steering.x>released.steering.x+.2);
+      await touch.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
+    }
+    await page.screenshot({path:`qa-output/evasion-controls-${mobile?'mobile':'desktop'}.png`});
     // Fire with orbit engaged, without a stop command, through both real input paths.
     // Isolate this scenario from the preceding low-level CDP touch gestures.
     await page.reload();
     await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type === 'webgl2');
     await page.evaluate(async ()=>{
       SpacePiratesAmbient.destroy();
-      const {VoyageScene}=await import(new URL('./src/voyage.js?v=turret360-1',location.href));
+      const {VoyageScene}=await import(new URL('./src/voyage.js?v=evasion-1',location.href));
       window.orbitQA=new VoyageScene(document.getElementById('starfield'));
       const s=orbitQA; s.stopLoop(); s.forceContact();
       const view=s.navigation.forceRear(true);
@@ -122,17 +159,21 @@ try {
     assert.equal(hooked.mode,'tethered'); assert.equal(hooked.navigation.orbiting,false);
     assert.ok(hooked.navigation.anchor, 'Impact attaches to the moving rear ramp');
     assert.equal(hooked.navigation.harpoonTarget,null);
+    assert.equal(hooked.lookTracking,false);
+    assert.equal(await page.locator('#dodge-button').isDisabled(),true);
+    await page.keyboard.press('Shift');
+    assert.equal((await read()).navigation.dodging,false,'Tether prohibits boost');
     await page.keyboard.press('o'); await advance(30);
     assert.equal((await read()).navigation.orbiting,false);
     assert.deepEqual((await read()).navigation.position,hooked.navigation.position,'Anchored ship cannot resume orbit');
     await tap('#boarding-action');
     assert.equal((await read()).mode,'ram-deploy');
     assert.deepEqual((await read()).navigation.position,hooked.navigation.position,'Pull begins at impact position without a jump');
-    await page.keyboard.press('o'); await drag(25,-25); await advance(220);
+    await page.keyboard.press('o'); await drag(25,-25,0); await advance(220);
     assert.equal((await read()).navigation.orbiting,false,'Pull never resumes orbit');
     assert.equal(await page.locator('#boarding-panel, #assault-cue').count(),0);
     assert.deepEqual(errors,[]);
-    console.log(`3D orbit ${mobile?'touch':'mouse'}: PASS (steering, half speed, orbital shot, flight, impact stop, tether/pull lock)`);
+    console.log(`Evasion ${mobile?'touch':'mouse'}: PASS (translation/look, tracking, boost, multi-touch, orbital shot, tether/pull lock)`);
     await page.close();
   }
 } finally {await browser.close();}

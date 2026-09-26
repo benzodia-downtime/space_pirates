@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { OrbitNavigation, ORBIT, HELM, lookAt, relativeHelm, pitchOffsetDegrees } from '../src/navigation.js';
+import { OrbitNavigation, ORBIT, HELM, FLIGHT, DODGE, flightVector, lookAt, relativeHelm, pitchOffsetDegrees } from '../src/navigation.js';
 const near = (a, b, eps = 1e-8) => assert.ok(Math.abs(a - b) < eps, a + ' ~= ' + b);
 function setup() { const nav = new OrbitNavigation(); nav.begin({ x: 0.31, y: -0.04 }); return nav; }
 
@@ -41,6 +41,40 @@ test('Pad up, down, left, right and diagonals steer actual 3D orbital travel wit
   }
 });
 const lengthFrom = (a,b) => Math.hypot(a.x-b.x, a.y-b.y, a.z-b.z);
+test('Strafe is view-relative, diagonal input is normalized, and release has no drift', () => {
+  for (const view of [{yaw:0,pitch:0},{yaw:1.4,pitch:.8},{yaw:2,pitch:Math.PI}]) {
+    const right=flightVector(view,{x:1,y:0,z:0}), up=flightVector(view,{x:0,y:1,z:0}), forward=flightVector(view,{x:0,y:0,z:1});
+    near(right.x*up.x+right.y*up.y+right.z*up.z,0);
+    near(forward.x*up.x+forward.y*up.y+forward.z*up.z,0);
+    for(const input of [{x:1,y:0},{x:0,y:1},{x:-1,y:-1}]) {
+      const n=setup(),before={...n.position}; n.toggleOrbit();
+      n.move(.05,view,0,input);
+      near(lengthFrom(n.position,before),FLIGHT.strafeSpeed*.05);
+      assert.equal(n.orbiting,false); const stopped={...n.position};
+      n.move(.05,view); assert.deepEqual(n.position,stopped);
+    }
+  }
+});
+test('Dodge has fixed physical displacement, cooldown and direction; it is not teleportation', () => {
+  const n=setup(),view={yaw:0,pitch:0},p={...n.position};n.toggleOrbit();
+  assert.equal(n.startDodge(view,{x:0,y:1,z:0}),true);assert.equal(n.orbiting,false);
+  assert.deepEqual(n.position,p);assert.equal(n.startDodge(view),false);
+  for(let i=0;i<11;i++) n.move(.02,{yaw:2,pitch:1});
+  near(n.position.y-p.y,DODGE.speed*DODGE.duration);near(n.position.x,p.x);
+  const stopped={...n.position};n.move(.02,view);assert.deepEqual(n.position,stopped);
+  assert.equal(n.startDodge(view),false);
+  for(let i=0;i<60;i++) n.move(.02,view);
+  assert.equal(n.startDodge(view),true);n.cancelDodge();n.move(.02,view);
+  assert.deepEqual(n.position,stopped);assert.ok(n.dodgeCooldown>0,'Cancel does not refund cooldown');
+  n.reset();assert.equal(n.dodgeCooldown,0);
+});
+test('Dodge respects hull clearance and cannot move a tethered ship', () => {
+  const n=setup();n.radius=86;n.updatePosition();const view=lookAt(n.position,n.enemyPosition);
+  n.startDodge(view,{x:0,y:0,z:1});n.move(.05,view);
+  assert.ok(n.radius>=85);assert.equal(n.safetyStop,true);assert.equal(n.dodgeTime,0);
+  const rear=n.forceRear();assert.equal(n.startDodge(rear),false);
+  const p={...n.position};n.move(.05,rear,1,{x:1,y:1});assert.deepEqual(n.position,p);
+});
 test('A released diagonal input retains its plane, radius and target view over complete orbits', () => {
   const n = setup(); n.toggleOrbit();
   let view = lookAt(n.position, n.enemyPosition);

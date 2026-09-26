@@ -19,6 +19,9 @@
   background: #01040c;
 }
 #starfield { z-index: 6; }
+.look-zone { position: absolute; z-index: 28; inset: 0 0 0 50%; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.look-zone:active { cursor: grabbing; }
+@media (pointer: fine) { .look-zone { left: 0; } }
 .stars { display: none; }
 .nebula-field { opacity: 0.72; }
 .h-panel, .v-panel { display: flex; gap: var(--panel-gap, 12px); min-width: 0; }
@@ -45,7 +48,7 @@
 .hud-action-row { grid-column: 2; grid-row: 2; justify-content: center; align-items: center; }
 .hud-action-row:not(:has(button:not([hidden]))) { display: none; }
 .flight-controls { grid-column: 1; grid-row: 2; }
-.thrust-controls { grid-column: 3; grid-row: 2; }
+.right-controls { grid-column: 3; grid-row: 2; align-items: flex-end; gap: 8px; }
 .action-notice {
   grid-column: 2; grid-row: 1; justify-self: center;
   margin: 0; max-width: 100%; color: #ffd09b; font-size: 11px; line-height: 1.4;
@@ -148,6 +151,8 @@
 :is(.voyage-ui, .settings-dialog) button:focus-visible, .steering-pad:focus-visible { outline: 2px solid #b8fbff; outline-offset: 3px; }
 :is(.voyage-ui, .settings-dialog) button[aria-pressed="true"], .voyage-ui button.is-held { background: #204747; border-color: #83e2c6; color: #d0fff0; }
 #orbit-button { width: 140px; }
+#track-button { width: 112px; }
+#dodge-button { width: 72px; font-variant-numeric: tabular-nums; }
 .voyage-ui .voyage-action { width: 148px; flex: 0 0 auto; }
 .voyage-action strong { font: inherit; font-weight: 700; }
 .flight-controls { display: flex; align-items: flex-end; gap: 12px; }
@@ -397,13 +402,14 @@
 .impact-flash { position: absolute; z-index: 27; inset: 0; pointer-events: none; opacity: var(--impact-flash, 0); background: radial-gradient(ellipse at 50% 40%, #ffe6b0, #d7772b 48%, transparent 78%); }
 .damage-vignette { position: absolute; z-index: 26; inset: 0; pointer-events: none; opacity: var(--damage-opacity, 0); background: radial-gradient(ellipse at center, transparent 35%, #a02315 100%); }
 @keyframes radar-sweep { to { transform: rotate(360deg); } }
-@media (max-width: 720px) and (orientation: portrait) {
+@media (max-width: 1000px) {
   .voyage-ui { --panel-gap: 8px; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
   .hud-bottom { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
   .hud-control-row { display: flex; justify-content: space-between; align-items: flex-end; }
   .hud-action-row { gap: 6px; flex-wrap: nowrap; }
   .orbit-controls { gap: 6px; }
   #orbit-button { width: 96px; }
+  #track-button { width: 94px; }
   .voyage-ui .voyage-action { width: 104px; }
   .action-notice { font-size: 10px; }
   .flight-controls { gap: 8px; }
@@ -411,10 +417,13 @@
   .thrust-controls { width: 92px; gap: 6px; }
   .voyage-ui button { font-size: 11px; padding: 7px; }
 }
-/* Landscape keeps all actions between the helm and thrust buttons, along the bottom edge. */
+/* Two shallow rows on short screens. The clearance note shares the lower row. */
 @media (max-height: 560px) and (orientation: landscape) {
   .voyage-ui { --panel-gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
-  .hud-bottom { gap: 6px 8px; }
+  .hud-bottom { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 8px; }
+  .hud-action-row { grid-column: 1 / -1; grid-row: 1; justify-content: center; }
+  .hud-control-row { display: contents; }
+  .action-notice { grid-column: 2; grid-row: 2; align-self: center; }
   .hud-action-row, .orbit-controls { gap: 6px; }
   #orbit-button { width: 96px; }
   .voyage-ui .voyage-action { width: 104px; }
@@ -422,7 +431,7 @@
   .action-notice { font-size: 10px; }
   .flight-controls { align-items: center; gap: 6px; }
   .voyage-ui .settings-button { min-width: 44px; }
-  .steering-pad { width: 64px; height: 64px; }
+  .steering-pad { width: 44px; height: 44px; }
   .thrust-controls { flex-direction: row; align-items: center; gap: 6px; width: auto; }
   .thrust-controls button { width: 60px; }
   .cockpit-console { height: 26vh; }
@@ -430,6 +439,11 @@
 @media (max-width: 360px) and (orientation: portrait) {
   .steering-pad { width: 76px; height: 76px; }
   .thrust-controls { width: 80px; }
+  #orbit-button { width: 88px; }
+  #track-button { width: 90px; }
+  .voyage-ui .voyage-action { width: 102px; }
+  #dodge-button { width: 64px; }
+  .flight-controls, .right-controls { gap: 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .voyage-radar__sweep { animation: none; }
@@ -440,7 +454,7 @@
 }
 
 /* Native modal supplies focus trapping, an inert background and Escape dismissal. */
-.voyage-ui .settings-button { min-width: 64px; }
+.voyage-ui .settings-button { min-width: 44px; }
 .settings-dialog {
   width: min(400px, calc(100vw - 32px)); max-height: calc(100dvh - 32px);
   margin: auto; padding: 20px; overflow: auto;

@@ -1,5 +1,5 @@
 import * as THREE from "../vendor/three.module.js";
-import { GUN_MOUNTS } from "./enemy-defense.js?v=turret360-1";
+import { GUN_MOUNTS } from "./enemy-defense.js?v=evasion-1";
 
 const smoothstep = THREE.MathUtils.smoothstep;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);

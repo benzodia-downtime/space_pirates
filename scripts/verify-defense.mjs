@@ -9,13 +9,16 @@ try {
     const page=await browser.newPage(mobile?{viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2}:{viewport:{width:1440,height:900}});
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     const read=()=>page.evaluate(()=>defenseQA.getState());
-    const tap=s=>mobile?page.locator(s).tap():page.locator(s).click();
+    const tap=async s=>{
+      if(mobile)await page.locator(s).tap();else await page.locator(s).click();
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    };
     async function fresh(rear=false) {
       await page.goto(url);
       await page.waitForFunction(()=>window.SpacePiratesAmbient?.getState().rendering.type==='webgl2');
       await page.evaluate(async rear=>{
         SpacePiratesAmbient.destroy();
-        const {VoyageScene}=await import(new URL('./src/voyage.js?v=turret360-1',location.href));
+        const {VoyageScene}=await import(new URL('./src/voyage.js?v=evasion-1',location.href));
         window.defenseQA=new VoyageScene(document.querySelector('#starfield'));
         const s=defenseQA;s.stopLoop();s.forceContact();
         const view=rear?s.navigation.forceRear(true):s.getView();
@@ -24,14 +27,15 @@ try {
       },rear);
     }
     const step=frames=>page.evaluate(n=>{for(let i=0;i<n;i++)defenseQA.update(.02);defenseQA.renderStill();},frames);
-    async function drag(dx,dy) {
+    async function drag(dx,dy,frames=Math.round(Math.hypot(dx,dy)*.18/8/.02)) {
       const box=await page.locator('#steering-pad').boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
       if(mobile) {
         const touch=await page.context().newCDPSession(page);
         await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
         await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:x+dx,y:y+dy}]});
+        await step(frames);
         await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await touch.detach();
-      } else {await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:3});await page.mouse.up();}
+      } else {await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+dx,y+dy,{steps:3});await step(frames);await page.mouse.up();}
       await step(1);
     }
     async function latch() {
@@ -74,20 +78,14 @@ try {
     const paused=await read();await page.waitForTimeout(100);
     assert.deepEqual((await read()).enemyDefense,paused.enemyDefense);
     await tap('#settings-close');await page.evaluate(()=>defenseQA.stopLoop());
-    // Upward orbit after the red lock dodges a fixed, non-homing shot.
-    await tap('#orbit-button');
-    if(mobile) {
-      const touch=await page.context().newCDPSession(page),box=await page.locator('#steering-pad').boundingBox();
-      const x=box.x+box.width/2,y=box.y+box.height/2;
-      await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y}]});
-      await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:y-30}]});
-      await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-    } else {await page.keyboard.down('ArrowUp');await step(1);await page.keyboard.up('ArrowUp');}
-    await step(70);
+    // Real pad/keyboard translation after lock avoids the non-homing salvo.
+    if(mobile) await drag(0,-35,60);
+    else {await page.locator('#steering-pad').focus();await page.keyboard.down('Space');await page.keyboard.press('Shift');await step(60);await page.keyboard.up('Space');}
+    await step(10);
     assert.ok((await read()).enemyDefense.shots>=1);
     assert.ok((await read()).rendering.enemyBoltsVisible>0);
     await page.screenshot({path:`qa-output/defense-dodge-${mobile?'mobile':'desktop'}.png`});
-    await step(110);assert.equal((await read()).enemyDefense.hull,100,'Changing orbit after lock avoids damage');
+    await step(110);assert.equal((await read()).enemyDefense.hull,100,'Translating after lock avoids damage');
     assert.ok((await read()).navigation.position.y>locked.navigation.position.y+30);
 
     await fresh();await step(400);await until('aim');await step(40);
@@ -126,7 +124,7 @@ try {
 
     await latch();await tap('#boarding-action');await step(80);
     assert.equal((await read()).mode,'charge');assert.equal((await read()).steeringLocked,false);
-    await drag(18,0);await step(112);
+    await drag(18,0);await step(92);
     let ram=await read();assert.equal(ram.mode,'jammed');assert.equal(ram.collision,'graze');assert.ok(ram.enemyDefense.hull<=90);
     assert.equal(ram.breachProgress,0);await step(1000);assert.equal((await read()).mode,'jammed');
     assert.equal((await read()).enemyDefense.hull,90,'Jammed ram costs collision damage only, no counterfire');
@@ -136,7 +134,7 @@ try {
     await step(350);ram=await read();assert.equal(ram.mode,'ready');assert.equal(ram.rendering.armourBreached,true);
     await page.screenshot({path:`qa-output/ram-recovered-${mobile?'mobile':'desktop'}.png`});
 
-    await latch();await tap('#boarding-action');await step(80);await drag(48,0);await step(112);
+    await latch();await tap('#boarding-action');await step(80);await drag(48,0);await step(58);
     ram=await read();assert.equal(ram.mode,'rebound');assert.equal(ram.collision,'miss');assert.equal(ram.breachProgress,0);
     await layout('rebound');await step(50);ram=await read();
     assert.equal(ram.mode,'survey');assert.equal(ram.navigation.anchor,null);assert.equal(ram.navigation.canOrbit,true);
@@ -146,7 +144,7 @@ try {
     await latch();await tap('#boarding-action');await step(540);
     assert.equal((await read()).mode,'ready','Centered ram completes without an artificial forced miss');
     await latch();await page.evaluate(()=>{defenseQA.enemyDefense.hull=20;});
-    await tap('#boarding-action');await step(80);await drag(48,0);await step(112);
+    await tap('#boarding-action');await step(80);await drag(48,0);await step(58);
     assert.equal((await read()).mode,'defeated','Ram collision damage can disable the ship');
     assert.equal((await read()).enemyDefense.hull,0);
     await fresh();await step(1600);

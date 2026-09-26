@@ -9,7 +9,8 @@ const unit = v => scale(v, 1 / (length(v) || 1));
 const rotate = (v, yaw) => ({ x: Math.cos(yaw) * v.x + Math.sin(yaw) * v.z, y: v.y, z: -Math.sin(yaw) * v.x + Math.cos(yaw) * v.z });
 
 export const HELM = Object.freeze({ yawScale: 0.442, pitchScale: 0.312, dragRadians: 0.006 });
-export const FLIGHT = Object.freeze({ contactDistance: 1100, surveyDistance: 220, forwardSpeed: 80, reverseSpeed: 45, closeSpeed: 22, safetyRadius: 85 });
+export const FLIGHT = Object.freeze({ contactDistance: 1100, surveyDistance: 220, forwardSpeed: 80, reverseSpeed: 45, closeSpeed: 22, strafeSpeed: 32, safetyRadius: 85 });
+export const DODGE = Object.freeze({ speed: 110, duration: 0.22, cooldown: 1.2 });
 export const ORBIT = Object.freeze({ radius: 155, minRadius: 120, speed: 0.095, sternZ: -51, doorHalfSize: 3.65 });
 
 export function relativeHelm(origin, dragX, dragY) {
@@ -36,6 +37,14 @@ export function pitchOffsetDegrees(viewPitch, targetPitch) {
   return (viewPitch - targetPitch) * 180 / Math.PI;
 }
 
+// Ship-local thrust axes: right, up, forward. No roll or world-axis strafing.
+export function flightVector(view, input) {
+  const magnitude = Math.max(1, Math.hypot(input.x, input.y, input.z));
+  const x = input.x / magnitude, y = input.y / magnitude, z = input.z / magnitude;
+  const sy = Math.sin(view.yaw), cy = Math.cos(view.yaw), sp = Math.sin(view.pitch), cp = Math.cos(view.pitch);
+  return { x: cy*x + sy*sp*y + sy*cp*z, y: cp*y - sp*z, z: sy*x - cy*sp*y - cy*cp*z };
+}
+
 // Orbit moves the cockpit, independently of the enemy's deliberate defensive yaw.
 // No renderer dependency: discovery, occlusion and harpoon hit tests are deterministic.
 export class OrbitNavigation {
@@ -43,6 +52,7 @@ export class OrbitNavigation {
   reset() {
     this.active = false; this.placed = false; this.orbiting = false; this.direction = 1;
     this.speed = 0; this.safetyStop = false;
+    this.dodgeTime = 0; this.dodgeCooldown = 0; this.dodgeVector = null;
     this.angle = 0; this.elevation = 0; this.radius = ORBIT.radius;
     this.orbitNormal = null;
     this.correction = { x: 0, y: 0 }; this.tetherDistance = 0;
@@ -78,21 +88,45 @@ export class OrbitNavigation {
     this.position = this.world({ x: Math.sin(this.angle) * flat, y: Math.sin(this.elevation) * this.radius, z: Math.cos(this.angle) * flat });
     this.orbitNormal = null;
   }
-  move(delta, view, thrust = 0) {
+  startDodge(view, input = { x: 0, y: 0, z: 0 }) {
+    if (this.anchor || this.dodgeCooldown > 0) return false;
+    const direction = Math.hypot(input.x, input.y, input.z) > .15 ? input : { x: 1, y: 0, z: 0 };
+    this.dodgeVector = unit(flightVector(view, direction));
+    this.dodgeTime = DODGE.duration; this.dodgeCooldown = DODGE.cooldown;
+    this.stopOrbit(); this.orbitNormal = null;
+    return true;
+  }
+  cancelDodge() { this.dodgeTime = 0; this.dodgeVector = null; }
+  move(delta, view, thrust = 0, lateral = { x: 0, y: 0 }) {
     this.speed = 0; this.safetyStop = false;
-    if (this.anchor || !thrust || delta <= 0) return;
+    const dt = clamp(delta, 0, .05);
+    this.dodgeCooldown = Math.max(0, this.dodgeCooldown - dt);
+    if (this.anchor) { this.cancelDodge(); return; }
+    if (!dt) return;
+    const input = { x: lateral.x, y: lateral.y, z: clamp(thrust, -1, 1) };
+    const magnitude = Math.max(1, Math.hypot(input.x, input.y, input.z));
+    const dodgeStep = Math.min(dt, this.dodgeTime);
+    if (!Math.hypot(input.x, input.y, input.z) && !dodgeStep) return;
     this.orbiting = false; // Manual thrust explicitly takes over from autopilot.
     this.orbitNormal = null;
     const speed = this.radius < 300 ? FLIGHT.closeSpeed : thrust > 0 ? FLIGHT.forwardSpeed : FLIGHT.reverseSpeed;
-    const step = clamp(delta, 0, 0.05) * clamp(thrust, -1, 1) * speed;
-    const next = { x: this.position.x + Math.sin(view.yaw) * Math.cos(view.pitch) * step,
-      y: this.position.y - Math.sin(view.pitch) * step, z: this.position.z - Math.cos(view.yaw) * Math.cos(view.pitch) * step };
+    const velocity = flightVector(view, { x: input.x / magnitude, y: input.y / magnitude, z: input.z / magnitude });
+    // Independent speeds, with normalized combined input so diagonal thrust is not a free boost.
+    const forward = flightVector(view, { x: 0, y: 0, z: input.z / magnitude });
+    const displacement = {};
+    for (const axis of ['x', 'y', 'z']) displacement[axis] = (velocity[axis] * FLIGHT.strafeSpeed + forward[axis] * (speed - FLIGHT.strafeSpeed)) * (dt - dodgeStep) + (this.dodgeVector?.[axis] || 0) * DODGE.speed * dodgeStep;
+    this.dodgeTime = Math.max(0, this.dodgeTime - dt);
+    if (this.dodgeTime < 1e-8) this.dodgeTime = 0;
+    const next = { x: this.position.x + displacement.x, y: this.position.y + displacement.y, z: this.position.z + displacement.z };
     const local = rotate(subtract(next, this.enemyPosition), -this.enemyYaw);
     const radius = length(local);
     // A non-destructive safety stop keeps ordinary flight out of the enemy hull.
     // The explicit harpoon assault alone is allowed to cross this clearance.
-    if (this.placed && radius < FLIGHT.safetyRadius) { this.safetyStop = true; return; }
-    this.position = next; this.speed = Math.sign(thrust) * speed;
+    const radial = subtract(this.position, this.enemyPosition);
+    const t = clamp(-dot(radial, displacement) / (dot(displacement, displacement) || 1), 0, 1);
+    const closest = { x: radial.x + displacement.x*t, y: radial.y + displacement.y*t, z: radial.z + displacement.z*t };
+    if (this.placed && length(closest) < FLIGHT.safetyRadius && (this.radius >= FLIGHT.safetyRadius || radius < this.radius)) { this.safetyStop = true; this.cancelDodge(); return; }
+    this.position = next; this.speed = length(displacement) / dt * (thrust < 0 && !input.x && !input.y && !dodgeStep ? -1 : 1);
     this.radius = radius;
     this.angle = Math.atan2(local.x, local.z);
     this.elevation = Math.atan2(local.y, Math.hypot(local.x, local.z));
@@ -103,6 +137,7 @@ export class OrbitNavigation {
     // Stopping is always allowed; starting is validated here for every input path.
     if (!this.orbiting && !this.canOrbit) return false;
     this.orbiting = !this.orbiting;
+    if (this.orbiting) this.cancelDodge();
     if (this.orbiting && !this.orbitNormal) {
       const radial = unit(subtract(this.position, this.enemyPosition));
       const tangent = rotate({ x: Math.cos(this.angle) * this.direction, y: 0, z: -Math.sin(this.angle) * this.direction }, this.enemyYaw);
@@ -144,7 +179,7 @@ export class OrbitNavigation {
       this.speed = this.radius * ORBIT.speed;
     }
     const next = lookAt(this.position, this.enemyPosition, previous);
-    const shift = { yaw: wrap(next.yaw - previous.yaw), pitch: next.pitch - previous.pitch };
+    const shift = this.orbiting ? { yaw: wrap(next.yaw - previous.yaw), pitch: next.pitch - previous.pitch } : { yaw: 0, pitch: 0 };
     this.inspect({ yaw: view.yaw + shift.yaw, pitch: view.pitch + shift.pitch }, dt);
     return shift;
   }
@@ -179,6 +214,7 @@ export class OrbitNavigation {
     if (this.anchor || (!this.harpoonTarget && !this.launch(view))) return null;
     this.anchor = this.harpoonTarget; this.harpoonTarget = null; this.harpoonLocalTarget = null;
     this.stopOrbit();
+    this.cancelDodge();
     // The ship can move during flight. Lock the cable from the impact-time position.
     const v = subtract(this.position, this.anchor); const distance = length(v);
     this.pullVector = { x: v.x / distance, y: v.y / distance, z: v.z / distance };
@@ -221,7 +257,7 @@ export class OrbitNavigation {
     return view;
   }
   getState() {
-    return { active: this.active, placed: this.placed, speed: this.speed, safetyStop: this.safetyStop, orbiting: this.orbiting, canOrbit: this.canOrbit, orbitTooClose: this.orbitTooClose, minOrbitRadius: ORBIT.minRadius, direction: this.direction, radius: this.radius, angleDegrees: ((this.angle * 180 / Math.PI) % 360 + 360) % 360,
+    return { active: this.active, placed: this.placed, speed: this.speed, safetyStop: this.safetyStop, dodging: this.dodgeTime > 0, dodgeCooldown: this.dodgeCooldown, orbiting: this.orbiting, canOrbit: this.canOrbit, orbitTooClose: this.orbitTooClose, minOrbitRadius: ORBIT.minRadius, direction: this.direction, radius: this.radius, angleDegrees: ((this.angle * 180 / Math.PI) % 360 + 360) % 360,
       position: { ...this.position }, enemyPosition: { ...this.enemyPosition }, enemyYaw: this.enemyYaw,
       orbitNormal: this.orbitNormal && { ...this.orbitNormal }, elevationDegrees: this.elevation * 180 / Math.PI,
       doorDiscovered: this.discovered, doorVisible: this.solution.visible, canHarpoon: this.solution.canFire,

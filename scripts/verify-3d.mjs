@@ -19,8 +19,8 @@ try {
   const tap = async selector => mobile ? page.locator(selector).tap() : page.locator(selector).click();
   const touch = mobile ? await page.context().newCDPSession(page) : null;
   async function drag(dx, dy, offset = 0) {
-    const box = await page.locator('#steering-pad').boundingBox();
-    const x = box.x + box.width / 2 + offset, y = box.y + box.height / 2;
+    const box = await page.locator('#look-zone').boundingBox();
+    const x = box.x + box.width / 2 + offset, y = box.y + box.height * .35;
     if (mobile) {
       await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
       if (dx || dy) await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx, y: y + dy }] });
@@ -48,7 +48,7 @@ try {
     assert.ok((await read()).rendering.farClipMetres >= 18000);
     await page.evaluate(async () => {
       SpacePiratesAmbient.destroy();
-      const { VoyageScene } = await import(new URL('./src/voyage.js?v=turret360-1', location.href));
+      const { VoyageScene } = await import(new URL('./src/voyage.js?v=evasion-1', location.href));
       window.qaVisibilityScene = new VoyageScene(document.getElementById('starfield'));
       qaVisibilityScene.pause();
     });
@@ -179,6 +179,8 @@ try {
   await checkRadar();
 
   async function checkLayout(label, matrix = true) {
+    const alreadyPaused = await page.evaluate(() => SpacePiratesAmbient.paused);
+    await page.evaluate(() => SpacePiratesAmbient.pause()); // Resizing/screenshots are not combat time.
     const original = page.viewportSize();
     const viewports = matrix ? [['desktop',1440,900], ['tablet',1024,768], ['portrait',390,844], ['small',320,568], ['landscape',844,390], ['short',667,375], ['compact-landscape',568,320]] : [[label,original.width,original.height]];
     for (const [name,width,height] of viewports) {
@@ -191,7 +193,7 @@ try {
         const dock = document.querySelector('.hud-bottom').getBoundingClientRect();
         if (dock.top < innerHeight * .65) issues.push('Controls extend above bottom 35% of viewport');
         const visible = e => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
-        const selectors = ['#voyage-radar','#orbit-controls','#orbit-readout','#boarding-action','#battle-start','.flight-controls','.thrust-controls'];
+        const selectors = ['#voyage-radar','#orbit-controls','#orbit-readout','#boarding-action','#battle-start','#track-button','.flight-controls','.right-controls'];
         const panels = selectors.map(s=>document.querySelector(s)).filter(visible);
         const overlap = (a,b) => Math.min(a.right,b.right)-Math.max(a.left,b.left) > 1 && Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top) > 1;
         const aim = document.querySelector('.cockpit-reticle').getBoundingClientRect();
@@ -218,6 +220,7 @@ try {
     }
     await page.setViewportSize(original);
     await page.evaluate(() => SpacePiratesAmbient.redraw());
+    if (!alreadyPaused) await page.evaluate(() => SpacePiratesAmbient.resume());
   }
   await checkLayout('cruise');
   if (process.argv.includes('--layout-only')) {
@@ -264,9 +267,8 @@ try {
   assert.ok(reverse.speed < 0); assert.ok(reverse.navigation.position.z > forward.navigation.position.z);
   const noScan = await read();
   await page.locator('#steering-pad').focus();
-  await page.keyboard.press('Space'); await page.waitForTimeout(350);
-  assert.equal((await read()).searchProgress, noScan.searchProgress, 'Space has no sensor pulse action');
-  assert.deepEqual((await read()).navigation.position, noScan.navigation.position);
+  await page.keyboard.down('Space'); await page.waitForTimeout(120); await page.keyboard.up('Space');
+  assert.ok((await read()).navigation.position.y > noScan.navigation.position.y, 'Space now ascends instead of triggering scan/attack');
   assert.deepEqual((await read()).rendering.enemyPosition, noScan.rendering.enemyPosition);
   await page.keyboard.down('w'); await page.keyboard.down('s');
   await page.waitForTimeout(80); const opposed = await read(); await page.waitForTimeout(200);
@@ -320,7 +322,7 @@ try {
   await page.waitForTimeout(600);
   assert.equal((await read()).navigation.doorDiscovered, false);
   assert.equal(await page.locator('#boarding-action').isEnabled(), false, 'Straight approach cannot succeed');
-  await page.keyboard.press('Space');
+  await page.keyboard.press('f');
   assert.equal((await read()).mode, 'survey', 'Blind attack is rejected');
   await page.screenshot({ path: 'qa-output/orbit-front.png' });
   await checkLayout('survey');
@@ -347,20 +349,21 @@ try {
   assert.equal((await read()).navigation.orbiting, false);
   await aim({ yaw: (await read()).guidanceBearing.x*.65, pitch: (await read()).guidanceBearing.y*.65 });
   const fixedEnemy = (await read()).rendering.enemyPosition;
-  const fixedRotation = (await read()).rendering.enemyRotation;
+  const initialShots = (await read()).enemyDefense.shots;
   await tap('#orbit-button');
-  await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.angleDegrees > 75);
+  await page.waitForFunction(() => { const a=SpacePiratesAmbient.getState().navigation.angleDegrees; return a>75 && a<110; });
   await page.screenshot({ path: 'qa-output/orbit-side.png' });
   assert.deepEqual((await read()).rendering.enemyPosition, fixedEnemy, 'Enemy stays fixed as player orbits');
-  assert.notDeepEqual((await read()).rendering.enemyRotation, fixedRotation, 'Defender deliberately turns its hull while the cockpit orbits');
+  assert.ok((await read()).enemyDefense.shots > initialShots, 'Defender remains active while the cockpit orbits');
+  // Hull yaw can legitimately stay fixed during the initial committed turn/hold and reload windows.
+  // Deterministic turning and 360-degree firing are covered in the defence suite.
   assert.equal((await read()).navigation.doorVisible, false, 'Rear hatch is occluded from the side');
   assert.equal(await page.locator('#orbit-direction').count(), 0);
-  await drag(-30, 0);
-  const reverseAngle = (await read()).navigation.angleDegrees;
-  await page.waitForTimeout(350);
-  assert.ok((await read()).navigation.angleDegrees < reverseAngle, 'Reverse autopilot direction');
-  await drag(30, 0);
-  await page.waitForFunction(() => SpacePiratesAmbient.getState().navigation.angleDegrees > 178, null, { timeout: 40000 });
+  await page.keyboard.down('a');await page.waitForTimeout(150);await page.keyboard.up('a');
+  assert.equal((await read()).navigation.orbiting,false,'Manual strafe overrides orbit');
+  await aim({yaw:(await read()).guidanceBearing.x*.65,pitch:(await read()).guidanceBearing.y*.65});
+  await tap('#orbit-button');
+  await page.waitForFunction(() => { const a=SpacePiratesAmbient.getState().navigation.angleDegrees; return a>178 && a<210; }, null, { timeout: 40000 });
   await tap('#orbit-button');
   const parked = (await read()).navigation.position;
   await aim((await read()).navigation.doorBearing);
@@ -403,7 +406,7 @@ try {
   await page.screenshot({ path: 'qa-output/harpoon-locked.png' });
   await checkLayout('tethered');
   if (mobile) await tap('#boarding-action');
-  else await page.keyboard.press('Space'); // Works even when the previous button still has focus.
+  else await page.keyboard.press('f'); // Contextual action, independent of prior button focus.
   let start = Date.now();
   while (Date.now() - start < 45000) {
     state = await read();
@@ -473,9 +476,7 @@ try {
   await page.waitForFunction(() => !SpacePiratesAmbient.paused);
 
   await page.locator('#steering-pad').focus();
-  await page.keyboard.down('d');
-  await page.waitForTimeout(250);
-  await page.keyboard.up('d');
+  await drag(25,0);
   await page.waitForTimeout(1200);
   const latched = await page.evaluate(() => SpacePiratesAmbient.getState());
   await page.waitForTimeout(400);
@@ -508,7 +509,7 @@ try {
   // Inspect a real collision frame with reduced motion, not just the settled ready state.
   const reduced = await page.evaluate(async () => {
     SpacePiratesAmbient.destroy();
-    const { VoyageScene } = await import(new URL('./src/voyage.js?v=turret360-1', location.href));
+    const { VoyageScene } = await import(new URL('./src/voyage.js?v=evasion-1', location.href));
     const scene = new VoyageScene(document.getElementById('starfield'));
     scene.pause();
     scene.forceEncounter();
