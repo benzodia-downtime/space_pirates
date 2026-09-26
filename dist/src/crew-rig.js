@@ -77,6 +77,11 @@ export class CrewRig {
     this.flash.visible=actor.shotAge<.065&&actor.health>0&&!reduced;
     if(actor.health<=0){this.arms[0].shoulder.rotation.x=-.4;this.arms[1].shoulder.rotation.x=-.2;this.weapon.rotation.z=ease*.8;}
     else this.weapon.rotation.z=0;
+    if(actor.state==='seated'){
+      this.hips.position.y=.62;this.hips.rotation.z=0;this.spine.rotation.set(0,0,0);
+      for(const leg of this.legs){leg.hip.rotation.x=-1.3;leg.knee.rotation.x=1.45;}
+      this.weapon.rotation.x=-.75;this.flash.visible=false;
+    }
     this.root.updateMatrixWorld(true);
     this.host.syncBatch(this.instances);
   }

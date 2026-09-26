@@ -1,6 +1,6 @@
-import {BoardingCombat,CREW,clamp,emptyCargo} from './boarding-combat.js?v=extraction-1';
-import {zoneAt} from './boarding-layout.js?v=extraction-1';
-import {BoardingRenderer} from './boarding-renderer.js?v=extraction-1';
+import {BoardingCombat,CREW,clamp,emptyCargo} from './boarding-combat.js?v=helm-return-1';
+import {zoneAt} from './boarding-layout.js?v=helm-return-1';
+import {BoardingRenderer} from './boarding-renderer.js?v=helm-return-1';
 const $=id=>document.getElementById(id);
 
 export class BoardingController {
@@ -38,7 +38,7 @@ export class BoardingController {
     this.tick=this.tick.bind(this);
   }
   get active(){return !this.level.hidden;}
-  get playing(){return this.active&&!this.paused&&this.sim.phase==='active'&&this.visual?.available;}
+  get playing(){return this.active&&!this.paused&&this.sim.walking&&this.visual?.available;}
   clearInput(){this.keys.clear();this.pointers.clear();this.pad={x:0,z:0};this.fireHeld=false;this.mouseAim=false;this.knob();}
   start() {
     if(!this.voyage.encounterReady||this.active)return;
@@ -55,7 +55,12 @@ export class BoardingController {
   stopLoop(){if(this.frame)cancelAnimationFrame(this.frame);this.frame=0;this.last=0;}
   loop(){if(this.active&&!this.paused&&!this.resultShown&&!this.frame&&this.visual?.available)this.frame=requestAnimationFrame(this.tick);}
   tick(now){this.frame=0;const dt=this.last?Math.min(.05,(now-this.last)/1000):0;this.last=now;this.update(dt);this.render();this.loop();}
-  update(dt){if(!this.active||this.paused||!this.visual?.available)return;this.sim.update(dt,this.input());if(['victory','defeat'].includes(this.sim.phase)&&this.sim.resultAge>(this.sim.phase==='defeat'?1.1:.15))this.exit();}
+  update(dt){
+    if(!this.active||this.paused||!this.visual?.available)return;this.sim.update(dt,this.input());
+    // The lever secures the loot, not the camera. Only sitting at the helm exits.
+    if(this.sim.detached&&!this.lootRecovered){for(const [key,n] of Object.entries(this.sim.bag))this.cargo[key]+=n;this.lootRecovered=true;this.lastOutcome='extracted';}
+    if(['victory','defeat'].includes(this.sim.phase)&&this.sim.resultAge>(this.sim.phase==='defeat'?1.1:.35))this.exit();
+  }
   input(){const x=Number(this.keys.has('d')||this.keys.has('arrowright'))-Number(this.keys.has('a')||this.keys.has('arrowleft'))+this.pad.x,z=Number(this.keys.has('w')||this.keys.has('arrowup'))-Number(this.keys.has('s')||this.keys.has('arrowdown'))+this.pad.z;return {x:clamp(x,-1,1),z:clamp(z,-1,1),aim:this.aim||this.mouseAim,crouch:this.crouch,run:this.keys.has('shift'),fire:this.fireHeld||this.keys.has('f')};}
   key(e,down) {
     if(!this.active)return;const key=e.key.toLowerCase();
@@ -108,14 +113,15 @@ export class BoardingController {
     $('battle-ammo').textContent=this.sim.reloadTime?`장전 ${this.sim.reloadTime.toFixed(1)}`:`${this.sim.rounds} / ${CREW.magazine}`;
     const zone=zoneAt(this.sim.player.x,this.sim.player.z),action=this.sim.interaction();
     const mission={cockpit:'조종석 · 계단을 내려가 연결 통로로 이동',stairs:'아래층 브리치로 내려가기',airlock:this.sim.returned?'귀환 완료 · 오른쪽 분리 레버를 당기세요':'하부 에어록 · 전방 통로로 적함 진입',bridge:this.sim.enteredEnemy?'연결 통로 · 내 함선으로 귀환 가능':'연결 통로 · 적함 화물실로 이동',enemy:this.sim.enemy.health<=0?(this.sim.enemy.looted?'시신 수색 완료 · 왔던 통로로 귀환':'적 승무원 사망 · 시신 가까이에서 수색'):'적함 · 전투하거나 언제든 통로로 철수'};
-    $('battle-phase').textContent=this.paused?'일시 정지':this.sim.phase==='extracting'||this.sim.phase==='victory'?'에어록 폐쇄 · 연결 통로 분리 중':this.sim.phase==='defeat'?'승무원 사망 · 조종석에서 부활합니다':this.sim.enemyPhase==='lock'?'적 조준 고정 · 엄폐 / 이동':mission[zone];
+    const home=zone==='cockpit'?'오른쪽 조종석 가까이에서 앉기 · E':zone==='stairs'?'조종석으로 올라가기':'브리치 회수 완료 · 뒤쪽 계단으로 조종석에 올라가세요';
+    $('battle-phase').textContent=this.paused?'일시 정지':this.sim.phase==='extracting'?(this.sim.extraction<.65?'연결 통로 회수 중':'전방 하부 해치 폐쇄 중'):this.sim.phase==='victory'?'조종석 착석 · 항해 조작으로 전환':this.sim.phase==='defeat'?'승무원 사망 · 조종석에서 부활합니다':this.sim.phase==='home'?home:this.sim.enemyPhase==='lock'?'적 조준 고정 · 엄폐 / 이동':mission[zone];
     $('battle-interact').hidden=!action;$('battle-interact').textContent=action?`${action.label} · E`:'';
     $('battle-interact').title=action?.hint||'';
-    const bag=this.sim.bag;$('battle-bag').textContent=`휴대 물자 · 연료 ${bag.fuelCells} / 탄약 ${bag.ammoCrates} / 의료 ${bag.medicalSupplies}`;
+    const bag=this.sim.bag;$('battle-bag').textContent=`${this.lootRecovered?'회수 완료':'휴대 물자'} · 연료 ${bag.fuelCells} / 탄약 ${bag.ammoCrates} / 의료 ${bag.medicalSupplies}`;
     $('battle-bag').hidden=!Object.values(bag).some(Boolean);
     $('battle-aim').setAttribute('aria-pressed',String(this.aim||Boolean(this.mouseAim)));$('battle-crouch').setAttribute('aria-pressed',String(this.crouch));
     $('battle-crosshair').classList.toggle('hit',this.sim.hitMarker>0);this.level.style.setProperty('--crew-damage',String(Math.max(0,1-this.sim.player.hitAge/.35)*.55));
-    $('battle-controls').inert=this.paused||this.sim.phase!=='active';
+    $('battle-controls').inert=this.paused||!this.sim.walking;
   }
   render(){if(!this.active)return;
     this.sim.view.aspect=this.level.clientWidth/this.level.clientHeight;

@@ -109,11 +109,24 @@ try {
     assert.equal((await read()).interaction.type,'extract');await page.screenshot({path:`qa-output/extraction-lever-${mobile?'mobile':'desktop'}.png`});
     await tap('#battle-interact');await step(40);assert.equal((await read()).phase,'extracting');
     await page.screenshot({path:`qa-output/extraction-disconnect-${mobile?'mobile':'desktop'}.png`});await step(60);
+    assert.equal((await read()).phase,'home');assert.equal((await read()).active,true,'Lever never changes camera mode');
+    assert.equal((await read()).rendering.bridgeVisible,false);assert.equal((await read()).rendering.hatchClosed,true);
+    assert.equal((await read()).zone,'airlock');await step(200);assert.equal((await read()).active,true,'Waiting cannot auto-seat');
+    assert.deepEqual(await page.evaluate(()=>SpacePiratesBattle.getCargo()),{fuelCells:2,ammoCrates:1,medicalSupplies:1},'Cargo banks on disconnection, before sitting');
+    await page.evaluate(()=>SpacePiratesBattle.exit());assert.equal((await read()).active,true,'Exit cannot bypass walking to the seat');
+    await page.screenshot({path:`qa-output/extraction-closed-${mobile?'mobile':'desktop'}.png`});
+    await walkTo(0,25.8);await walkTo(0,32);assert.equal((await read()).zone,'stairs');
+    await walkTo(0,40);assert.equal((await read()).active,true);assert.equal((await read()).interaction,null);
+    await walkTo(2,40);assert.equal((await read()).interaction.type,'helm');
+    await page.screenshot({path:`qa-output/extraction-seat-${mobile?'mobile':'desktop'}.png`});
+    await tap('#battle-interact');await step(2);assert.equal((await read()).player.state,'seated');await step(30);
     assert.equal((await read()).active,false);assert.equal((await read()).lastOutcome,'extracted');assert.equal(await page.evaluate(()=>SpacePiratesAmbient.getState().mode),'cruise');
     assert.deepEqual(await page.evaluate(()=>SpacePiratesBattle.getCargo()),{fuelCells:2,ammoCrates:1,medicalSupplies:1});
     await page.evaluate(()=>SpacePiratesBattle.exit());assert.equal((await page.evaluate(()=>SpacePiratesBattle.getCargo())).fuelCells,2,'No duplicate extraction');
     await fresh();await walkTo(0,25.8);await walkTo(2.3,25.8);assert.ok((await read()).enemy.health>0);
     await tap('#battle-interact');await step(100);assert.equal((await read()).lastOutcome,'extracted');
+    assert.equal((await read()).active,true);await walkTo(0,25.8);await walkTo(0,40);await walkTo(2,40);
+    await tap('#battle-interact');await step(30);assert.equal((await read()).active,false);
     assert.equal((await page.evaluate(()=>SpacePiratesBattle.getCargo())).fuelCells,0,'Empty-handed retreat still succeeds');
     await fresh();await step(2000);assert.equal((await read()).phase,'defeat');assert.equal((await read()).active,false);
     assert.equal(await page.evaluate(()=>SpacePiratesAmbient.getState().mode),'ready','Death respawns at the connected cockpit');
@@ -127,7 +140,7 @@ try {
     assert.equal((await read()).paused,true);assert.equal(await page.locator('#battle-graphics-error').isVisible(),true);
     await page.evaluate(()=>document.querySelector('#battle-canvas').dispatchEvent(new Event('webglcontextrestored')));
     await tap('#battle-resume');await step(1);assert.equal((await read()).rendering.type,'webgl2');
-    assert.deepEqual(errors,[]);console.log(`Extraction ${mobile?'mobile':'desktop'} PASS: upper helm, stairs, airlock, breach, actual combat, corpse loot, walk back, lever, empty retreat, death/helm respawn, controls/layout/pause`);
+    assert.deepEqual(errors,[]);console.log(`Extraction ${mobile?'mobile':'desktop'} PASS: upper helm, stairs, combat, loot, lever, bridge retraction/hatch closure, no teleport, walk upstairs, explicit seating, empty retreat, death/respawn, controls/layout/pause`);
     await page.close();
   }
 }finally{await browser.close();}

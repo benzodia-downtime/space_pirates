@@ -1,7 +1,7 @@
 import * as THREE from '../vendor/three.module.js';
-import {COVER,cameraPose,muzzle} from './boarding-combat.js?v=extraction-1';
-import {WALLS,INTERIOR} from './boarding-layout.js?v=extraction-1';
-import {CrewRig} from './crew-rig.js?v=extraction-1';
+import {COVER,cameraPose,muzzle} from './boarding-combat.js?v=helm-return-1';
+import {WALLS,INTERIOR} from './boarding-layout.js?v=helm-return-1';
+import {CrewRig} from './crew-rig.js?v=helm-return-1';
 
 export class BoardingRenderer {
   constructor(canvas) {
@@ -111,6 +111,9 @@ export class BoardingRenderer {
       this.box(this.scene,blue,.85,1,.25,side*2.5,5,40.4);
     }
     this.sign('NAUTILUS / HELM',0,7.3,36.06,3.2,.4);
+    this.sign('PILOT / SIT',2.5,5.6,38.45,1.8,.24);
+    this.helmMarker=new THREE.Group();this.scene.add(this.helmMarker);
+    for(const side of [-1,1])this.box(this.helmMarker,cyan,.045,.025,1.5,INTERIOR.helm.x+side*.65,4.025,INTERIOR.helm.z);
     this.sign('BREACH / LOWER DECK',0,3.35,23.15,3.5,.32);
     this.sign('RETURN TO HELM',0,6.5,35.75,2.9,.36,Math.PI);
     this.sign('DISCONNECT',3,2,25.3,1.55,.26);
@@ -137,7 +140,10 @@ export class BoardingRenderer {
     this.leverArm=new THREE.Group();this.lever.add(this.leverArm);
     this.box(this.leverArm,trim,.075,.55,.075,0,.22,0);
     this.box(this.leverArm,amber,.42,.12,.14,0,.51,0);
-    this.sealDoor=this.box(this.passage,blue,4.4,3.8,.18,0,5.8,-.1);
+    // Own-ship hatch must not shrink or disappear with the retracting bridge.
+    const hatch=new THREE.Group();this.scene.add(hatch);
+    this.sealDoor=this.box(hatch,blue,4.4,3.8,.2,0,5.8,23);
+    this.box(this.sealDoor,amber,.75,.025,1.1,0,0,.55);
     // Architectural ceilings should not cast coarse, room-wide bands through
     // the much smaller combat shadow map. Characters/cargo retain shadows.
     for(const child of this.scene.children)if(!existing.has(child))child.traverse(o=>{if(o.isMesh)o.castShadow=false;});
@@ -152,7 +158,7 @@ export class BoardingRenderer {
   line(line,from,to,color,opacity=1){const a=line.geometry.attributes.position;a.setXYZ(0,from.x,from.y,from.z);a.setXYZ(1,to.x,to.y,to.z);a.needsUpdate=true;line.material.color.setHex(color);line.material.opacity=opacity;}
   draw(sim,reduced=false) {
     if(!this.available)return;this.resize();
-    const pose=cameraPose(sim.player,sim.view,sim.aiming);this.camera.position.set(pose.position.x,pose.position.y,pose.position.z);
+    const pose=cameraPose(sim.player,sim.view,sim.aiming,sim.solids);this.camera.position.set(pose.position.x,pose.position.y,pose.position.z);
     const recoil=reduced?0:Math.max(0,1-sim.player.shotAge/.12)*.008;
     this.camera.lookAt(pose.position.x+pose.direction.x,pose.position.y+pose.direction.y+recoil,pose.position.z+pose.direction.z);
     if(this.camera.fov!==pose.fov){this.camera.fov=pose.fov;this.camera.updateProjectionMatrix();}
@@ -161,15 +167,17 @@ export class BoardingRenderer {
     this.lootMarker.position.set(sim.enemy.x,.7+(reduced?0:Math.sin(sim.time*3)*.07),sim.enemy.z);
     this.lootMarker.rotation.y=sim.time;
     this.leverArm.rotation.x=-sim.extraction*1.1;
-    this.sealDoor.position.y=5.8-Math.min(1,sim.extraction*2)*3.9;
-    // First seal our airlock, then visibly shorten the bridge behind it.
-    this.passage.scale.z=1-Math.max(0,sim.extraction-.5)*1.8;
+    // Watch the bridge retract, then close the fixed ship-side hatch.
+    this.passage.scale.z=Math.max(.01,1-sim.extraction/.65);
+    this.passage.visible=sim.extraction<.65;
+    this.sealDoor.position.y=5.8-Math.max(0,Math.min(1,(sim.extraction-.65)/.35))*3.9;
+    this.helmMarker.visible=sim.phase==='home';
     this.lines.forEach((line,i)=>{const shot=sim.tracers[i];line.visible=Boolean(shot);if(shot)this.line(line,shot.from,shot.to,shot.color,1-shot.age/.1);});
     this.sparks.forEach((mesh,i)=>{const impact=sim.impacts[i];mesh.visible=Boolean(impact)&&!reduced;if(impact){mesh.position.set(impact.point.x,impact.point.y,impact.point.z);mesh.scale.setScalar(1+impact.age*4);mesh.material.color.setHex(impact.color);}});
     this.laser.visible=sim.phase==='active'&&['aim','lock'].includes(sim.enemyPhase);
     if(this.laser.visible){const from=muzzle(sim.enemy,{yaw:sim.enemy.yaw}),to=sim.enemyPhase==='lock'?sim.enemyAim:{x:sim.player.x,y:sim.player.y+(sim.player.crouch?.65:1.25),z:sim.player.z};this.line(this.laser,from,to,sim.enemyPhase==='lock'?0xff5942:0xffc56b,.48);}
     this.renderer.render(this.scene,this.camera);
   }
-  getState(){return {type:this.available?'webgl2':'unavailable',camera:this.camera?.position.toArray(),fov:this.camera?.fov,player:this.player?.getState(),enemy:this.enemy?.getState(),connectedInterior:true,cockpitHeight:4,bridgeHeight:0,leverAngle:this.leverArm?.rotation.x,drawCalls:this.renderer?.info.render.calls,triangles:this.renderer?.info.render.triangles,pixelRatio:this.renderer?.getPixelRatio()};}
+  getState(){return {type:this.available?'webgl2':'unavailable',camera:this.camera?.position.toArray(),fov:this.camera?.fov,player:this.player?.getState(),enemy:this.enemy?.getState(),connectedInterior:true,cockpitHeight:4,bridgeHeight:0,leverAngle:this.leverArm?.rotation.x,bridgeVisible:this.passage?.visible,hatchClosed:this.sealDoor?.position.y<2,helmMarkerVisible:this.helmMarker?.visible,drawCalls:this.renderer?.info.render.calls,triangles:this.renderer?.info.render.triangles,pixelRatio:this.renderer?.getPixelRatio()};}
   destroy(){this.canvas.removeEventListener('webglcontextlost',this.onLost);this.canvas.removeEventListener('webglcontextrestored',this.onRestored);for(const r of this.resources)r.dispose();this.renderer?.dispose();}
 }

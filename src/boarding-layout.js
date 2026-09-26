@@ -1,5 +1,5 @@
 // Connected decks, in metres. The cockpit is one storey above the breach.
-export const INTERIOR = Object.freeze({bridgeStart:15,bridgeEnd:23,stairStart:28,stairEnd:36,upperDeck:4,spawn:{x:0,y:4,z:40},lever:{x:3,y:1.1,z:25.8}});
+export const INTERIOR = Object.freeze({bridgeStart:15,bridgeEnd:23,stairStart:28,stairEnd:36,upperDeck:4,spawn:{x:0,y:4,z:40},lever:{x:3,y:1.1,z:25.8},helm:{x:2.5,y:4,z:40}});
 export const DECKS = Object.freeze([
   {name:'enemy',minX:-9,maxX:9,minZ:-15,maxZ:15},
   {name:'bridge',minX:-2.2,maxX:2.2,minZ:15,maxZ:23},

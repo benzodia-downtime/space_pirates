@@ -1,4 +1,4 @@
-import {INTERIOR,WALLS,DECKS,deckHeight,zoneAt,canStand} from './boarding-layout.js?v=extraction-1';
+import {INTERIOR,WALLS,DECKS,deckHeight,zoneAt,canStand} from './boarding-layout.js?v=helm-return-1';
 // Renderer-independent TPS rules. World units are metres (1 m = 100 Unreal units).
 export const LOOT=Object.freeze({fuelCells:2,ammoCrates:1,medicalSupplies:1});
 export const emptyCargo=()=>({fuelCells:0,ammoCrates:0,medicalSupplies:0});
@@ -22,6 +22,8 @@ export const SOLIDS=[...COVER.map(bounds),...WALLS.map(bounds),
   ...DECKS.filter(d=>d.name!=='stairs').map(d=>({min:{x:d.minX,y:deckHeight(d.minZ)-.25,z:d.minZ},max:{x:d.maxX,y:deckHeight(d.minZ)-.01,z:d.maxZ}})),
   ...Array.from({length:16},(_,i)=>bounds({x:0,z:28+i*.5+.25,w:4,d:.5,h:(i+1)*.25})),
 ];
+export const CLOSED_HATCH=bounds({x:0,y:0,z:23,w:4.4,h:3.8,d:.2});
+const SEALED_SOLIDS=[...SOLIDS,CLOSED_HATCH];
 export function rayBox(from,dir,box,max=Infinity) {
   let near=0,far=max;
   for(const axis of ['x','y','z']) {
@@ -31,13 +33,13 @@ export function rayBox(from,dir,box,max=Infinity) {
   return near<=max?near:null;
 }
 const bodyBounds=actor=>({min:{x:actor.x-.38,y:(actor.y||0)+.05,z:actor.z-.32},max:{x:actor.x+.38,y:(actor.y||0)+(actor.crouch?1.04:1.86),z:actor.z+.32}});
-export function trace(from,dir,max,target=null) {
+export function trace(from,dir,max,target=null,solids=SOLIDS) {
   let hit={distance:max,kind:'air'};
-  for(const box of SOLIDS) {const t=rayBox(from,dir,box,max);if(t!==null&&t<hit.distance)hit={distance:t,kind:'cover'};}
+  for(const box of solids) {const t=rayBox(from,dir,box,max);if(t!==null&&t<hit.distance)hit={distance:t,kind:'cover'};}
   if(target?.health>0) {const t=rayBox(from,dir,bodyBounds(target),max);if(t!==null&&t<hit.distance)hit={distance:t,kind:'crew'};}
   return {...hit,point:add(from,dir,hit.distance)};
 }
-export function cameraPose(actor,view,aiming=false) {
+export function cameraPose(actor,view,aiming=false,solids=SOLIDS) {
   const forward=direction(view.yaw,view.pitch),right={x:Math.cos(view.yaw),y:0,z:Math.sin(view.yaw)};
   const eye={x:actor.x,y:(actor.y||0)+(actor.crouch?.92:1.62),z:actor.z};
   const portrait=view.aspect<.8;
@@ -45,7 +47,7 @@ export function cameraPose(actor,view,aiming=false) {
   const offset=sub(desired,eye),distance=length(offset),dir=unit(offset);
   let allowed=distance;
   // A padded boom test keeps the shoulder camera outside walls and cargo.
-  for(const box of SOLIDS) {
+  for(const box of solids) {
     const padded={min:add(box.min,{x:-.15,y:-.15,z:-.15}),max:add(box.max,{x:.15,y:.15,z:.15})};
     const t=rayBox(eye,dir,padded,distance);if(t!==null)allowed=Math.min(allowed,Math.max(.08,t-.12));
   }
@@ -58,6 +60,9 @@ export function muzzle(actor,view) {
 const actor=(x,z,health)=>({x,y:deckHeight(z),z,yaw:0,health,maxHealth:health,crouch:false,speed:0,travel:0,shotAge:99,hitAge:99,deathAge:0,state:'idle'});
 export class BoardingCombat {
   constructor(){this.reset();}
+  get walking(){return this.phase==='active'||this.phase==='home';}
+  get detached(){return this.extraction>=1;}
+  get solids(){return this.detached?SEALED_SOLIDS:SOLIDS;}
   reset() {
     this.player=actor(INTERIOR.spawn.x,INTERIOR.spawn.z,100);this.enemy=actor(.5,-7,50);this.enemy.yaw=Math.PI;
     this.view={yaw:0,pitch:.025};this.time=0;this.phase='active';this.resultAge=0;
@@ -74,9 +79,10 @@ export class BoardingCombat {
     this.enemyPhase='wait';this.enemyClock=1.6;this.enemyAim=null;this.tracers=[];this.impacts=[];
   }
   interaction() {
-    if(this.phase!=='active'||this.player.health<=0)return null;
-    const p=this.player,e=this.enemy,l=INTERIOR.lever;
-    if(zoneAt(p.x,p.z)==='airlock'&&Math.hypot(p.x-l.x,p.z-l.z)<1.9)return {type:'extract',label:'분리 레버 당기기',hint:'전리품을 확정하고 조종석으로 복귀'};
+    if(!this.walking||this.player.health<=0)return null;
+    const p=this.player,e=this.enemy,l=INTERIOR.lever,h=INTERIOR.helm;
+    if(this.phase==='home')return zoneAt(p.x,p.z)==='cockpit'&&Math.hypot(p.x-h.x,p.z-h.z)<1.25?{type:'helm',label:'조종석에 앉기',hint:'운전대를 잡고 항해 화면으로 전환'}:null;
+    if(zoneAt(p.x,p.z)==='airlock'&&Math.hypot(p.x-l.x,p.z-l.z)<1.9)return {type:'extract',label:'분리 레버 당기기',hint:'브리치 회수와 해치 폐쇄 · 이후 직접 조종석으로 이동'};
     if(e.health<=0&&!e.looted&&e.deathAge>=.7&&Math.hypot(p.x-e.x,p.z-e.z)<2) {
       const from={x:p.x,y:p.y+1.2,z:p.z},to={x:e.x,y:e.y+.35,z:e.z},v=sub(to,from);
       if(trace(from,unit(v),Math.max(0,length(v)-.1)).kind==='air')return {type:'loot',label:'시신 수색',hint:'연료 전지 ×2 · 탄약 ×1 · 의료 물자 ×1'};
@@ -86,12 +92,13 @@ export class BoardingCombat {
   interact() {
     const action=this.interaction();if(!action)return false;
     if(action.type==='loot'){this.enemy.looted=true;for(const [key,n] of Object.entries(LOOT))this.bag[key]+=n;}
+    else if(action.type==='helm') {this.phase='victory';this.resultAge=0;Object.assign(this.player,INTERIOR.helm,{yaw:0,crouch:false,speed:0});this.view.yaw=0;this.view.pitch=.025;this.aiming=false;this.animateStates();}
     else {this.phase='extracting';this.extraction=0;this.enemyPhase='idle';this.tracers=[];this.player.speed=this.enemy.speed=0;}
     return action.type;
   }
   move(a,x,z,dt,speed,other) {
     const n=Math.max(1,Math.hypot(x,z)),before={x:a.x,z:a.z};
-    const legal=(px,pz)=>canStand(px,pz)&&!(a===this.enemy&&pz>14.2)&&!COVER.some(o=>Math.abs(px-o.x)<o.w/2+CREW.radius&&Math.abs(pz-o.z)<o.d/2+CREW.radius)&&(!other||other.health<=0||Math.hypot(px-other.x,pz-other.z)>.72);
+    const legal=(px,pz)=>canStand(px,pz)&&!(this.detached&&a===this.player&&pz<23.1+CREW.radius)&&!(a===this.enemy&&pz>14.2)&&!COVER.some(o=>Math.abs(px-o.x)<o.w/2+CREW.radius&&Math.abs(pz-o.z)<o.d/2+CREW.radius)&&(!other||other.health<=0||Math.hypot(px-other.x,pz-other.z)>.72);
     const dx=x/n*speed*dt,dz=z/n*speed*dt;
     const nx=a.x+dx;
     if(legal(nx,a.z))a.x=nx;
@@ -99,20 +106,20 @@ export class BoardingCombat {
     if(legal(a.x,nz))a.z=nz;
     a.y=deckHeight(a.z);a.speed=Math.hypot(a.x-before.x,a.z-before.z)/(dt||1);a.travel+=a.speed*dt;
   }
-  reload(){if(this.phase!=='active'||this.reloadTime||this.rounds===CREW.magazine)return false;this.reloadTime=CREW.reload;return true;}
+  reload(){if(!this.walking||this.reloadTime||this.rounds===CREW.magazine)return false;this.reloadTime=CREW.reload;return true;}
   shoot(source,target,from,dir,color) {
-    const hit=trace(from,dir,CREW.range,target);source.shotAge=0;
+    const hit=trace(from,dir,CREW.range,target,this.solids);source.shotAge=0;
     this.tracers.push({from:{...from},to:hit.point,age:0,color});
     if(hit.kind!=='air')this.impacts.push({point:hit.point,age:0,color:hit.kind==='crew'?0xffa36a:0x83ddf5});
     if(hit.kind==='crew'){target.health=Math.max(0,target.health-CREW.damage);target.hitAge=0;if(source===this.player){this.hits++;this.hitMarker=.16;}}
     return hit;
   }
   fire() {
-    if(this.phase!=='active'||this.reloadTime||this.cooldown)return false;
+    if(!this.walking||this.reloadTime||this.cooldown)return false;
     if(!this.rounds){this.reload();return false;}
     // Crosshair ray chooses a world point. The physical muzzle then traces toward
     // it, so shoulder peeking cannot shoot through the crate in front of the gun.
-    const camera=cameraPose(this.player,this.view,this.aiming),aim=trace(camera.position,camera.direction,60,this.enemy);
+    const camera=cameraPose(this.player,this.view,this.aiming,this.solids),aim=trace(camera.position,camera.direction,60,this.enemy,this.solids);
     const from=muzzle(this.player,this.view),dir=unit(sub(aim.point,from));
     this.shoot(this.player,this.enemy,from,dir,0x82f2ff);this.rounds--;this.shots++;this.cooldown=CREW.cadence;
     if(!this.rounds)this.reload();return true;
@@ -150,8 +157,8 @@ export class BoardingCombat {
     this.time+=dt;this.hitMarker=Math.max(0,this.hitMarker-dt);
     this.tracers=this.tracers.filter(t=>(t.age+=dt)<.1);this.impacts=this.impacts.filter(t=>(t.age+=dt)<.24);
     for(const a of [this.player,this.enemy]){a.shotAge+=dt;a.hitAge+=dt;if(a.health<=0)a.deathAge+=dt;}
-    if(this.phase==='extracting') {this.extraction=Math.min(1,this.extraction+dt/1.6);if(this.extraction>=1){this.phase='victory';this.resultAge=0;}}
-    if(this.phase!=='active'){this.resultAge+=dt;this.player.speed=this.enemy.speed=0;this.animateStates();return;}
+    if(this.phase==='extracting') {this.extraction=Math.min(1,this.extraction+dt/1.6);if(this.detached){this.phase='home';this.resultAge=0;}}
+    if(!this.walking){this.resultAge+=dt;this.player.speed=this.enemy.speed=0;this.animateStates();return;}
     if(this.player.health<=0){this.phase='defeat';this.bag=emptyCargo();this.enemyPhase='idle';this.resultAge=0;this.animateStates();return;}
     this.aiming=Boolean(input.aim);this.player.crouch=Boolean(input.crouch);this.player.yaw=this.view.yaw;
     this.cooldown=Math.max(0,this.cooldown-dt);
@@ -163,11 +170,11 @@ export class BoardingCombat {
     if(zoneAt(this.player.x,this.player.z)==='enemy')this.enteredEnemy=true;
     this.returned=this.enteredEnemy&&this.player.z>=23;
     if(input.fire)this.fire();
-    if(this.enemy.health>0)this.updateEnemy(dt);
+    if(this.enemy.health>0&&!this.detached)this.updateEnemy(dt);
     if(this.enemy.health<=0){this.enemyPhase='idle';this.enemy.speed=0;}
     if(this.player.health<=0){this.phase='defeat';this.bag=emptyCargo();this.enemyPhase='idle';this.resultAge=0;}
     this.animateStates();
   }
-  animateStates(){for(const a of [this.player,this.enemy])a.state=a.health<=0?'down':a.hitAge<.22?'hit':a.shotAge<.18?'fire':a===this.player&&this.reloadTime?'reload':a.speed>.1?(a.crouch?'crouch-walk':a.speed>4?'run':'walk'):a.crouch?'crouch':a===this.enemy&&['aim','lock'].includes(this.enemyPhase)?'aim':a===this.player&&this.aiming?'aim':'idle';}
+  animateStates(){for(const a of [this.player,this.enemy])a.state=a.health<=0?'down':a===this.player&&this.phase==='victory'?'seated':a.hitAge<.22?'hit':a.shotAge<.18?'fire':a===this.player&&this.reloadTime?'reload':a.speed>.1?(a.crouch?'crouch-walk':a.speed>4?'run':'walk'):a.crouch?'crouch':a===this.enemy&&['aim','lock'].includes(this.enemyPhase)?'aim':a===this.player&&this.aiming?'aim':'idle';}
   getState(){return {phase:this.phase,time:this.time,player:{...this.player},enemy:{...this.enemy},view:{...this.view},aiming:this.aiming,rounds:this.rounds,reloadTime:this.reloadTime,enemyPhase:this.enemyPhase,enemyAim:this.enemyAim&&{...this.enemyAim},shots:this.shots,hits:this.hits,enemyShots:this.enemyShots,resultAge:this.resultAge,bag:{...this.bag},zone:zoneAt(this.player.x,this.player.z),enteredEnemy:this.enteredEnemy,returned:this.returned,extraction:this.extraction,interaction:this.interaction(),tracers:this.tracers.map(t=>({...t,from:{...t.from},to:{...t.to}}))};}
 }

@@ -514,6 +514,12 @@ try {
   assert.equal((await page.evaluate(()=>SpacePiratesBattle.getState())).interaction.type,'extract');
   await page.keyboard.press('e');await crewStep(100);
   assert.equal((await page.evaluate(()=>SpacePiratesBattle.getState())).lastOutcome,'extracted');
+  assert.equal((await page.evaluate(()=>SpacePiratesBattle.getState())).active,true,'Disconnection stays in TPS');
+  await page.keyboard.down('a');await crewStep(34);await page.keyboard.up('a');
+  await page.keyboard.down('s');await crewStep(209);await page.keyboard.up('s');
+  await page.keyboard.down('d');await crewStep(30);await page.keyboard.up('d');
+  assert.equal((await page.evaluate(()=>SpacePiratesBattle.getState())).interaction.type,'helm');
+  await page.keyboard.press('e');await crewStep(30);
   assert.deepEqual(await page.evaluate(()=>SpacePiratesBattle.getCargo()),{fuelCells:0,ammoCrates:0,medicalSupplies:0});
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().mode), 'cruise');
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().rendering.bridgeVisible), false);

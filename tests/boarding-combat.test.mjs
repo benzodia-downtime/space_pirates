@@ -90,7 +90,21 @@ test('Corpse loot requires proximity, can be collected once, and remains carried
 test('Living players can extract with a living enemy and empty bag by pulling the physical home lever',()=>{
   const s=new BoardingCombat();s.enteredEnemy=true;s.player.x=INTERIOR.lever.x;s.player.z=INTERIOR.lever.z;s.player.y=0;
   assert.equal(s.interact(),'extract');assert.equal(s.interact(),false);assert.equal(s.fire(),false);
-  advance(s,1.8);assert.equal(s.phase,'victory');assert.equal(s.enemy.health,50);assert.equal(s.extraction,1);assert.equal(s.bag.fuelCells,0);
+  advance(s,1.8);assert.equal(s.phase,'home');assert.equal(s.enemy.health,50);assert.equal(s.extraction,1);assert.equal(s.bag.fuelCells,0);
+  assert.equal(s.player.z,INTERIOR.lever.z);assert.equal(s.interact(),false,'Lever cannot teleport or be pulled twice');
+  advance(s,20);assert.equal(s.phase,'home','Waiting never returns to the cockpit view');
+});
+
+test('After disconnect the closed hatch blocks walking, shots and camera, while stairs and helm remain usable',()=>{
+  const s=new BoardingCombat();Object.assign(s.player,{x:2.3,y:0,z:25.8});s.interact();advance(s,1.8);
+  advance(s,.68,{x:-1});advance(s,2,{z:1});assert.ok(s.player.z>=23.44);
+  assert.equal(trace({x:0,y:1.4,z:25},{x:0,y:0,z:-1},20,null,s.solids).kind,'cover');
+  s.view.yaw=Math.PI;assert.ok(cameraPose(s.player,s.view,false,s.solids).position.z>23.1);
+  s.view.yaw=0;advance(s,4.8,{z:-1});assert.equal(zoneAt(s.player.x,s.player.z),'cockpit');assert.equal(s.player.y,4);
+  assert.equal(s.interact(),false,'Standing upstairs is not enough: approach the pilot seat');
+  s.player.x=INTERIOR.helm.x;s.player.z=INTERIOR.helm.z;
+  assert.equal(s.interaction().type,'helm');assert.equal(s.interact(),'helm');assert.equal(s.phase,'victory');assert.equal(s.player.state,'seated');
+  assert.equal(s.interact(),false,'Seating is a one-shot action');
 });
 
 test('Death drops carried loot; respawn is at our upper helm without recreating the corpse or its loot',()=>{
