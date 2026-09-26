@@ -501,7 +501,23 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => SpacePiratesAmbient.resume());
   await page.locator('#battle-start').click();
-  await page.waitForFunction(() => !document.getElementById('battle-result').hidden, null, { timeout: 45000 });
+  // Boarding is now a manual TPS, not an automatic exchange of 2D sprite shots.
+  await page.evaluate(()=>SpacePiratesBattle.stopLoop());
+  for(let shot=0;shot<8&&(await page.evaluate(()=>SpacePiratesBattle.getState().phase))==='active';shot++) {
+    for(let correction=0;correction<5;correction++) {
+      const b=await page.evaluate(()=>SpacePiratesBattle.getState()),cam=b.rendering.camera;
+      const dx=b.enemy.x-cam[0],dz=b.enemy.z-cam[2],yaw=Math.atan2(dx,-dz),pitch=Math.atan2(cam[1]-1.25,Math.hypot(dx,dz));
+      const look=await page.locator('#battle-look').boundingBox(),x=look.width*.65,y=look.height*.42;
+      const dragX=Math.atan2(Math.sin(yaw-b.view.yaw),Math.cos(yaw-b.view.yaw))/.005,dragY=(pitch-b.view.pitch)/.004;
+      await page.mouse.move(x,y);await page.mouse.down({button:'right'});await page.mouse.move(x+dragX,y+dragY);await page.mouse.up({button:'right'});
+      await page.evaluate(()=>SpacePiratesBattle.redraw());
+    }
+    await page.locator('#battle-fire').click();
+    await page.evaluate(()=>{for(let i=0;i<14;i++)SpacePiratesBattle.update(.02);SpacePiratesBattle.redraw();});
+  }
+  await page.evaluate(()=>{for(let i=0;i<50;i++)SpacePiratesBattle.update(.02);SpacePiratesBattle.redraw();});
+  assert.equal(await page.evaluate(()=>SpacePiratesBattle.getState().phase),'victory');
+  await page.waitForFunction(() => !document.getElementById('battle-result').hidden);
   await page.screenshot({ path: 'qa-output/battle-result.png' });
   console.log('battle', await page.locator('#battle-result').innerText());
   await page.locator('#battle-result-action').click();

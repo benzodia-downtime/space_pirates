@@ -12,7 +12,7 @@
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./voyage.css?v=enemyorbit-1" />
-    <link rel="stylesheet" href="./battle.css?v=loot-1" />
+    <link rel="stylesheet" href="./battle.css?v=tps-1" />
   </head>
   <body>
     <a class="skip-link" href="#steering-pad">항해 조작으로 바로가기</a>
@@ -147,152 +147,64 @@
       </div>
     </dialog>
 
-    <section
-      id="battle-level"
-      class="battle-level"
-      aria-labelledby="battle-title"
-      tabindex="-1"
-      hidden
-    >
-      <div class="battle-level__stars" aria-hidden="true"></div>
-
-      <header class="battle-hud">
-        <article class="unit-card unit-card--player" aria-label="플레이어 승무원 능력치">
-          <div class="unit-card__heading">
-            <div>
-              <span>PLAYER CREW</span>
-              <strong>인간 사수</strong>
+    <section id="battle-level" class="battle-level" aria-labelledby="battle-title" tabindex="-1" hidden>
+      <canvas id="battle-canvas" aria-label="3D 인간 승무원이 싸우는 적함 내부, 어깨 너머 TPS 시점"></canvas>
+      <div id="battle-look" aria-label="드래그로 조준 방향 변경"></div>
+      <div class="crew-damage" aria-hidden="true"></div>
+      <div id="battle-crosshair" class="battle-crosshair" aria-hidden="true"><i></i><b></b></div>
+      <div class="battle-ui">
+        <header class="battle-hud">
+          <div class="battle-mission">
+            <span class="battle-eyebrow">BOARDING / CARGO 07</span>
+            <h1 id="battle-title">함내 교전</h1>
+            <p id="battle-phase" aria-live="polite">적 승무원 제압</p>
+          </div>
+          <button id="battle-pause" type="button" aria-label="전투 일시 정지" aria-pressed="false">일시 정지</button>
+        </header>
+        <div class="battle-vitals">
+          <div class="crew-vital">
+            <div><span>아군</span><output id="player-health-text">100 / 100</output></div>
+            <div id="player-health-track" class="health-track" role="progressbar" aria-label="플레이어 체력" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="player-health-bar"></span></div>
+          </div>
+          <div class="crew-vital crew-vital--enemy">
+            <div><span>적 승무원</span><output id="enemy-health-text">50 / 50</output></div>
+            <div id="enemy-health-track" class="health-track" role="progressbar" aria-label="적 체력" aria-valuemin="0" aria-valuemax="50" aria-valuenow="50"><span id="enemy-health-bar"></span></div>
+          </div>
+        </div>
+        <div class="battle-spacer"></div>
+        <div id="battle-controls" class="battle-controls">
+          <p class="battle-help">WASD 이동 · 우클릭 드래그 조준 · 좌클릭 / F 사격 · R 장전 · C 낮추기 · Shift 달리기</p>
+          <div class="battle-control-row">
+            <div id="battle-pad" class="battle-pad" role="group" tabindex="0" aria-label="승무원 이동 패드. 위아래 전후진, 좌우 이동">
+              <span class="battle-pad-label">이동</span><span class="battle-pad-axis"></span><span id="battle-pad-knob"></span>
             </div>
-            <output id="player-health-text">100 / 100 HP</output>
-          </div>
-          <div
-            id="player-health-track"
-            class="health-track"
-            role="progressbar"
-            aria-label="플레이어 체력"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            aria-valuenow="100"
-          >
-            <span id="player-health-bar"></span>
-          </div>
-          <dl class="unit-card__stats">
-            <div><dt>ATK</dt><dd>10</dd></div>
-            <div><dt>RANGE</dt><dd>20m</dd></div>
-          </dl>
-        </article>
-
-        <div class="battle-readout" aria-live="polite">
-          <span id="battle-phase">교전 대기</span>
-          <h1 id="battle-title">함내 교전</h1>
-          <strong id="battle-distance">49.2 m</strong>
-        </div>
-
-        <article class="unit-card unit-card--enemy" aria-label="적 승무원 능력치">
-          <div class="unit-card__heading">
-            <div>
-              <span>HOSTILE CREW</span>
-              <strong>인간 약탈자</strong>
+            <div class="battle-secondary">
+              <button id="battle-crouch" type="button" aria-pressed="false">몸 낮추기</button>
+              <button id="battle-aim" type="button" aria-pressed="false">정밀 조준</button>
             </div>
-            <output id="enemy-health-text">50 / 50 HP</output>
+            <div class="battle-weapon">
+              <button id="battle-reload" type="button" aria-label="소총 재장전"><span id="battle-ammo">8 / 8</span><small>재장전</small></button>
+              <button id="battle-fire" type="button" aria-label="길게 눌러 소총 사격">사격</button>
+            </div>
           </div>
-          <div
-            id="enemy-health-track"
-            class="health-track"
-            role="progressbar"
-            aria-label="적 체력"
-            aria-valuemin="0"
-            aria-valuemax="50"
-            aria-valuenow="50"
-          >
-            <span id="enemy-health-bar"></span>
-          </div>
-          <dl class="unit-card__stats">
-            <div><dt>ATK</dt><dd>10</dd></div>
-            <div><dt>RANGE</dt><dd>20m</dd></div>
-          </dl>
-        </article>
-      </header>
-
-      <div id="battlefield" class="battlefield" aria-label="60미터 곱하기 36미터 함선 내부 탑뷰 전장">
-        <div class="battlefield__deck" aria-hidden="true"></div>
-        <div class="battlefield__grid" aria-hidden="true"></div>
-        <div class="battlefield__bulkheads" aria-hidden="true"></div>
-        <div id="projectile-layer" class="projectile-layer" aria-hidden="true"></div>
-
-        <div
-          id="player-combatant"
-          class="combatant combatant--player"
-          data-state="idle"
-          role="img"
-          aria-label="위에서 내려다본, 소총을 든 플레이어 인간 승무원"
-        >
-          <div class="combatant__sprite-frame">
-            <img
-              class="combatant__sprite"
-              src="./assets/crew-player.png?v=topdown-1"
-              width="64"
-              height="64"
-              alt=""
-              draggable="false"
-            />
-            <span class="combatant__muzzle" aria-hidden="true"></span>
-          </div>
-          <span class="combatant__name">PLAYER · HUMAN</span>
-        </div>
-
-        <div
-          id="enemy-combatant"
-          class="combatant combatant--enemy"
-          data-state="idle"
-          role="img"
-          aria-label="위에서 내려다본, 소총을 든 적 인간 승무원"
-        >
-          <div class="combatant__sprite-frame">
-            <img
-              class="combatant__sprite"
-              src="./assets/crew-enemy.png?v=topdown-1"
-              width="64"
-              height="64"
-              alt=""
-              draggable="false"
-            />
-            <span class="combatant__muzzle" aria-hidden="true"></span>
-          </div>
-          <span class="combatant__name">HOSTILE · HUMAN</span>
-        </div>
-
-        <div
-          id="battle-result"
-          class="battle-result"
-          role="dialog"
-          aria-labelledby="battle-result-title"
-          aria-describedby="battle-result-copy"
-          hidden
-        >
-          <span id="battle-result-eyebrow">ENCOUNTER RESOLVED</span>
-          <h2 id="battle-result-title">적함 제압</h2>
-          <p id="battle-result-copy">적 승무원이 제압되었습니다.</p>
-          <ul id="battle-loot" class="loot-manifest" aria-label="적함에서 회수할 물자" hidden>
-            <li><span>연료 전지</span><strong>×2</strong></li>
-            <li><span>탄약 상자</span><strong>×1</strong></li>
-            <li><span>의료 물자</span><strong>×1</strong></li>
-          </ul>
-          <button id="battle-result-action" type="button">전리품 모두 회수</button>
         </div>
       </div>
-
-      <footer class="battle-footer">
-        <p class="scale-readout">
-          <span>UNREAL SCALE</span>
-          1m = 100uu = <strong id="meter-pixels">0 px</strong>
-          <i aria-hidden="true">·</i>
-          사정거리 20m = 2,000uu = <strong id="range-pixels">0 px</strong>
-        </p>
-        <button id="battle-return" class="battle-return" type="button">우주로 돌아가기</button>
-      </footer>
+      <div id="battle-pause-panel" class="battle-overlay" role="dialog" aria-modal="true" aria-labelledby="battle-pause-title" hidden>
+        <div class="battle-modal"><span class="battle-eyebrow">BOARDING / PAUSED</span><h2 id="battle-pause-title">일시 정지</h2>
+          <p>왼쪽 패드로 이동하고 오른쪽 화면을 드래그해 조준하세요. 화물 상자 뒤에서 몸을 낮추면 사선을 피할 수 있습니다.</p>
+          <p>PC: WASD 이동 · 우클릭 드래그 조준 · 좌클릭 / F 사격 · R 장전 · C 낮추기 · Shift 달리기</p>
+          <button id="battle-resume" type="button">계속하기</button><button id="battle-return" type="button">아군 함선으로 철수</button>
+        </div>
+      </div>
+      <div id="battle-result" class="battle-overlay" role="dialog" aria-modal="true" aria-labelledby="battle-result-title" aria-describedby="battle-result-copy" hidden>
+        <div class="battle-modal"><span id="battle-result-eyebrow" class="battle-eyebrow">SECTOR SECURED</span><h2 id="battle-result-title">적함 제압</h2><p id="battle-result-copy"></p>
+          <ul id="battle-loot" class="loot-manifest" aria-label="회수 물자" hidden><li><span>연료 전지</span><strong>×2</strong></li><li><span>탄약 상자</span><strong>×1</strong></li><li><span>의료 물자</span><strong>×1</strong></li></ul>
+          <button id="battle-result-action" type="button">전리품 모두 회수</button><button id="battle-result-exit" type="button">회수 없이 철수</button>
+        </div>
+      </div>
+      <div id="battle-graphics-error" class="battle-overlay" role="alert" hidden><div class="battle-modal"><h2>3D 화면 연결 중단</h2><p>그래픽 복구 후 계속하기를 누르거나 새로고침해 주세요.</p><button id="battle-error-exit" type="button">항해로 돌아가기</button></div></div>
     </section>
 
-    <script type="module" src="./src/main.js?v=enemyorbit-1"></script>
+    <script type="module" src="./src/main.js?v=tps-1"></script>
   </body>
 </html>

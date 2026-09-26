@@ -7,9 +7,10 @@
   "scripts": {
     "start": "node server.mjs",
     "build": "node scripts/build-static.mjs",
-    "check": "node --check server.mjs && node --check scripts/build-static.mjs && node --check src/voyage.js && node --check src/voyage-renderer.js && node --check src/main.js && node --check src/assault.js && node --check src/assault-audio.js && node --check src/navigation.js && node --check src/enemy-defense.js && node --check src/player-cannon.js",
-    "test": "npm run build && npm run check && node --test tests/assault.test.mjs tests/navigation.test.mjs tests/enemy-defense.test.mjs tests/player-cannon.test.mjs",
-    "test:e2e": "node scripts/verify-3d.mjs"
+    "check": "node --check server.mjs && node --check scripts/build-static.mjs && node --check src/voyage.js && node --check src/voyage-renderer.js && node --check src/main.js && node --check src/assault.js && node --check src/assault-audio.js && node --check src/navigation.js && node --check src/enemy-defense.js && node --check src/player-cannon.js && node --check src/boarding-combat.js && node --check src/boarding-controller.js && node --check src/boarding-renderer.js && node --check src/crew-rig.js",
+    "test": "npm run build && npm run check && node --test tests/*.test.mjs",
+    "test:e2e": "node scripts/verify-3d.mjs",
+    "test:boarding": "node scripts/verify-boarding.mjs"
   },
   "engines": {
     "node": ">=18"

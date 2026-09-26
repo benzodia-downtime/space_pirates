@@ -10,6 +10,7 @@ const staticFiles = [
   ["voyage.css", "voyage.css"],
   ["battle.css", "battle.css"],
   [join("src", "main.js"), join("src", "main.js")],
+  ...["boarding-combat.js", "boarding-controller.js", "boarding-renderer.js", "crew-rig.js"].map(name=>[join("src",name),join("src",name)]),
   [join("src", "voyage.js"), join("src", "voyage.js")],
   [join("src", "navigation.js"), join("src", "navigation.js")],
   [join("src", "player-cannon.js"), join("src", "player-cannon.js")],
