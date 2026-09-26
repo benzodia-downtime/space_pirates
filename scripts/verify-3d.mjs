@@ -524,7 +524,7 @@ try {
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().mode), 'cruise');
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().rendering.bridgeVisible), false);
   assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().steeringLocked), false);
-  assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().rendering.ramVisible), false);
+  assert.equal(await page.evaluate(() => SpacePiratesAmbient.getState().rendering.ramVisible), true, 'The stowed breaching collar is permanent ship hardware');
   assert.equal((await read()).navigation.active, false);
   assert.equal((await read()).speed, 0); assert.equal((await read()).thrust, 0);
   assert.equal((await read()).navigation.anchor, null);

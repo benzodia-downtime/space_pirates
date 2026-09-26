@@ -1,4 +1,4 @@
-import { VoyageScene } from "./voyage.js?v=chase-1";
+import { VoyageScene } from "./voyage.js?v=boarding-tug-1";
 import { BoardingController } from "./boarding-controller.js?v=helm-return-1";
 import { CREW } from "./boarding-combat.js?v=helm-return-1";
 

@@ -2,6 +2,7 @@ import * as THREE from "../vendor/three.module.js";
 import { GUN_MOUNTS } from "./enemy-defense.js?v=engagement-1";
 import { SIEGE } from "./player-cannon.js?v=engagement-1";
 import { flightCameraFrame } from "./flight-camera.js?v=chase-1";
+import { buildBoardingShip } from "./boarding-ship.js?v=boarding-tug-1";
 
 const smoothstep = THREE.MathUtils.smoothstep;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -421,8 +422,8 @@ export class VoyageRenderer {
       jet.rotation.z=-side*Math.PI/2; jet.userData.torque=Math.sign(side*z); this.turnJets.push(jet);
     }
     // Four aft dorsal lamps remain readable from the chase camera.
-    this.box(this.playerHull,m.dark,[0,1.55,4],[3.4,.2,.7]);
-    this.hullLamps=Array.from({length:4},(_,i)=>this.box(this.playerHull,m.cyan,[(i-1.5)*.75,1.7,4],[.5,.12,.45]));
+    this.box(this.playerHull,m.dark,[0,.5,8.6],[3.8,2.2,2.2]);
+    this.hullLamps=Array.from({length:4},(_,i)=>this.box(this.playerHull,m.cyan,[(i-1.5)*.75,1.67,8.6],[.5,.12,.45]));
   }
 
   drawDefense(defense, nav, motion) {
@@ -489,7 +490,7 @@ export class VoyageRenderer {
     this.passGlints=[glow(this.player,0xff9b48),glow(this.player,0xff9b48)];
     this.passLight=new THREE.PointLight(0xffa256,0,28,2);this.player.add(this.passLight);
     this.playerEngineHalos=this.playerEngines.map(({x})=>{
-      const halo=glow(this.playerHull,0x79deff);halo.position.set(x,-1.1,12.2);halo.scale.setScalar(4.5);return halo;
+      const halo=glow(this.playerHull,0x79deff);halo.position.set(x,-1.1,12.2);halo.scale.setScalar(3.4);return halo;
     });
     const scarMaterial=this.keep(new THREE.MeshBasicMaterial({color:0x100e0b,transparent:true,opacity:.85,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));
     const scarGeometry=this.keep(new THREE.CircleGeometry(1,9));
@@ -572,38 +573,7 @@ export class VoyageRenderer {
     this.player = new THREE.Group();
     this.player.name='nautilus-exterior';this.scene.add(this.player);
     this.playerHull=new THREE.Group();this.player.add(this.playerHull);
-    const paint=this.material(0x93a7ac),stripe=this.material(0xdf7b34),glass=this.material(0x163d53);
-    const outline=new THREE.Shape();
-    [[0,-16],[3.6,-12],[4.8,-1],[8,5],[7,10],[3.3,8],[0,9],[-3.3,8],[-7,10],[-8,5],[-4.8,-1],[-3.6,-12]].forEach(([x,z],i)=>i?outline.lineTo(x,z):outline.moveTo(x,z));
-    outline.closePath();
-    const hull=this.keep(new THREE.ExtrudeGeometry(outline,{depth:3,steps:1,bevelEnabled:true,bevelSegments:1,bevelSize:.35,bevelThickness:.3,curveSegments:1}));
-    hull.rotateX(Math.PI/2);hull.translate(0,-1,0);this.mesh(this.playerHull,hull,paint);
-    this.box(this.playerHull,m.hull,[0,.5,-2],[5.2,3,8]);
-    this.box(this.playerHull,glass,[0,1.4,-6.05],[4.4,1.5,.16]);
-    this.box(this.playerHull,glass,[0,2.05,-2],[4.4,.16,6]);
-    this.box(this.playerHull,stripe,[0,-.55,-10],[.65,.3,8]);
-    this.box(this.playerHull,m.dark,[0,-1.5,5],[6,5,5]);
-    this.box(this.playerHull,paint,[0,1.1,5],[5.5,.6,4.5]);
-    this.label(this.playerHull,'NAUTILUS',[0,-.2,7.58],4,'#b1e8ed');
-    const exhaust=this.keep(new THREE.MeshBasicMaterial({color:0x68d9ff,transparent:true,opacity:.42,depthWrite:false,blending:THREE.AdditiveBlending}));
-    const jetGeometry=this.keep(new THREE.ConeGeometry(1.1,8,8));
-    this.playerEngines=[];this.playerManeuverJets=[];
-    for(const side of [-1,1]) {
-      const x=side*6.3;
-      const nacelle=this.mesh(this.playerHull,this.cylinderGeometry,m.hull,[x,-1.1,5],[1.6,12,1.6]);nacelle.rotation.x=Math.PI/2;
-      const ring=this.mesh(this.playerHull,this.cylinderGeometry,stripe,[x,-1.1,11],[1.8,.7,1.8]);ring.rotation.x=Math.PI/2;
-      const core=this.mesh(this.playerHull,this.cylinderGeometry,m.cyan,[x,-1.1,11.5],[1.1,.2,1.1]);core.rotation.x=Math.PI/2;
-      const plume=this.mesh(this.playerHull,jetGeometry,exhaust,[x,-1.1,16]);plume.rotation.x=Math.PI/2;
-      this.playerEngines.push({x,plume});
-      this.box(this.playerHull,stripe,[side*6,-.5,1],[.4,.4,8]);
-      this.box(this.playerHull,m.panel,[side*6.4,1.7,8],[.35,4.5,3.3]);
-      for(const z of [-4,1,6])this.box(this.playerHull,m.dark,[side*3.8,-.55,z],[1.1,.2,1.2]);
-      this.box(this.playerHull,m.cyan,[side*7.6,-.6,5],[.15,.2,1.6]);
-      const lateral=this.mesh(this.playerHull,jetGeometry,exhaust,[-side*8,-1,3],[.25,.35,.25]);
-      lateral.rotation.z=side*Math.PI/2;lateral.userData.side=side;this.playerManeuverJets.push(lateral);
-      const reverse=this.mesh(this.playerHull,jetGeometry,exhaust,[side*4.2,-1,-11],[.2,.3,.2]);
-      reverse.rotation.x=-Math.PI/2;reverse.userData.reverse=true;this.playerManeuverJets.push(reverse);
-    }
+    buildBoardingShip(this);
     this.launcher = this.box(this.player, m.dark, [-4.5, -1.5, -12], [0.6, 0.6, 4]);
     this.harpoonCable = this.mesh(this.scene, this.cylinderGeometry, m.trim);
     this.harpoonBolt = this.mesh(this.scene, this.keep(new THREE.ConeGeometry(0.3, 1.5, 5)), m.amber);
@@ -646,6 +616,12 @@ export class VoyageRenderer {
     outline.holes.push(hole);
     const head = this.keep(new THREE.ExtrudeGeometry(outline, { depth: 1.1, bevelEnabled: true, bevelSegments: 1, bevelThickness: 0.16, bevelSize: 0.16 }));
     this.mesh(this.ramHead, head, m.dark);
+    for(const x of [-3.5,3.5]) {
+      this.box(this.ramHead,this.boardingHazard,[x,0,-.1],[.85,5.2,.35]);
+      for(const y of [-1.8,-.6,.6,1.8]) {
+        const stripe=this.box(this.ramHead,m.dark,[x,y,-.3],[.9,.38,.08]);stripe.rotation.z=.28;
+      }
+    }
     for (const x of [-2.9, 2.9]) this.box(this.ramHead, m.amber, [x,0,1.3], [0.12,5.6,0.1]);
     for (const y of [-2.9, 2.9]) this.box(this.ramHead, m.amber, [0,y,1.3], [5.6,0.12,0.1]);
     const spikeGeometry = this.keep(new THREE.ConeGeometry(0.6, 2.7, 4));
@@ -654,7 +630,10 @@ export class VoyageRenderer {
       spike.rotation.x = -Math.PI / 2;
       this.box(this.ramHead, m.amber, [x,y,1.18], [0.4,0.4,0.1]);
     }
-    this.ramPistons = [-1,1].map(side => this.box(this.player,m.dark,[side*3.4,-2.8,-13],[0.8,0.8,1]));
+    this.ramPistons = [-1,1].map(side => {
+      const housing=this.mesh(this.player,this.cylinderGeometry,m.dark,[side*3.4,-4,-9],[.65,4,.65]);housing.rotation.x=Math.PI/2;
+      const shaft=this.mesh(this.player,this.cylinderGeometry,this.boardingMetal);shaft.userData.side=side;return shaft;
+    });
     this.claws = [];
     // Hinged claws fold back over the torn bow and secure the embedded ram.
     for (const side of [-1,1]) for (const height of [-1,1]) {
@@ -753,6 +732,8 @@ export class VoyageRenderer {
     this.drawPlayerCannon(frame.cannon, nav, a, motion);
     this.drawEngagementEffects(frame.defense,frame.cannon,nav,motion,time);
     const opening = smoothstep(a.pressure, 0.7, 1);
+    this.entryDoors.forEach(door=>{door.position.x=door.userData.side*(1.32+opening*2.8);});
+    this.harpoonWinch.rotation.x=-a.harpoon*12-a.charge*24;
     this.doors.forEach((door,i) => { door.position.x = (i === 0 ? -1 : 1) * (1.72 + opening*3.5); });
     this.hatchLamp.material.color.setHex(a.pressure >= 1 ? 0x71f2c3 : 0xff9260);
     for (const panel of this.armour) {
@@ -760,9 +741,14 @@ export class VoyageRenderer {
       panel.position.set(x*(1.85 + a.breach*3.2),y*(1.85+a.breach*3.1),31.4+a.breach*1.5);
       panel.rotation.set(y*a.breach*0.72,-x*a.breach*0.8,x*y*a.breach*0.22);
     }
-    this.ramHead.visible = a.ram > 0;
-    this.ramHead.position.set(0,-4*a.breach-6.8*(1-a.ram),-14-a.ram*4);
-    this.ramPistons.forEach(piston => { piston.visible = a.ram > 0; piston.scale.z = 3+a.ram*5; piston.position.z = -11.5-a.ram*2.5; });
+    // The breaching collar is part of the ship even before an attack. Its
+    // deployed tip and final connection retain the original assault coordinates.
+    this.ramHead.visible = true;
+    this.ramHead.position.set(0,-4*a.breach-4*(1-a.ram),-14-a.ram*4);
+    this.ramPistons.forEach(piston => {
+      const x=piston.userData.side*3.4;
+      this.barBetween(piston,new THREE.Vector3(x,-4,-11),new THREE.Vector3(x,this.ramHead.position.y,this.ramHead.position.z+.6),.34,true);
+    });
     this.claws.forEach(claw => {
       claw.visible = a.clamps > 0;
       claw.rotation.z = claw.userData.side*claw.userData.height*(1-a.clamps)*1.3;
@@ -846,6 +832,9 @@ export class VoyageRenderer {
       view:'third-person',playerPosition:this.player.position.toArray(),playerRotation:this.player.rotation.toArray().slice(0,3),
       playerScreen:this.project(this.player.position),aimScreen:this.project(this.aimPoint),aimPoint:this.aimPoint.toArray(),
       playerBounds:this.playerScreenBounds(),playerBank:this.playerHull.rotation.z,
+      boardingHardware:{design:'salvaged-boarding-tug',winchAngle:this.harpoonWinch.rotation.x,
+        ramPosition:this.ramHead.position.toArray(),ramDeployed:this.lastFrame.assault.ram>0,
+        lowerHatchLocal:this.playerHatch.position.toArray(),airlockOpen:this.entryDoors.every(door=>Math.abs(door.position.x)>4)},
       triangles: this.renderer.info.render.triangles, drawCalls: this.renderer.info.render.calls,
       pixelRatio: this.renderer.getPixelRatio(), cameraPosition: this.camera.position.toArray(),
       farClipMetres: this.camera.far,
@@ -878,8 +867,10 @@ export class VoyageRenderer {
   playerScreenBounds() {
     this.playerHull.updateWorldMatrix(true,false);
     const points=[];
-    for(const x of [-8.4,8.4])for(const y of [-4.4,4])for(const z of [-16.4,13]) {
-      points.push(this.project(new THREE.Vector3(x,y,z).applyMatrix4(this.playerHull.matrixWorld)));
+    this.player.updateWorldMatrix(true,true);
+    for(const [object,xs,ys,zs] of [[this.playerHull,[-8.4,8.4],[-3.8,4],[-13.8,12]],[this.playerHull,[-6.7,6.7],[2.8,4.6],[-13,-4.5]],
+      [this.boardingTunnel,[-3.2,3.2],[-6.7,-1.3],[-13.8,7.5]],[this.ramHead,[-4.4,4.4],[-4.4,4.4],[-2.6,1.5]]]) {
+      for(const x of xs)for(const y of ys)for(const z of zs)points.push(this.project(new THREE.Vector3(x,y,z).applyMatrix4(object.matrixWorld)));
     }
     return {left:Math.min(...points.map(p=>p.x)),right:Math.max(...points.map(p=>p.x)),top:Math.min(...points.map(p=>p.y)),bottom:Math.max(...points.map(p=>p.y))};
   }

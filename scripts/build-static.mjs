@@ -19,6 +19,7 @@ const staticFiles = [
   [join("src", "assault-audio.js"), join("src", "assault-audio.js")],
   [join("src", "voyage-renderer.js"), join("src", "voyage-renderer.js")],
   [join("src", "flight-camera.js"), join("src", "flight-camera.js")],
+  [join("src", "boarding-ship.js"), join("src", "boarding-ship.js")],
   [join("node_modules", "three", "build", "three.module.js"), join("vendor", "three.module.js")],
   [join("node_modules", "three", "build", "three.core.js"), join("vendor", "three.core.js")],
   [join("node_modules", "three", "LICENSE"), join("vendor", "three-LICENSE.txt")],

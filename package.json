@@ -11,7 +11,8 @@
     "test": "npm run build && npm run check && node --test tests/*.test.mjs",
     "test:e2e": "node scripts/verify-3d.mjs",
     "test:boarding": "node scripts/verify-boarding.mjs",
-    "test:chase": "node scripts/verify-chase.mjs"
+    "test:chase": "node scripts/verify-chase.mjs",
+    "check:ship": "node --check src/boarding-ship.js"
   },
   "engines": {
     "node": ">=18"
