@@ -1,6 +1,6 @@
 import * as THREE from "../vendor/three.module.js";
-import { GUN_MOUNTS } from "./enemy-defense.js?v=enemyorbit-1";
-import { SIEGE } from "./player-cannon.js?v=enemyorbit-1";
+import { GUN_MOUNTS } from "./enemy-defense.js?v=engagement-1";
+import { SIEGE } from "./player-cannon.js?v=engagement-1";
 
 const smoothstep = THREE.MathUtils.smoothstep;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -69,6 +69,7 @@ export class VoyageRenderer {
     this.makePlayer();
     this.makePlayerCannon();
     this.makeDefense();
+    this.makeEngagementEffects();
     this.makeRig();
     this.makeRam();
     this.makeStars();
@@ -187,6 +188,28 @@ export class VoyageRenderer {
     // Bow is sealed armour. The only boarding entry is the rear loading ramp.
     plate(m.panel, [0, 0, 31.4], [7.5, 7.5, 1.5]);
     plate(m.trim, [0, 0, 32.2], [0.45, 7, 0.1]);
+    // Human-sized maintenance doors, window bays and stacked freight give the
+    // hull a readable scale. These stay fixed in world space during close passes.
+    const freight=this.material(0x75513c),freightDark=this.material(0x29454c);
+    for(const side of [-1,1]) {
+      for(let bay=0;bay<6;bay++) {
+        const z=-40+bay*12;
+        plate(m.dark,[side*16.92,5,z],[.12,1.5,8]);
+        for(let w=0;w<4;w++)plate((bay+w)%3?m.amber:m.cyan,[side*17,5,z-3+w*2],[.13,.65,1.15]);
+        plate(m.dark,[side*16.92,-3.7,z],[.15,2.6,1.35]);
+        plate(m.amber,[side*17.02,-2.25,z],[.18,.12,1.55]);
+        for(const y of [7,8.1])plate(m.panel,[side*12.4,y,z],[.15,.15,10]);
+        for(const dz of [-4,0,4])plate(m.trim,[side*12.4,7.5,z+dz],[.12,1.2,.12]);
+      }
+      for(const z of [-37,-20,-3,14]) {
+        plate(z<0?freight:freightDark,[side*10.4,9.2,z],[6,2.1,12]);
+        for(const dz of [-4,-2,0,2,4])plate(m.dark,[side*10.4,10.3,z+dz],[5.4,.18,.3]);
+        plate(m.trim,[side*13.3,9.3,z],[.15,2.3,11]);
+      }
+      for(let i=0;i<7;i++)plate(m.dark,[side*10.5,-4.5+i*.6,31.6],[6,.23,.14]);
+      const registry=this.label(this.enemy,'K E S T R E L  /  0 7',[side*17.02,1.8,17],11,'#e3c6a2');
+      registry.rotation.y=side*Math.PI/2;
+    }
     const rearBoxes = [];
     const rearPlate = (material, position, scale) => rearBoxes.push({ material, position, scale });
     for (const x of [-4.2, 4.2]) rearPlate(m.trim, [x, 0, 31.6], [0.7, 9, 0.7]);
@@ -277,6 +300,7 @@ export class VoyageRenderer {
     for(const y of [-3.3,3.3])this.box(this.anchorFrame,m.cyan,[0,y,-51.86],[6.8,.15,.1]);
     this.siegeFlash=this.keep(new THREE.MeshBasicMaterial({color:0xffb45e}));
     this.siegeImpactMeshes=Array.from({length:8},()=>this.mesh(this.enemy,this.keep(new THREE.OctahedronGeometry(1)),this.siegeFlash));
+    this.siegeBacking=this.box(this.enemy,m.dark,[0,0,-53.05],[11.2,10.4,.2]);
   }
 
   makePlayerCannon() {
@@ -297,11 +321,14 @@ export class VoyageRenderer {
     this.siegeMaterial.color.setHex(damage>.65?0x514b42:damage>.3?0x72604c:0x8a6a47);
     this.siegePlates.forEach(plate=>{
       const {x,y}=plate.userData;
+      const hits=(nav?.armorScars||[]).filter(hit=>Math.round(THREE.MathUtils.clamp(hit.x/3.73,-1,1))===x && (hit.y<0?-1:1)===y).length;
+      const dent=Math.min(1,hits*.32+damage*.2);
       plate.visible=!exposed || (motion && age<1.6);
-      plate.position.set(x*(3.73+peel*5),y*(2.6+peel*5),-54-peel*4);
-      plate.rotation.set(y*(damage*.04+peel*.8),x*(damage*.06+peel*.6),x*y*peel*.3);
+      plate.position.set(x*(3.73+peel*5),y*(2.6+peel*5),-54-peel*4-dent*.75);
+      plate.rotation.set(y*(dent*.19+peel*.8),x*(dent*.16+peel*.6),x*y*peel*.3);
       plate.scale.setScalar(exposed?Math.max(.01,1-Math.max(0,age-.7)/.9):1);
     });
+    this.siegeBacking.visible=!exposed;
     this.siegeCracks.forEach((crack,i)=>{crack.visible=!exposed && damage>=(i+1)/12;});
     this.siegeScars.forEach((scar,i)=>{
       const hit=nav?.armorScars[i];scar.visible=!exposed && Boolean(hit);
@@ -369,6 +396,22 @@ export class VoyageRenderer {
     this.aimBeams=Array.from({length:9},()=>this.mesh(this.scene,this.cylinderGeometry,this.aimMaterial));
     const boltMaterial=this.keep(new THREE.MeshBasicMaterial({color:0xffdb98}));
     this.enemyBolts=Array.from({length:18},()=>this.mesh(this.scene,this.cylinderGeometry,boltMaterial));
+    this.glowTexture=glowTexture;
+    // Moving armoured shutters reveal the actual double barrels. Each cloned
+    // turret owns its mechanics, while all rounds still originate at the shared muzzle.
+    for(const gun of this.guns) {
+      gun.shutters=[-1,1].map(side=>{
+        const shutter=this.box(gun.group,m.panel,[side*1.3,0,4.8],[2.4,3.8,.5]);
+        shutter.userData.side=side;return shutter;
+      });
+      gun.coils=[];
+      for(const x of [-1.4,1.4])for(let i=0;i<4;i++) {
+        const coil=this.box(gun.group,m.dark,[x,.74,1.3+i*.85],[1.35,.13,.3]);
+        coil.userData.step=i;gun.coils.push(coil);
+      }
+      gun.recoilParts=gun.group.children.filter(child=>child.isMesh && child.position.z>0 && !gun.shutters.includes(child) && !gun.coils.includes(child));
+      for(const part of gun.recoilParts)part.userData.restZ=part.position.z;
+    }
     this.turnJets=[];
     const jetGeometry=this.keep(new THREE.ConeGeometry(.8,4,6));
     for(const side of [-1,1]) for(const z of [-23,23]) {
@@ -394,6 +437,13 @@ export class VoyageRenderer {
       gun.glow.visible=active && (charge>0 || muzzle>.2);
       gun.glow.material.color.setHex(locked?0xff4e25:0xffb545);
       gun.glow.scale.setScalar((locked?10:4+charge*5)+muzzle*.08);
+      const heat=active && defense.muzzleAge>=0?Math.max(0,1-defense.muzzleAge/1.4):0;
+      const opened=active?Math.max(smoothstep(charge,0,.3),heat):0;
+      gun.shutters.forEach(shutter=>{shutter.position.x=shutter.userData.side*(1.3+opened*2.5);shutter.rotation.y=shutter.userData.side*opened*.25;});
+      gun.coils.forEach(coil=>{coil.material=active && (charge>(coil.userData.step+.5)/4 || heat>.2)?(locked?this.materials.red:this.materials.amber):this.materials.dark;});
+      const kick=motion && active && defense.muzzleAge>=0?Math.exp(-defense.muzzleAge*9)*.85:0;
+      gun.recoilParts.forEach(part=>{part.position.z=part.userData.restZ-kick;});
+      gun.opened=opened;
     });
     const aiming=Boolean(defense?.aimPoint && ['aim','locked'].includes(defense.gunPhase));
     const directions=aiming?defense.directions(nav):[];
@@ -410,11 +460,95 @@ export class VoyageRenderer {
       const bolt=defense?.bolts[i]; mesh.visible=Boolean(bolt);
       if(!bolt) return;
       const head=new THREE.Vector3(bolt.position.x,bolt.position.y,bolt.position.z);
-      const tail=head.clone().addScaledVector(new THREE.Vector3(bolt.direction.x,bolt.direction.y,bolt.direction.z),-11);
-      this.barBetween(mesh,tail,head,.45,true);
+      const tail=head.clone().addScaledVector(new THREE.Vector3(bolt.direction.x,bolt.direction.y,bolt.direction.z),-18);
+      this.barBetween(mesh,tail,head,.4,true);
     });
     this.turnJets.forEach(jet=>{jet.visible=Boolean(defense && Math.abs(defense.turning)>.001 && jet.userData.torque===Math.sign(defense.turning));});
     this.hullLamps.forEach((lamp,i)=>{lamp.material=(defense?.hull??100)>i*25?this.materials.cyan:this.materials.red;});
+  }
+
+  makeEngagementEffects() {
+    const m=this.materials;
+    const glow=(parent,color)=>{
+      const material=this.keep(new THREE.SpriteMaterial({map:this.glowTexture,color,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));
+      const sprite=new THREE.Sprite(material);parent.add(sprite);return sprite;
+    };
+    this.enginePlumes=[];
+    const exhaust=this.keep(new THREE.MeshBasicMaterial({color:0x53bcff,transparent:true,opacity:.2,depthWrite:false,blending:THREE.AdditiveBlending}));
+    const cone=this.keep(new THREE.ConeGeometry(2.5,18,10));
+    for(const x of [-19,19]) {
+      const plume=this.mesh(this.enemy,cone,exhaust,[x,-2,-61]);plume.rotation.x=-Math.PI/2;
+      const halo=glow(this.enemy,0x76d6ff);halo.position.set(x,-2,-53);halo.scale.setScalar(14);
+      this.enginePlumes.push({plume,halo});
+    }
+    const trail=this.keep(new THREE.MeshBasicMaterial({color:0xff7733,transparent:true,opacity:.2,depthWrite:false,blending:THREE.AdditiveBlending}));
+    this.boltTrails=Array.from({length:18},()=>this.mesh(this.scene,this.cylinderGeometry,trail));
+    this.boltHeads=Array.from({length:18},()=>glow(this.scene,0xffb65a));
+    this.passGlints=[glow(this.camera,0xff9b48),glow(this.camera,0xff9b48)];
+    this.passLight=new THREE.PointLight(0xffa256,0,28,2);this.camera.add(this.passLight);
+    const scarMaterial=this.keep(new THREE.MeshBasicMaterial({color:0x100e0b,transparent:true,opacity:.85,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));
+    const scarGeometry=this.keep(new THREE.CircleGeometry(1,9));
+    this.hullScars=Array.from({length:24},()=>this.mesh(this.enemy,scarGeometry,scarMaterial));
+    this.hitFragments=new THREE.InstancedMesh(this.boxGeometry,m.trim,80);this.hitFragments.frustumCulled=false;this.enemy.add(this.hitFragments);
+    this.hitSparks=new THREE.InstancedMesh(this.boxGeometry,m.amber,80);this.hitSparks.frustumCulled=false;this.enemy.add(this.hitSparks);
+    this.fragmentTransform=new THREE.Object3D();
+  }
+
+  drawEngagementEffects(defense,cannon,nav,motion,time) {
+    const hot=nav.active && !nav.anchor;
+    this.enginePlumes.forEach(({plume,halo},i)=>{
+      const thrust=(hot?1:.35)+(motion?Math.sin(time*5+i)*.04:0);
+      plume.scale.set(1,thrust,1);plume.position.z=-52-9*thrust;
+      halo.material.opacity=hot?.6:.28;
+    });
+    this.boltTrails.forEach((mesh,i)=>{
+      const bolt=defense?.bolts[i],halo=this.boltHeads[i];mesh.visible=halo.visible=Boolean(bolt && motion);
+      if(!bolt)return;
+      const head=new THREE.Vector3(bolt.position.x,bolt.position.y,bolt.position.z),direction=new THREE.Vector3(bolt.direction.x,bolt.direction.y,bolt.direction.z);
+      this.barBetween(mesh,head.clone().addScaledVector(direction,-26),head,.95,true);
+      halo.position.copy(head);halo.scale.setScalar(4.5);
+    });
+    // Light sweeps across the real canopy only after an actual narrowly missed
+    // volley. Camera orientation, field of view and the crosshair never move.
+    const pass=defense?.nearMiss;
+    const glow=motion && pass && defense.nearMissAge>=0?Math.max(0,1-defense.nearMissAge/.42)*( .35+pass.strength*.65):0;
+    const local=pass?new THREE.Vector3(pass.offset.x,pass.offset.y,pass.offset.z).applyQuaternion(this.camera.quaternion.clone().invert()):new THREE.Vector3();
+    this.passGlints.forEach((sprite,i)=>{
+      sprite.visible=glow>0;
+      const halfHeight=Math.tan(this.camera.fov*Math.PI/360)*2.4;
+      sprite.position.set(Math.sign(local.x||1)*halfHeight*this.camera.aspect*.8,(i?-.35:.35)*halfHeight,-2.4);
+      sprite.scale.set(.6,1.8,1);sprite.material.opacity=glow*.45;
+    });
+    this.passLight.position.set(Math.sign(local.x||1)*3,0,-3);this.passLight.intensity=glow*24;
+    this.hullScars.forEach((mesh,i)=>{
+      const scar=cannon?.scars[i];
+      // Rear plate marks leave with the discarded plate; hull burns remain.
+      mesh.visible=Boolean(scar && (scar.kind!=='armor' || nav.armorHealth>0));
+      if(!mesh.visible)return;
+      const normal=new THREE.Vector3(scar.normal.x,scar.normal.y,scar.normal.z);
+      if(normal.lengthSq()<.5)normal.set(0,0,1);
+      mesh.position.set(scar.point.x,scar.point.y,scar.point.z).addScaledVector(normal,.09);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),normal);
+      mesh.scale.setScalar(scar.kind==='armor'?1.05:.6);
+    });
+    let count=0;
+    if(motion)for(const [hitIndex,hit] of (cannon?.impacts||[]).slice(-8).entries()) {
+      const n=new THREE.Vector3(hit.normal.x,hit.normal.y,hit.normal.z),age=hit.age;
+      if(n.lengthSq()<.5)n.set(0,0,1);
+      const tangent=new THREE.Vector3(Math.abs(n.y)<.8?0:1,Math.abs(n.y)<.8?1:0,0).cross(n).normalize();
+      const bitangent=new THREE.Vector3().crossVectors(n,tangent);
+      for(let i=0;i<10;i++) {
+        const angle=i*2.39996+hitIndex,velocity=n.clone().multiplyScalar(7+i%4).addScaledVector(tangent,Math.cos(angle)*(5+i%3)).addScaledVector(bitangent,Math.sin(angle)*(5+i%3));
+        const transform=this.fragmentTransform;
+        transform.position.set(hit.point.x,hit.point.y,hit.point.z).addScaledVector(velocity,age);
+        transform.rotation.set(age*(i+2),angle,age*7);
+        const size=(hit.kind==='armor'?.26:.1)*Math.max(.05,1-age/.7);
+        transform.scale.set(size*2,size,size*.5);transform.updateMatrix();this.hitFragments.setMatrixAt(count,transform.matrix);
+        transform.scale.set(.035,Math.max(.02,.8-age),.035);transform.quaternion.setFromUnitVectors(Y_AXIS,velocity.normalize());
+        transform.updateMatrix();this.hitSparks.setMatrixAt(count,transform.matrix);count++;
+      }
+    }
+    for(const mesh of [this.hitFragments,this.hitSparks]) {mesh.count=count;mesh.visible=count>0;mesh.instanceMatrix.needsUpdate=true;}
   }
 
   makePlayer() {
@@ -595,6 +729,7 @@ export class VoyageRenderer {
     this.enemy.visible = Boolean(nav?.placed);
     this.drawDefense(frame.defense, nav, motion);
     this.drawPlayerCannon(frame.cannon, nav, a, motion);
+    this.drawEngagementEffects(frame.defense,frame.cannon,nav,motion,time);
     const opening = smoothstep(a.pressure, 0.7, 1);
     this.doors.forEach((door,i) => { door.position.x = (i === 0 ? -1 : 1) * (1.72 + opening*3.5); });
     this.hatchLamp.material.color.setHex(a.pressure >= 1 ? 0x71f2c3 : 0xff9260);
@@ -699,6 +834,9 @@ export class VoyageRenderer {
       rearArmorVisible:this.siegePlates.some(p=>p.visible), rearArmorPieces:this.siegePlates.filter(p=>p.visible).length,
       rearArmorCracks:this.siegeCracks.filter(p=>p.visible).length, anchorFrameVisible:this.anchorFrame.visible,
       playerGunVisible:this.playerGun.visible,
+      engagement:{turretsOpen:this.guns.filter(g=>g.opened>.5).length,nearMissGlow:this.passGlints.some(g=>g.visible),
+        fragments:this.hitFragments.count,scars:this.hullScars.filter(g=>g.visible).length,enginePlumes:this.enginePlumes.length,
+        boltTrails:this.boltTrails.filter(g=>g.visible).length},
       turretChargeColor: this.guns.find(g=>g.mount===this.lastFrame.defense?.mount)?.charge.color.getHex(),
       activeGun: this.lastFrame.defense?.mount,
       gunMounts: this.guns.map(g=>({mount:g.mount,position:g.group.getWorldPosition(new THREE.Vector3()).toArray(),direction:g.group.getWorldDirection(new THREE.Vector3()).toArray()})),

@@ -47,7 +47,8 @@ export function traceCannon(nav,from,to) {
     // Only the outward rear face is vulnerable; side/top/front shots ricochet.
     const kind=candidate.kind==='armor' && hit.face==='z-' && d.z/(distance||1)>.45?'armor':'hull';
     const point=add(a,d,hit.t);
-    nearest={kind,point,position:nav.world(point),t:hit.t};
+    const normal={x:0,y:0,z:0};if(hit.face)normal[hit.face[0]]=hit.face[1]==='-'?-1:1;
+    nearest={kind,point,normal,position:nav.world(point),t:hit.t};
   }
   return nearest;
 }
@@ -56,7 +57,7 @@ export class PlayerCannon {
   constructor() {this.reset();}
   reset() {
     this.rounds=SIEGE.magazine;this.reloadTime=0;this.cooldown=0;
-    this.bolts=[];this.impacts=[];this.shotAge=-1;this.shots=0;this.armorHits=0;
+    this.bolts=[];this.impacts=[];this.scars=[];this.shotAge=-1;this.shots=0;this.armorHits=0;
   }
   fire(nav,view) {
     if(nav.anchor || !nav.placed || this.cooldown>0 || this.reloadTime>0 || !this.rounds)return false;
@@ -94,6 +95,7 @@ export class PlayerCannon {
           this.armorHits++;events.push(nav.armorHealth===0?'armor-break':'armor-hit');
         } else events.push('armor-ricochet');
         this.impacts.push({...hit,age:0});
+        this.scars.push({...hit});this.scars=this.scars.slice(-24);
       }
       bolt.position=end;
     }
@@ -101,5 +103,5 @@ export class PlayerCannon {
     if(trigger && view && this.fire(nav,view))events.push('player-fire');
     return events;
   }
-  getState() {return {rounds:this.rounds,reloadTime:this.reloadTime,cooldown:this.cooldown,shots:this.shots,armorHits:this.armorHits,bolts:this.bolts.map(b=>({...b,position:{...b.position},direction:{...b.direction}})),impacts:this.impacts.map(h=>({...h,point:{...h.point}}))};}
+  getState() {return {rounds:this.rounds,reloadTime:this.reloadTime,cooldown:this.cooldown,shots:this.shots,armorHits:this.armorHits,scars:this.scars.map(h=>({...h,point:{...h.point},normal:{...h.normal}})),bolts:this.bolts.map(b=>({...b,position:{...b.position},direction:{...b.direction}})),impacts:this.impacts.map(h=>({...h,point:{...h.point},normal:{...h.normal}}))};}
 }

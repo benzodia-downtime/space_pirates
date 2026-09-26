@@ -14,7 +14,7 @@ export class AssaultAudio {
 
   tone(from, to, duration, volume, type = "sine") {
     const ctx = this.context;
-    if (!this.enabled || !ctx || ctx.state !== "running") return;
+    if (!this.enabled || !ctx || ctx.state !== "running" || this.voices.size>=24) return;
     const voice = ctx.createOscillator();
     const gain = ctx.createGain();
     const now = ctx.currentTime;
@@ -31,7 +31,33 @@ export class AssaultAudio {
     voice.stop(now + duration);
   }
 
-  play(stage) {
+  noise(duration, volume, frequency, pan=0) {
+    const ctx=this.context;
+    if(!this.enabled || !ctx || ctx.state!=='running' || this.voices.size>=24)return;
+    if(!this.noiseBuffer) {
+      this.noiseBuffer=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);
+      const data=this.noiseBuffer.getChannelData(0);
+      for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+    }
+    const voice=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+    const stereo=ctx.createStereoPanner(),now=ctx.currentTime;
+    voice.buffer=this.noiseBuffer;filter.type='lowpass';filter.frequency.setValueAtTime(frequency,now);
+    filter.frequency.exponentialRampToValueAtTime(100,now+duration);
+    gain.gain.setValueAtTime(0,now);gain.gain.linearRampToValueAtTime(volume,now+.018);
+    gain.gain.exponentialRampToValueAtTime(.001,now+duration);
+    stereo.pan.setValueAtTime(Math.max(-1,Math.min(1,pan)),now);
+    voice.connect(filter).connect(gain).connect(stereo).connect(ctx.destination);
+    this.voices.add(voice);voice.onended=()=>{this.voices.delete(voice);voice.disconnect();filter.disconnect();gain.disconnect();stereo.disconnect();};
+    voice.start();voice.stop(now+duration);
+  }
+
+  play(stage, {pan=0,strength=1}={}) {
+    if(stage==='enemy-near-miss')this.noise(.42,.1+strength*.13,3200,pan);
+    if(stage==='player-fire')this.noise(.18,.11,1800);
+    if(stage==='armor-hit')this.noise(.28,.13,2700);
+    if(stage==='armor-break')this.noise(.85,.2,3800);
+    if(stage==='enemy-charge')this.noise(.2,.045,700);
+    if(stage==='enemy-fire')this.noise(.4,.12,1600);
     if (stage === 'player-fire') {this.tone(130,35,.2,.09,'sawtooth');this.tone(780,180,.08,.025,'triangle');}
     if (stage === 'armor-hit') {this.tone(310,70,.22,.065,'triangle');this.tone(75,35,.25,.07);}
     if (stage === 'armor-ricochet') this.tone(1350,420,.12,.035,'triangle');

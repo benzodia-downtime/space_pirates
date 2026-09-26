@@ -1,10 +1,10 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=extraction-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=engagement-1";
 import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=extraction-1";
-import { AssaultAudio } from "./assault-audio.js?v=enemyorbit-1";
-import { EnemyDefense } from "./enemy-defense.js?v=enemyorbit-1";
-import { PlayerCannon } from "./player-cannon.js?v=enemyorbit-1";
+import { AssaultAudio } from "./assault-audio.js?v=engagement-1";
+import { EnemyDefense } from "./enemy-defense.js?v=engagement-1";
+import { PlayerCannon } from "./player-cannon.js?v=engagement-1";
 
-import { OrbitNavigation, HELM, FLIGHT, ORBIT, flightInput, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=enemyorbit-1";
+import { OrbitNavigation, HELM, FLIGHT, ORBIT, flightInput, relativeHelm, lookAt, pitchOffsetDegrees } from "./navigation.js?v=engagement-1";
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -525,8 +525,8 @@ export class VoyageScene {
     this.cruiseElapsed = 0;
     this.resetBoardingState();
     this.contactBearing = {
-      x: this.pointer.x * 0.68 + (Math.random() < 0.5 ? -1 : 1) * (0.2 + Math.random() * 0.24),
-      y: clamp(this.pointer.y * 0.48 - 0.14 + Math.random() * 0.26, -0.5, 0.5),
+      x: this.pointer.x * 0.68 + (Math.random() < 0.5 ? -1 : 1) * (0.12 + Math.random() * 0.08),
+      y: clamp(this.pointer.y * 0.48 - 0.16 + Math.random() * 0.06, -0.5, 0.5),
     };
 
     if (this.battleButton) {
@@ -534,6 +534,9 @@ export class VoyageScene {
       this.battleButton.disabled = true;
     }
     this.navigation.begin(this.contactBearing, { position, radius: FLIGHT.contactDistance, active: false });
+    // Present a broad three-quarter silhouette instead of an anonymous bow dot.
+    // Only the enemy's heading changes: the player still starts at rest, in control.
+    this.navigation.setEnemyYaw(this.navigation.enemyYaw+.8);
     this.spaceScene?.setAttribute("data-voyage-state", "cruise");
     this.updateHud(true);
 
@@ -760,7 +763,9 @@ export class VoyageScene {
       this.shiftView({yaw:afterEnemyMotion.yaw-beforeEnemyMotion.yaw,pitch:afterEnemyMotion.pitch-beforeEnemyMotion.pitch});
     }
     for (const event of defenseEvents) {
-      this.audio.play(event);
+      const pass=this.enemyDefense.nearMiss, yaw=this.getView().yaw;
+      const pan=pass?(pass.offset.x*Math.cos(yaw)+pass.offset.z*Math.sin(yaw))/pass.distance:0;
+      this.audio.play(event,{pan,strength:pass?.strength??1});
       if (event === "enemy-lock" && this.announcement) this.announcement.textContent = this.enemyDefense.pattern==='fan' ? "적 확산 포격. 시선을 돌리고 전진·회피로 사선을 벗어나십시오." : "적 포격 조준 고정. 진행 방향을 바꿔 회피하십시오.";
       if (event === "enemy-hit" && this.announcement) this.announcement.textContent = `피격. 함선 내구도 ${this.enemyDefense.hull}.`;
     }

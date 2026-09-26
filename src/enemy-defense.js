@@ -10,7 +10,7 @@ export const DEFENSE = Object.freeze({
   range: 1200, coneYaw: .7, conePitch: .5,
   aimSeconds: 1.8, lockSeconds: 1.2, reloadSeconds: 3.5,
   boltSpeed: 220, boltLife: 6, hitRadius: 6, hull: 100, damage: 25,
-  fanStep: .1, fanCount: 9,
+  fanStep: .1, fanCount: 9, nearMissRadius: 22,
 });
 
 // Gun pivots are shared with the renderer; a rotating barrel's muzzle follows its bore.
@@ -50,6 +50,7 @@ export class EnemyDefense {
     this.aimPoint = null; this.bolts = []; this.hull = DEFENSE.hull;
     this.hitAge = -1; this.muzzleAge = -1; this.shots = 0; this.hits = 0;
     this.previousPlayer = null;
+    this.nearMiss = null; this.nearMissAge = -1; this.nearMisses = 0; this.nearMissVolleys = new Set();
     this.pattern='focused';this.mount='bow';this.hitVolleys=new Set();
   }
   get defeated() { return this.hull <= 0; }
@@ -93,6 +94,7 @@ export class EnemyDefense {
     if (!dt) return events;
     if(this.hitAge >= 0) this.hitAge += dt;
     if(this.muzzleAge >= 0) this.muzzleAge += dt;
+    if(this.nearMissAge >= 0) this.nearMissAge += dt;
     if (!nav.active || this.defeated) {
       this.phase = this.defeated ? 'victory' : 'idle';
       this.ceaseFire(); this.previousPlayer = {...nav.position}; return events;
@@ -125,21 +127,33 @@ export class EnemyDefense {
     } else if(!suppressed && !weaponHold && this.turnTime >= DEFENSE.holdSeconds) {this.phase='turn';this.turnTime=0;this.turnGoal=null;}
 
     const previousPlayer = this.previousPlayer || nav.position;
+    const passes = new Map();
     for(const bolt of this.bolts) {
       const before = {...bolt.position}; bolt.age += dt;
       for(const axis of ['x','y','z']) bolt.position[axis] += bolt.direction[axis]*DEFENSE.boltSpeed*dt;
       // Relative swept segments avoid tunnelling and include player movement this frame.
       const a=sub(before,previousPlayer), b=sub(bolt.position,nav.position), ab=sub(b,a);
       const t=clamp(-dot(a,ab)/(dot(ab,ab)||1),0,1);
-      if(Math.hypot(a.x+ab.x*t,a.y+ab.y*t,a.z+ab.z*t) <= DEFENSE.hitRadius) {
+      const offset={x:a.x+ab.x*t,y:a.y+ab.y*t,z:a.z+ab.z*t}, distance=len(offset);
+      if(distance <= DEFENSE.hitRadius) {
         bolt.age=DEFENSE.boltLife;
         if(!this.hitVolleys.has(bolt.volley)) {
           this.damage(bolt.damage);this.hitVolleys.add(bolt.volley);this.hits++; events.push('enemy-hit');
         }
+      } else if(distance<DEFENSE.nearMissRadius && dot(a,ab)<0 && dot(b,ab)>=0) {
+        // Only celebrate a physical closest pass, never a still-approaching shot.
+        if(!passes.has(bolt.volley) || distance<passes.get(bolt.volley).distance)passes.set(bolt.volley,{offset,distance});
       }
+    }
+    for(const [volley,pass] of passes) {
+      if(this.hitVolleys.has(volley) || this.nearMissVolleys.has(volley))continue;
+      this.nearMissVolleys.add(volley);this.nearMisses++;this.nearMissAge=0;
+      this.nearMiss={...pass,strength:1-(pass.distance-DEFENSE.hitRadius)/(DEFENSE.nearMissRadius-DEFENSE.hitRadius)};
+      events.push('enemy-near-miss');
     }
     this.bolts=this.bolts.filter(b=>b.age<DEFENSE.boltLife);
     for(const id of this.hitVolleys) if(!this.bolts.some(b=>b.volley===id)) this.hitVolleys.delete(id);
+    for(const id of this.nearMissVolleys) if(!this.bolts.some(b=>b.volley===id)) this.nearMissVolleys.delete(id);
     this.previousPlayer={...nav.position};
     if(this.defeated) { this.phase='victory';this.ceaseFire();nav.stopOrbit();events.push('defeated');return events; }
     this.cooldown=Math.max(0,this.cooldown-dt);
@@ -168,6 +182,7 @@ export class EnemyDefense {
     return {phase:this.phase,turning:this.turning,gunPhase:this.gunPhase,charge:this.charge,pattern:this.pattern,mount:this.mount,
       orbiting:['turn','hold'].includes(this.phase),finishingAttack:['tethered','breached'].includes(this.phase)&&this.gunPhase!=='idle',
       aimPoint:this.aimPoint && {...this.aimPoint},hull:this.hull,defeated:this.defeated,
+      nearMissAge:this.nearMissAge,nearMisses:this.nearMisses,nearMiss:this.nearMiss && {...this.nearMiss,offset:{...this.nearMiss.offset}},
       shots:this.shots,hits:this.hits,bolts:this.bolts.map(b=>({...b,position:{...b.position},direction:{...b.direction}}))};
   }
 }
