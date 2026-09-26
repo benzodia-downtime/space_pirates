@@ -11,7 +11,7 @@
     />
     <title>Space Pirates</title>
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./voyage.css?v=enemyorbit-1" />
+    <link rel="stylesheet" href="./voyage.css?v=chase-1" />
     <link rel="stylesheet" href="./battle.css?v=extraction-1" />
   </head>
   <body>
@@ -20,7 +20,7 @@
     <main
       id="space-scene"
       class="space-scene"
-      aria-label="노틸러스 조종석에서 전면 창밖의 깊은 우주를 항해하는 화면"
+      aria-label="노틸러스 함선 뒤에서 바라보는 3인칭 우주 항해 화면"
     >
       <canvas id="starfield" aria-hidden="true"></canvas>
       <section id="renderer-error" class="renderer-error" role="alert" hidden>
@@ -42,23 +42,11 @@
       <div id="stars-near" class="stars stars--near" aria-hidden="true"></div>
 
       <div id="cockpit-shell" class="cockpit-shell" aria-hidden="true">
-        <div class="cockpit-shell__glass">
-          <span class="cockpit-shell__reflection cockpit-shell__reflection--left"></span>
-          <span class="cockpit-shell__reflection cockpit-shell__reflection--right"></span>
-        </div>
-
-        <div class="cockpit-shell__canopy">
-          <span class="cockpit-shell__beam cockpit-shell__beam--top"></span>
-          <span class="cockpit-shell__beam cockpit-shell__beam--left"></span>
-          <span class="cockpit-shell__beam cockpit-shell__beam--right"></span>
-        </div>
-
         <div class="cockpit-reticle">
           <span></span>
           <i></i>
         </div>
 
-        <div class="cockpit-console"></div>
       </div>
       <div class="impact-flash" aria-hidden="true"></div>
       <div class="damage-vignette" aria-hidden="true"></div>
@@ -202,6 +190,6 @@
       <div id="battle-graphics-error" class="battle-overlay" role="alert" hidden><div class="battle-modal"><h2>3D 화면 연결 중단</h2><p>그래픽 복구 후 계속하기를 누르거나 휴대 물자를 포기하고 조종석에서 부활하세요.</p><button id="battle-error-exit" type="button">휴대 물자 포기 · 조종석 부활</button></div></div>
     </section>
 
-    <script type="module" src="./src/main.js?v=engagement-1"></script>
+    <script type="module" src="./src/main.js?v=chase-1"></script>
   </body>
 </html>

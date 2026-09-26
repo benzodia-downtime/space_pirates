@@ -1,11 +1,12 @@
 import * as THREE from "../vendor/three.module.js";
 import { GUN_MOUNTS } from "./enemy-defense.js?v=engagement-1";
 import { SIEGE } from "./player-cannon.js?v=engagement-1";
+import { flightCameraFrame } from "./flight-camera.js?v=chase-1";
 
 const smoothstep = THREE.MathUtils.smoothstep;
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
-// One unit is one metre. The defending hull, orbiting cockpit, harpoon and
+// One unit is one metre. The defending hull, player ship, harpoon and
 // destructible stern ramp all share the same world coordinates.
 export class VoyageRenderer {
   constructor(canvas) {
@@ -75,6 +76,7 @@ export class VoyageRenderer {
     this.makeStars();
     this.available = true;
     document.getElementById("space-scene")?.setAttribute("data-renderer", "webgl");
+    document.getElementById("space-scene")?.setAttribute("data-view", "third-person");
     this.onContextLost = (event) => {
       event.preventDefault();
       this.available = false;
@@ -418,9 +420,9 @@ export class VoyageRenderer {
       const jet=this.mesh(this.enemy,jetGeometry,m.cyan,[side*17.8,1,z]);
       jet.rotation.z=-side*Math.PI/2; jet.userData.torque=Math.sign(side*z); this.turnJets.push(jet);
     }
-    // Four physical lamps on the foredeck show hull condition without another HUD panel.
-    this.box(this.player,m.dark,[0,-2.02,-13.3],[3.4,.2,.7]);
-    this.hullLamps=Array.from({length:4},(_,i)=>this.box(this.player,m.cyan,[(i-1.5)*.75,-1.87,-13.2],[.5,.1,.45]));
+    // Four aft dorsal lamps remain readable from the chase camera.
+    this.box(this.playerHull,m.dark,[0,1.55,4],[3.4,.2,.7]);
+    this.hullLamps=Array.from({length:4},(_,i)=>this.box(this.playerHull,m.cyan,[(i-1.5)*.75,1.7,4],[.5,.12,.45]));
   }
 
   drawDefense(defense, nav, motion) {
@@ -484,8 +486,11 @@ export class VoyageRenderer {
     const trail=this.keep(new THREE.MeshBasicMaterial({color:0xff7733,transparent:true,opacity:.2,depthWrite:false,blending:THREE.AdditiveBlending}));
     this.boltTrails=Array.from({length:18},()=>this.mesh(this.scene,this.cylinderGeometry,trail));
     this.boltHeads=Array.from({length:18},()=>glow(this.scene,0xffb65a));
-    this.passGlints=[glow(this.camera,0xff9b48),glow(this.camera,0xff9b48)];
-    this.passLight=new THREE.PointLight(0xffa256,0,28,2);this.camera.add(this.passLight);
+    this.passGlints=[glow(this.player,0xff9b48),glow(this.player,0xff9b48)];
+    this.passLight=new THREE.PointLight(0xffa256,0,28,2);this.player.add(this.passLight);
+    this.playerEngineHalos=this.playerEngines.map(({x})=>{
+      const halo=glow(this.playerHull,0x79deff);halo.position.set(x,-1.1,12.2);halo.scale.setScalar(4.5);return halo;
+    });
     const scarMaterial=this.keep(new THREE.MeshBasicMaterial({color:0x100e0b,transparent:true,opacity:.85,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));
     const scarGeometry=this.keep(new THREE.CircleGeometry(1,9));
     this.hullScars=Array.from({length:24},()=>this.mesh(this.enemy,scarGeometry,scarMaterial));
@@ -508,18 +513,29 @@ export class VoyageRenderer {
       this.barBetween(mesh,head.clone().addScaledVector(direction,-26),head,.95,true);
       halo.position.copy(head);halo.scale.setScalar(4.5);
     });
-    // Light sweeps across the real canopy only after an actual narrowly missed
-    // volley. Camera orientation, field of view and the crosshair never move.
+    // A near miss illuminates the appropriate flank of the visible ship, not a
+    // nonexistent cockpit window. It never moves the camera or changes aim.
     const pass=defense?.nearMiss;
     const glow=motion && pass && defense.nearMissAge>=0?Math.max(0,1-defense.nearMissAge/.42)*( .35+pass.strength*.65):0;
-    const local=pass?new THREE.Vector3(pass.offset.x,pass.offset.y,pass.offset.z).applyQuaternion(this.camera.quaternion.clone().invert()):new THREE.Vector3();
+    const local=pass?new THREE.Vector3(pass.offset.x,pass.offset.y,pass.offset.z).applyQuaternion(this.player.quaternion.clone().invert()):new THREE.Vector3();
     this.passGlints.forEach((sprite,i)=>{
       sprite.visible=glow>0;
-      const halfHeight=Math.tan(this.camera.fov*Math.PI/360)*2.4;
-      sprite.position.set(Math.sign(local.x||1)*halfHeight*this.camera.aspect*.8,(i?-.35:.35)*halfHeight,-2.4);
-      sprite.scale.set(.6,1.8,1);sprite.material.opacity=glow*.45;
+      sprite.position.set(Math.sign(local.x||1)*7.5,1,i?5:-5);
+      sprite.scale.set(7,7,1);sprite.material.opacity=glow*.55;
     });
-    this.passLight.position.set(Math.sign(local.x||1)*3,0,-3);this.passLight.intensity=glow*24;
+    this.passLight.position.set(Math.sign(local.x||1)*8,2,0);this.passLight.intensity=glow*55;
+    const input=this.lastFrame.movement||{x:0,z:0};
+    const drive=nav.anchor?0:Math.min(1,Math.max(0,input.z)+Number(nav.orbiting)*.55);
+    const boost=nav.dodgeTime>0?1:0;
+    this.playerEngines.forEach(({plume},i)=>{
+      const thrust=.18+drive*.7+boost*.8;
+      plume.scale.y=thrust;plume.position.z=12+4*thrust;
+      this.playerEngineHalos[i].material.opacity=.35+drive*.4+boost*.25;
+    });
+    this.playerManeuverJets.forEach(jet=>{
+      jet.visible=!nav.anchor && (jet.userData.reverse?input.z<-.1:Math.sign(input.x)===jet.userData.side && Math.abs(input.x)>.1);
+    });
+    this.playerHull.rotation.z=motion && !nav.anchor?-input.x*.12:0;
     this.hullScars.forEach((mesh,i)=>{
       const scar=cannon?.scars[i];
       // Rear plate marks leave with the discarded plate; hull burns remain.
@@ -554,15 +570,39 @@ export class VoyageRenderer {
   makePlayer() {
     const m = this.materials;
     this.player = new THREE.Group();
-    this.camera.add(this.player);
-    // Visible foredeck is part of our vessel; the view never switches to an exterior camera.
-    this.box(this.player, m.hull, [0, -3.8, -8], [13, 1.5, 17]);
-    this.box(this.player, m.dark, [0, -2.7, -5], [5.8, 0.55, 11]);
-    this.box(this.player, m.panel, [0, -2.4, -14], [6.2, 0.7, 3]);
-    this.box(this.player, m.trim, [0, -2.03, -13.9], [6, 0.08, 0.4]);
-    for (const x of [-5.5, 5.5]) {
-      this.box(this.player, m.panel, [x, -2.5, -9], [1.3, 1.4, 10]);
-      this.box(this.player, m.cyan, [x, -1.76, -9], [0.14, 0.1, 8]);
+    this.player.name='nautilus-exterior';this.scene.add(this.player);
+    this.playerHull=new THREE.Group();this.player.add(this.playerHull);
+    const paint=this.material(0x93a7ac),stripe=this.material(0xdf7b34),glass=this.material(0x163d53);
+    const outline=new THREE.Shape();
+    [[0,-16],[3.6,-12],[4.8,-1],[8,5],[7,10],[3.3,8],[0,9],[-3.3,8],[-7,10],[-8,5],[-4.8,-1],[-3.6,-12]].forEach(([x,z],i)=>i?outline.lineTo(x,z):outline.moveTo(x,z));
+    outline.closePath();
+    const hull=this.keep(new THREE.ExtrudeGeometry(outline,{depth:3,steps:1,bevelEnabled:true,bevelSegments:1,bevelSize:.35,bevelThickness:.3,curveSegments:1}));
+    hull.rotateX(Math.PI/2);hull.translate(0,-1,0);this.mesh(this.playerHull,hull,paint);
+    this.box(this.playerHull,m.hull,[0,.5,-2],[5.2,3,8]);
+    this.box(this.playerHull,glass,[0,1.4,-6.05],[4.4,1.5,.16]);
+    this.box(this.playerHull,glass,[0,2.05,-2],[4.4,.16,6]);
+    this.box(this.playerHull,stripe,[0,-.55,-10],[.65,.3,8]);
+    this.box(this.playerHull,m.dark,[0,-1.5,5],[6,5,5]);
+    this.box(this.playerHull,paint,[0,1.1,5],[5.5,.6,4.5]);
+    this.label(this.playerHull,'NAUTILUS',[0,-.2,7.58],4,'#b1e8ed');
+    const exhaust=this.keep(new THREE.MeshBasicMaterial({color:0x68d9ff,transparent:true,opacity:.42,depthWrite:false,blending:THREE.AdditiveBlending}));
+    const jetGeometry=this.keep(new THREE.ConeGeometry(1.1,8,8));
+    this.playerEngines=[];this.playerManeuverJets=[];
+    for(const side of [-1,1]) {
+      const x=side*6.3;
+      const nacelle=this.mesh(this.playerHull,this.cylinderGeometry,m.hull,[x,-1.1,5],[1.6,12,1.6]);nacelle.rotation.x=Math.PI/2;
+      const ring=this.mesh(this.playerHull,this.cylinderGeometry,stripe,[x,-1.1,11],[1.8,.7,1.8]);ring.rotation.x=Math.PI/2;
+      const core=this.mesh(this.playerHull,this.cylinderGeometry,m.cyan,[x,-1.1,11.5],[1.1,.2,1.1]);core.rotation.x=Math.PI/2;
+      const plume=this.mesh(this.playerHull,jetGeometry,exhaust,[x,-1.1,16]);plume.rotation.x=Math.PI/2;
+      this.playerEngines.push({x,plume});
+      this.box(this.playerHull,stripe,[side*6,-.5,1],[.4,.4,8]);
+      this.box(this.playerHull,m.panel,[side*6.4,1.7,8],[.35,4.5,3.3]);
+      for(const z of [-4,1,6])this.box(this.playerHull,m.dark,[side*3.8,-.55,z],[1.1,.2,1.2]);
+      this.box(this.playerHull,m.cyan,[side*7.6,-.6,5],[.15,.2,1.6]);
+      const lateral=this.mesh(this.playerHull,jetGeometry,exhaust,[-side*8,-1,3],[.25,.35,.25]);
+      lateral.rotation.z=side*Math.PI/2;lateral.userData.side=side;this.playerManeuverJets.push(lateral);
+      const reverse=this.mesh(this.playerHull,jetGeometry,exhaust,[side*4.2,-1,-11],[.2,.3,.2]);
+      reverse.rotation.x=-Math.PI/2;reverse.userData.reverse=true;this.playerManeuverJets.push(reverse);
     }
     this.launcher = this.box(this.player, m.dark, [-4.5, -1.5, -12], [0.6, 0.6, 4]);
     this.harpoonCable = this.mesh(this.scene, this.cylinderGeometry, m.trim);
@@ -571,10 +611,6 @@ export class VoyageRenderer {
     // The breach is on the lower forward deck, below the raised cockpit.
     this.playerHatch.position.set(0, -4, -14);
     this.player.add(this.playerHatch);
-    this.canopy = new THREE.Group();
-    this.camera.add(this.canopy);
-    this.canopyBeams = Array.from({ length: 3 }, () => this.box(this.canopy, m.dark));
-    this.canopyLights = Array.from({ length: 2 }, () => this.box(this.canopy, m.trim));
   }
 
   makeRig() {
@@ -669,23 +705,9 @@ export class VoyageRenderer {
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
     this.camera.fov = width < height ? 74 : 58;
-    // Optical centre and HUD reticle agree, leaving room for the lower console.
+    // Fixed reticle above the visible ship, clear of the bottom control rows.
     this.camera.setViewOffset(width, height, 0, height * 0.1, width, height);
     this.camera.updateProjectionMatrix();
-    const halfHeight = 2.6 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-    const halfWidth = halfHeight * width / height;
-    const top = halfHeight * 0.77;
-    const bottom = -halfHeight * 1.28;
-    this.barBetween(this.canopyBeams[0], new THREE.Vector3(-halfWidth, top, -2.6), new THREE.Vector3(halfWidth, top, -2.6), 0.13);
-    for (let i = 0; i < 2; i++) {
-      const side = i === 0 ? -1 : 1;
-      const start = new THREE.Vector3(halfWidth * 0.87 * side, top, -2.6);
-      const end = new THREE.Vector3(halfWidth * 1.04 * side, bottom, -2.6);
-      this.barBetween(this.canopyBeams[i + 1], start, end, 0.13);
-      start.z += 0.08;
-      end.z += 0.08;
-      this.barBetween(this.canopyLights[i], start, end, 0.018);
-    }
   }
 
   barBetween(mesh, start, end, thickness, cylindrical = false) {
@@ -709,11 +731,11 @@ export class VoyageRenderer {
     const chargeMotion = motion && a.stage === "charge" ? a.charge : 0;
     const nav = frame.navigation;
     const origin = nav?.placed ? nav.position : { x: 0, y: 0, z: 6 };
-    this.camera.position.set(origin.x + Math.sin(a.impactAge*71)*shock*0.06, origin.y + Math.sin(a.impactAge*53)*shock*0.1, origin.z + shock*0.48 - chargeMotion*0.2);
-    this.camera.rotation.set(-steering.y*0.312 + Math.sin(a.impactAge*49)*shock*0.016, -steering.x*0.442, Math.sin(a.impactAge*63)*shock*0.012);
-    // The docking cradle settles the lower deck onto the ram axis after impact.
-    // Keep the puncture fixed in world space while the upper helm seats above it.
-    this.camera.position.add(new THREE.Vector3(0,4*a.breach,0).applyEuler(this.camera.rotation));
+    const view={yaw:steering.x*.442,pitch:steering.y*.312};
+    const pose=flightCameraFrame(nav||{position:origin},view,{portrait:this.width<this.height,compact:this.height<500,dock:Math.max(a.ram,a.breach),breach:a.breach});
+    this.player.position.copy(pose.ship);this.player.rotation.set(-view.pitch,-view.yaw,0,'YXZ');
+    this.aimPoint=new THREE.Vector3(pose.target.x,pose.target.y,pose.target.z);
+    this.camera.position.copy(pose.position);this.camera.up.copy(pose.up);this.camera.lookAt(this.aimPoint);
     const range = distance;
     if (nav?.placed) {
       this.enemy.position.set(nav.enemyPosition.x, nav.enemyPosition.y, nav.enemyPosition.z);
@@ -821,6 +843,9 @@ export class VoyageRenderer {
     if (!this.renderer || !this.lastFrame) return { type: "unavailable", available: false };
     return {
       type: "webgl2", available: this.available, units: "metres", shipVisible: this.enemy.visible,
+      view:'third-person',playerPosition:this.player.position.toArray(),playerRotation:this.player.rotation.toArray().slice(0,3),
+      playerScreen:this.project(this.player.position),aimScreen:this.project(this.aimPoint),aimPoint:this.aimPoint.toArray(),
+      playerBounds:this.playerScreenBounds(),playerBank:this.playerHull.rotation.z,
       triangles: this.renderer.info.render.triangles, drawCalls: this.renderer.info.render.calls,
       pixelRatio: this.renderer.getPixelRatio(), cameraPosition: this.camera.position.toArray(),
       farClipMetres: this.camera.far,
@@ -848,6 +873,15 @@ export class VoyageRenderer {
       bridgeEnd: this.collar.position.toArray(), bridgeVisible: this.bridge.visible,
       bridgeUp: new THREE.Vector3(0, 1, 0).applyQuaternion(this.bridge.quaternion).toArray(),
     };
+  }
+
+  playerScreenBounds() {
+    this.playerHull.updateWorldMatrix(true,false);
+    const points=[];
+    for(const x of [-8.4,8.4])for(const y of [-4.4,4])for(const z of [-16.4,13]) {
+      points.push(this.project(new THREE.Vector3(x,y,z).applyMatrix4(this.playerHull.matrixWorld)));
+    }
+    return {left:Math.min(...points.map(p=>p.x)),right:Math.max(...points.map(p=>p.x)),top:Math.min(...points.map(p=>p.y)),bottom:Math.max(...points.map(p=>p.y))};
   }
 
   dispose() {

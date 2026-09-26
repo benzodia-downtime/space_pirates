@@ -399,6 +399,7 @@
 
 
 .space-scene[data-renderer="webgl"] .cockpit-shell__canopy { display: none; }
+.space-scene[data-view="third-person"] .cockpit-shell { transform: none; will-change: auto; }
 .cockpit-reticle { opacity: .65; }
 .renderer-error { position: absolute; z-index: 80; inset: 0; display: grid; place-items: center; padding: 24px; color: #e3f6ff; background: rgba(2, 7, 16, .96); }
 .renderer-error > div { max-width: 400px; line-height: 1.7; }

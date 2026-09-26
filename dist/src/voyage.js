@@ -1,4 +1,4 @@
-import { VoyageRenderer } from "./voyage-renderer.js?v=engagement-1";
+import { VoyageRenderer } from "./voyage-renderer.js?v=chase-1";
 import { AssaultSequence, ASSAULT_COPY } from "./assault.js?v=extraction-1";
 import { AssaultAudio } from "./assault-audio.js?v=engagement-1";
 import { EnemyDefense } from "./enemy-defense.js?v=engagement-1";
@@ -844,6 +844,7 @@ export class VoyageScene {
       travel: this.starTravel, assault: this.assault,
       defense: this.enemyDefense,
       cannon: this.cannon,
+      movement:this.getMovement(),
     });
     if (this.radar) {
       const dx = actualRelativeX * 64, dy = -4 + actualRelativeY * 58;

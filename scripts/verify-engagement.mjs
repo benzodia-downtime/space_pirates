@@ -41,12 +41,13 @@ try {
       await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+50,y:p.y}]});await step(20);
       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await cdp.detach();
     } else {await page.keyboard.down('d');await step(20);await page.keyboard.up('d');}
-    const camera=(await read()).rendering.cameraRotation;
+    const heading=(await read()).steering;
     await page.evaluate(()=>{const s=engagementQA;for(let i=0;i<100 && !s.enemyDefense.shots;i++)s.update(.02);for(let i=0;i<12;i++)s.update(.02);s.renderStill();});
     assert.ok((await read()).rendering.engagement.boltTrails>0);await snap('incoming');
     await page.evaluate(()=>{const s=engagementQA;for(let i=0;i<200 && !s.enemyDefense.nearMisses;i++)s.update(.02);s.renderStill();});
     state=await read();assert.equal(state.enemyDefense.nearMisses,1);assert.equal(state.enemyDefense.hull,100);
-    assert.equal(state.rendering.engagement.nearMissGlow,true);assert.deepEqual(state.rendering.cameraRotation,camera);
+    assert.equal(state.rendering.engagement.nearMissGlow,true);assert.deepEqual(state.steering,heading);
+    assert.ok(Math.abs(state.rendering.aimScreen.x-50)<.001 && Math.abs(state.rendering.aimScreen.y-40)<.001);
     await snap('near-miss');
     await page.evaluate(()=>engagementQA.pause());state=await read();await step(50);
     assert.deepEqual((await read()).enemyDefense,state.enemyDefense,'Pause freezes effects and rounds');
